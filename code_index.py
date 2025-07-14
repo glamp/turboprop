@@ -46,10 +46,11 @@ from tqdm import tqdm
 
 # Import our custom embedding helper
 from embedding_helper import EmbeddingGenerator
+from database_manager import DatabaseManager
 
-# Global locks for database operations to prevent concurrent access issues
-_db_init_lock = threading.Lock()
-_db_write_lock = threading.Lock()
+# Global database manager instance
+_db_manager = None
+_db_manager_lock = threading.Lock()
 
 def get_version():
     """Get the version of turboprop."""
@@ -57,7 +58,7 @@ def get_version():
         from turboprop._version import __version__
         return __version__
     except ImportError:
-        return "0.1.6"
+        return "0.2.0"
 
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
@@ -96,59 +97,41 @@ def compute_id(text: str) -> str:
 
 def init_db(repo_path: Path = None):
     """
-    Initialize the DuckDB database and create the code_files table if it doesn't exist.
-
-    The table schema includes:
-    - id: VARCHAR PRIMARY KEY - unique hash of file path + content
-    - path: VARCHAR - absolute path to the file
-    - content: TEXT - full text content of the file
-    - embedding: FLOAT[768] - vector embedding for similarity search
+    Initialize or get the database manager instance.
 
     Args:
         repo_path: Path to the repository where the database should be stored.
                   If None, uses current directory (for backward compatibility)
 
     Returns:
-        DuckDB connection object ready for use
+        DatabaseManager instance
     """
-    # Use global lock to prevent concurrent table creation
-    with _db_init_lock:
-        # Create database in the repository directory or current directory
-        if repo_path is None:
-            db_path = Path(DB_PATH)
-        else:
-            # Create .turboprop directory if it doesn't exist
-            turboprop_dir = repo_path / ".turboprop"
-            turboprop_dir.mkdir(exist_ok=True)
-            db_path = turboprop_dir / "code_index.duckdb"
-        
-        con = duckdb.connect(str(db_path))
-        
-        # Retry logic for table creation to handle concurrent access
-        max_retries = 3
-        retry_delay = 0.1  # 100ms
-        
-        for attempt in range(max_retries):
-            try:
-                con.execute(f"""
-                  CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+    global _db_manager
+    
+    with _db_manager_lock:
+        if _db_manager is None:
+            # Create database in the repository directory or current directory
+            if repo_path is None:
+                db_path = Path(DB_PATH)
+            else:
+                # Create .turboprop directory if it doesn't exist
+                turboprop_dir = repo_path / ".turboprop"
+                turboprop_dir.mkdir(exist_ok=True)
+                db_path = turboprop_dir / "code_index.duckdb"
+            
+            _db_manager = DatabaseManager(db_path)
+            
+            # Initialize table schema
+            _db_manager.execute_with_retry(f"""
+                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     id VARCHAR PRIMARY KEY,
                     path VARCHAR,
                     content TEXT,
                     embedding DOUBLE[{DIMENSIONS}]
-                  )
-                """)
-                break  # Success, exit retry loop
-            except Exception as e:
-                if "write-write conflict" in str(e) and attempt < max_retries - 1:
-                    # Wait a bit and retry
-                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
-                    continue
-                else:
-                    # Re-raise if it's not a write-write conflict or we've exhausted retries
-                    raise e
+                )
+            """)
         
-        return con
+        return _db_manager
 
 
 def scan_repo(repo_path: Path, max_bytes: int):
@@ -221,7 +204,7 @@ def scan_repo(repo_path: Path, max_bytes: int):
     return files
 
 
-def get_existing_file_hashes(con):
+def get_existing_file_hashes(db_manager):
     """
     Retrieve existing file hashes from the database for smart re-indexing.
     
@@ -229,7 +212,7 @@ def get_existing_file_hashes(con):
         Dict mapping file paths to their content hashes
     """
     try:
-        result = con.execute(f"SELECT path, id FROM {TABLE_NAME}").fetchall()
+        result = db_manager.execute_with_retry(f"SELECT path, id FROM {TABLE_NAME}")
         return {path: hash_id for path, hash_id in result}
     except Exception:
         return {}
@@ -265,13 +248,13 @@ def filter_changed_files(files, existing_hashes):
 
 
 
-def embed_and_store(con, embedder, files, max_workers=None, progress_callback=None):
+def embed_and_store(db_manager, embedder, files, max_workers=None, progress_callback=None):
     """
     Process a list of files by generating embeddings and storing them in the database.
     Uses sequential processing for reliability.
 
     Args:
-        con: DuckDB database connection
+        db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance for generating embeddings
         files: List of Path objects to process
         max_workers: Number of parallel workers (ignored - always sequential)
@@ -309,15 +292,12 @@ def embed_and_store(con, embedder, files, max_workers=None, progress_callback=No
     
     # Insert all rows in a single batch operation for better performance
     if rows:
-        with _db_write_lock:
-            con.executemany(
-                f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
-                rows
-            )
+        operations = [(f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)", row) for row in rows]
+        db_manager.execute_transaction(operations)
         print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
 
-def build_full_index(con):
+def build_full_index(db_manager):
     """
     Verify that the database contains embeddings for search operations.
 
@@ -325,18 +305,18 @@ def build_full_index(con):
     This function just validates that embeddings exist in the database.
 
     Args:
-        con: DuckDB database connection
+        db_manager: DatabaseManager instance
 
     Returns:
         Number of embeddings in the database, or 0 if none found
     """
     # Check if we have any embeddings in the database
-    result = con.execute(
-        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL").fetchone()
-    return result[0] if result else 0
+    result = db_manager.execute_with_retry(
+        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
+    return result[0][0] if result and result[0] else 0
 
 
-def search_index(con, embedder, query: str, k: int):
+def search_index(db_manager, embedder, query: str, k: int):
     """
     Search the code index for files semantically similar to the given query.
 
@@ -346,7 +326,7 @@ def search_index(con, embedder, query: str, k: int):
     3. Returns the top k most similar files with their similarity scores
 
     Args:
-        con: DuckDB database connection
+        db_manager: DatabaseManager instance
         embedder: SentenceTransformer model for generating query embedding
         query: Text query to search for (e.g., "function to parse JSON")
         k: Number of top results to return
@@ -361,22 +341,23 @@ def search_index(con, embedder, query: str, k: int):
     # Use DuckDB's array operations for cosine similarity search
     # Cosine similarity = dot(a,b) / (norm(a) * norm(b))
     # Cosine distance = 1 - cosine similarity
-    results = con.execute(f"""
-        SELECT 
-            path,
-            substr(content, 1, 300) as snippet,
-            1 - (list_dot_product(embedding, $1) / 
-                (sqrt(list_dot_product(embedding, embedding)) * sqrt(list_dot_product($1, $1)))) as distance
-        FROM {TABLE_NAME}
-        WHERE embedding IS NOT NULL
-        ORDER BY distance ASC
-        LIMIT {k}
-    """, [q_emb]).fetchall()
+    with db_manager.get_connection() as con:
+        results = con.execute(f"""
+            SELECT 
+                path,
+                substr(content, 1, 300) as snippet,
+                1 - (list_dot_product(embedding, $1) / 
+                    (sqrt(list_dot_product(embedding, embedding)) * sqrt(list_dot_product($1, $1)))) as distance
+            FROM {TABLE_NAME}
+            WHERE embedding IS NOT NULL
+            ORDER BY distance ASC
+            LIMIT {k}
+        """, [q_emb]).fetchall()
 
     return results
 
 
-def embed_and_store_single(con, embedder, path: Path):
+def embed_and_store_single(db_manager, embedder, path: Path):
     """
     Process a single file for embedding and storage (used for incremental updates).
 
@@ -384,7 +365,7 @@ def embed_and_store_single(con, embedder, path: Path):
     suitable for real-time updates when files change during watch mode.
 
     Args:
-        con: DuckDB database connection
+        db_manager: DatabaseManager instance
         embedder: SentenceTransformer model for generating embeddings
         path: Path to the single file to process
 
@@ -402,16 +383,12 @@ def embed_and_store_single(con, embedder, path: Path):
     uid = compute_id(str(path) + text)
     emb = embedder.encode(text)
 
-    # Use write lock for database operations
-    with _db_write_lock:
-        # First, delete any existing records for this path (handles content changes)
-        con.execute(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),))
-        
-        # Store in database
-        con.execute(
-            f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
-            (uid, str(path), text, emb.tolist())
-        )
+    # Use transaction for database operations
+    operations = [
+        (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),)),
+        (f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)", (uid, str(path), text, emb.tolist()))
+    ]
+    db_manager.execute_transaction(operations)
 
     # Return the ID and embedding for immediate index update
     return uid, emb
@@ -439,20 +416,20 @@ class DebouncedHandler(FileSystemEventHandler):
     4. This ensures we only process the "final" version of rapid changes
     """
 
-    def __init__(self, repo: Path, max_bytes: int, con, embedder, debounce_sec: float):
+    def __init__(self, repo: Path, max_bytes: int, db_manager, embedder, debounce_sec: float):
         """
         Initialize the debounced file handler.
 
         Args:
             repo: Path to the repository being watched
             max_bytes: Maximum file size to process
-            con: DuckDB database connection
+            db_manager: DatabaseManager instance
             embedder: SentenceTransformer model for embeddings
             debounce_sec: Seconds to wait before processing file changes
         """
         self.repo = repo
         self.max_bytes = max_bytes
-        self.con = con
+        self.db_manager = db_manager
         self.embedder = embedder
         self.debounce = debounce_sec
         # Track active timers for each file to implement debouncing
@@ -503,7 +480,7 @@ class DebouncedHandler(FileSystemEventHandler):
                 # Only process files under the size limit
                 if p.stat().st_size <= self.max_bytes:
                     # Update database with new file content and embedding
-                    res = embed_and_store_single(self.con, self.embedder, p)
+                    res = embed_and_store_single(self.db_manager, self.embedder, p)
                     if res:
                         uid, emb = res
                         # With DuckDB, no separate index update needed
@@ -513,9 +490,8 @@ class DebouncedHandler(FileSystemEventHandler):
                 pass
         elif ev_type == "deleted":
             # Remove deleted file from database
-            with _db_write_lock:
-                self.con.execute(
-                    f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
+            self.db_manager.execute_with_retry(
+                f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
             print(f"[debounce] {p} deleted from database")
 
 
@@ -543,7 +519,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
     max_bytes = int(max_mb * 1024**2)
 
     # Initialize database and ML model
-    con = init_db(repo)
+    db_manager = init_db(repo)
     
     try:
         embedder = EmbeddingGenerator(EMBED_MODEL)
@@ -553,12 +529,12 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
         raise e
 
     # Verify database has embeddings
-    embedding_count = build_full_index(con)
+    embedding_count = build_full_index(db_manager)
     print(f"[watch] found {embedding_count} embeddings in database")
 
     # Set up the debounced file handler
     handler = DebouncedHandler(
-        repo, max_bytes, con, embedder, debounce_sec)
+        repo, max_bytes, db_manager, embedder, debounce_sec)
 
     # Create and configure the file system observer
     observer = Observer()
@@ -575,10 +551,13 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
     except KeyboardInterrupt:
         # Clean shutdown on Ctrl+C
         observer.stop()
-    observer.join()
+    finally:
+        observer.join()
+        # Clean up database connections
+        db_manager.cleanup()
 
 
-def reindex_all(repo_path: Path, max_bytes: int, con, embedder, max_workers=None, force_all=False):
+def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_workers=None, force_all=False):
     """
     Intelligently reindex a repository by only processing changed files.
 
@@ -591,7 +570,7 @@ def reindex_all(repo_path: Path, max_bytes: int, con, embedder, max_workers=None
     Args:
         repo_path: Path to the repository root directory
         max_bytes: Maximum file size in bytes to process
-        con: DuckDB database connection
+        db_manager: DatabaseManager instance
         embedder: SentenceTransformer model for generating embeddings
         max_workers: Number of parallel workers (default: CPU count)
         force_all: If True, reprocess all files regardless of changes
@@ -612,7 +591,7 @@ def reindex_all(repo_path: Path, max_bytes: int, con, embedder, max_workers=None
     files_to_process = files
     if not force_all:
         print("🧠 Checking for changed files...")
-        existing_hashes = get_existing_file_hashes(con)
+        existing_hashes = get_existing_file_hashes(db_manager)
         files_to_process = filter_changed_files(files, existing_hashes)
         
         if not files_to_process:
@@ -622,10 +601,10 @@ def reindex_all(repo_path: Path, max_bytes: int, con, embedder, max_workers=None
         print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
     
     # Generate embeddings and store them in the database
-    embed_and_store(con, embedder, files_to_process, max_workers)
+    embed_and_store(db_manager, embedder, files_to_process, max_workers)
     
     # Build the search index from all stored embeddings
-    build_full_index(con)
+    build_full_index(db_manager)
     
     elapsed = time.time() - start_time
     return len(files), len(files_to_process), elapsed
@@ -924,13 +903,13 @@ Examples:
             print("🔄 Force mode: reprocessing all files")
 
         repo_path = Path(args.repo).resolve()
-        con = init_db(repo_path)
+        db_manager = init_db(repo_path)
 
         # Use new smart reindex function
         total_files, processed_files, elapsed = reindex_all(
             repo_path, 
             int(args.max_mb * 1024**2), 
-            con, 
+            db_manager, 
             embedder,
             args.workers,
             args.force_all
@@ -948,10 +927,13 @@ Examples:
         if processed_files > 0:
             print(f"⚡ Processing rate: {processed_files/elapsed:.1f} files/second")
         
-        embedding_count = build_full_index(con)
+        embedding_count = build_full_index(db_manager)
         print(f"💾 Database saved to: {repo_path / '.turboprop' / 'code_index.duckdb'}")
         print(f"🔍 Total embeddings in index: {embedding_count}")
         print("\n💡 Try searching: turboprop search \"your query here\"")
+        
+        # Clean up database connections
+        db_manager.cleanup()
 
     elif args.cmd == "search":
         # Search the existing index
@@ -959,14 +941,17 @@ Examples:
         print(f"📊 Returning top {args.k} results...")
 
         repo_path = Path(args.repo).resolve()
-        con = init_db(repo_path)
+        db_manager = init_db(repo_path)
 
         try:
-            results = search_index(con, embedder, args.query, args.k)
+            results = search_index(db_manager, embedder, args.query, args.k)
         except Exception as e:
             print(f"❌ Search failed: {e}")
             print("💡 Make sure you've built an index first: turboprop index <repo>")
             return
+        finally:
+            # Clean up database connections
+            db_manager.cleanup()
 
         if not results:
             print("❌ No results found.")

@@ -34,7 +34,7 @@ from pydantic import BaseModel
 # Import our core indexing functionality
 # Note: reindex_all is referenced but may need to be implemented
 from code_index import init_db, search_index, reindex_all, watch_mode, TABLE_NAME, EMBED_MODEL, DIMENSIONS
-from sentence_transformers import SentenceTransformer
+from embedding_helper import EmbeddingGenerator
 
 # Initialize FastAPI application with metadata
 app = FastAPI(
@@ -46,18 +46,13 @@ app = FastAPI(
 # Initialize shared resources that persist across requests
 # These are created once when the server starts
 current_dir = Path(".").resolve()  # Use current working directory as repo path
-con = init_db(current_dir)  # Database connection
+db_manager = init_db(current_dir)  # Database manager
 # Initialize ML model with MPS compatibility handling
 try:
-    embedder = SentenceTransformer(EMBED_MODEL)  # ML model for embeddings
+    embedder = EmbeddingGenerator(EMBED_MODEL)  # ML model for embeddings
 except Exception as e:
-    # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
-    if "meta tensor" in str(e) or "to_empty" in str(e):
-        print("🔧 Detected MPS compatibility issue, falling back to CPU...")
-        import torch
-        embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
-    else:
-        raise e
+    print(f"❌ Failed to initialize embedding generator: {e}")
+    raise e
 
 
 # Pydantic models for request/response validation and documentation
@@ -133,10 +128,12 @@ def http_index(req: IndexRequest):
     max_bytes = int(req.max_mb * 1024**2)
 
     # Trigger full reindexing of the specified repository
-    total_files, processed_files, elapsed = reindex_all(Path(req.repo), max_bytes, con, embedder)
+    total_files, processed_files, elapsed = reindex_all(
+        Path(req.repo), max_bytes, db_manager, embedder)
 
     # Count total files in database to report back to user
-    count = con.execute(f"SELECT count(*) FROM {TABLE_NAME}").fetchone()[0]
+    count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+    count = count_result[0][0] if count_result and count_result[0] else 0
 
     return {"status": "indexed", "files": count}
 
@@ -178,7 +175,7 @@ def http_search(query: str, k: int = 5):
         ]
     """
     # Perform semantic search using the core search function
-    results = search_index(con, embedder, query, k)
+    results = search_index(db_manager, embedder, query, k)
 
     # Convert results to the standardized response format
     # The list comprehension transforms tuples to structured objects
@@ -219,11 +216,11 @@ def http_status():
         }
     """
     # Get file count from database
-    file_count = con.execute(
-        f"SELECT count(*) FROM {TABLE_NAME}").fetchone()[0]
+    count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+    file_count = count_result[0][0] if count_result and count_result[0] else 0
 
     # Check if database file exists and get its size
-    db_path = current_dir / "code_index.duckdb"
+    db_path = current_dir / ".turboprop" / "code_index.duckdb"
     db_size_mb = 0
     if db_path.exists():
         db_size_mb = db_path.stat().st_size / (1024 * 1024)
@@ -283,3 +280,13 @@ def _startup_watch():
     )
     watcher_thread.start()
     print("[server] Started background file watcher for current directory")
+
+
+@app.on_event("shutdown")
+def _shutdown_cleanup():
+    """
+    Clean up database connections when the server shuts down.
+    """
+    if db_manager:
+        db_manager.cleanup()
+        print("[server] Database connections cleaned up")
