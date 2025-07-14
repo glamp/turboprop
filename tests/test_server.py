@@ -234,7 +234,7 @@ class TestAppInitialization:
         """Test that app has correct metadata."""
         assert app.title == "Code Index MCP"
         assert app.description == "Semantic code search and indexing API"
-        assert app.version == "1.0.0"
+        assert app.version == "0.1.9"
         
     def test_app_routes(self):
         """Test that required routes are registered."""
