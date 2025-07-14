@@ -40,7 +40,7 @@ from sentence_transformers import SentenceTransformer
 app = FastAPI(
     title="Code Index MCP",
     description="Semantic code search and indexing API",
-    version="1.0.0"
+    version="0.1.5"
 )
 
 # Initialize shared resources that persist across requests

@@ -33,13 +33,17 @@ from sentence_transformers import SentenceTransformer
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# Global locks for database operations to prevent concurrent access issues
+_db_init_lock = threading.Lock()
+_db_write_lock = threading.Lock()
+
 def get_version():
     """Get the version of turboprop."""
     try:
-        from _version import __version__
+        from turboprop._version import __version__
         return __version__
     except ImportError:
-        return "0.1.0"
+        return "0.1.5"
 
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
@@ -93,25 +97,44 @@ def init_db(repo_path: Path = None):
     Returns:
         DuckDB connection object ready for use
     """
-    # Create database in the repository directory or current directory
-    if repo_path is None:
-        db_path = Path(DB_PATH)
-    else:
-        # Create .turboprop directory if it doesn't exist
-        turboprop_dir = repo_path / ".turboprop"
-        turboprop_dir.mkdir(exist_ok=True)
-        db_path = turboprop_dir / "code_index.duckdb"
-    
-    con = duckdb.connect(str(db_path))
-    con.execute(f"""
-      CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-        id VARCHAR PRIMARY KEY,
-        path VARCHAR,
-        content TEXT,
-        embedding DOUBLE[{DIMENSIONS}]
-      )
-    """)
-    return con
+    # Use global lock to prevent concurrent table creation
+    with _db_init_lock:
+        # Create database in the repository directory or current directory
+        if repo_path is None:
+            db_path = Path(DB_PATH)
+        else:
+            # Create .turboprop directory if it doesn't exist
+            turboprop_dir = repo_path / ".turboprop"
+            turboprop_dir.mkdir(exist_ok=True)
+            db_path = turboprop_dir / "code_index.duckdb"
+        
+        con = duckdb.connect(str(db_path))
+        
+        # Retry logic for table creation to handle concurrent access
+        max_retries = 3
+        retry_delay = 0.1  # 100ms
+        
+        for attempt in range(max_retries):
+            try:
+                con.execute(f"""
+                  CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                    id VARCHAR PRIMARY KEY,
+                    path VARCHAR,
+                    content TEXT,
+                    embedding DOUBLE[{DIMENSIONS}]
+                  )
+                """)
+                break  # Success, exit retry loop
+            except Exception as e:
+                if "write-write conflict" in str(e) and attempt < max_retries - 1:
+                    # Wait a bit and retry
+                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    continue
+                else:
+                    # Re-raise if it's not a write-write conflict or we've exhausted retries
+                    raise e
+        
+        return con
 
 
 def scan_repo(repo_path: Path, max_bytes: int):
@@ -281,10 +304,11 @@ def embed_and_store(con, embedder, files, max_workers=None, progress_callback=No
     
     # Insert all rows in a single batch operation for better performance
     if rows:
-        con.executemany(
-            f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
-            rows
-        )
+        with _db_write_lock:
+            con.executemany(
+                f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
+                rows
+            )
 
 
 def build_full_index(con):
@@ -372,14 +396,16 @@ def embed_and_store_single(con, embedder, path: Path):
     uid = compute_id(str(path) + text)
     emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
 
-    # First, delete any existing records for this path (handles content changes)
-    con.execute(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),))
-    
-    # Store in database
-    con.execute(
-        f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
-        (uid, str(path), text, emb.tolist())
-    )
+    # Use write lock for database operations
+    with _db_write_lock:
+        # First, delete any existing records for this path (handles content changes)
+        con.execute(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),))
+        
+        # Store in database
+        con.execute(
+            f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
+            (uid, str(path), text, emb.tolist())
+        )
 
     # Return the ID and embedding for immediate index update
     return uid, emb
@@ -481,8 +507,9 @@ class DebouncedHandler(FileSystemEventHandler):
                 pass
         elif ev_type == "deleted":
             # Remove deleted file from database
-            self.con.execute(
-                f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
+            with _db_write_lock:
+                self.con.execute(
+                    f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
             print(f"[debounce] {p} deleted from database")
 
 

@@ -34,6 +34,9 @@ from code_index import (
     search_index, watch_mode, reindex_all, TABLE_NAME, EMBED_MODEL, DIMENSIONS, get_version
 )
 
+# Global lock for database connection management
+_db_connection_lock = threading.Lock()
+
 # Initialize the MCP server
 mcp = FastMCP("🚀 Turboprop: Semantic Code Search & AI-Powered Discovery")
 
@@ -53,14 +56,15 @@ _config = {
 def get_db_connection():
     """Get or create the database connection."""
     global _db_connection
-    if _db_connection is None:
-        if _config['repository_path']:
-            repo_path = Path(_config['repository_path'])
-            _db_connection = init_db(repo_path)
-        else:
-            # Use current directory as fallback
-            _db_connection = init_db(Path.cwd())
-    return _db_connection
+    with _db_connection_lock:
+        if _db_connection is None:
+            if _config['repository_path']:
+                repo_path = Path(_config['repository_path'])
+                _db_connection = init_db(repo_path)
+            else:
+                # Use current directory as fallback
+                _db_connection = init_db(Path.cwd())
+        return _db_connection
 
 
 def get_embedder():
