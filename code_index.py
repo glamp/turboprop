@@ -15,8 +15,18 @@ The system supports three main operations:
 3. watch: Monitor a repository for changes and incrementally update the index
 """
 
-# Standard library imports for file operations, process management, and utilities
+# Force CPU usage for PyTorch before any imports to avoid MPS issues on Apple Silicon
 import os
+import platform
+is_apple_silicon = platform.processor() == 'arm' or platform.machine() == 'arm64'
+
+if is_apple_silicon:
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+    os.environ['PYTORCH_DISABLE_MPS'] = '1'
+    os.environ['PYTORCH_DEVICE'] = 'cpu'
+
+# Standard library imports for file operations, process management, and utilities
 import subprocess
 import argparse
 import hashlib
@@ -30,10 +40,12 @@ import multiprocessing
 # Third-party imports for database, ML, and file monitoring
 import duckdb
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from tqdm import tqdm
+
+# Import our custom embedding helper
+from embedding_helper import EmbeddingGenerator
 
 # Global locks for database operations to prevent concurrent access issues
 _db_init_lock = threading.Lock()
@@ -251,90 +263,45 @@ def filter_changed_files(files, existing_hashes):
     return changed_files
 
 
-def process_single_file(path, model_name=None):
-    """
-    Process a single file for embedding generation.
-    
-    Args:
-        path: Path object to process
-        model_name: Name of the SentenceTransformer model to use
-        
-    Returns:
-        Tuple of (uid, path_str, text, embedding_list) or None if failed
-    """
-    try:
-        text = path.read_text(encoding="utf-8")
-        uid = compute_id(str(path) + text)
-        
-        # Create a new model instance for thread safety
-        if model_name is None:
-            model_name = EMBED_MODEL
-        
-        # Import here to avoid issues with multiprocessing
-        try:
-            embedder = SentenceTransformer(model_name)
-        except Exception as e:
-            # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
-            if "meta tensor" in str(e) or "to_empty" in str(e):
-                import torch
-                embedder = SentenceTransformer(model_name, device='cpu')
-            else:
-                raise e
-        
-        emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
-        return (uid, str(path), text, emb.tolist())
-    except Exception as e:
-        # Log specific errors to help debug embedding failures
-        print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
-        return None
 
 
 def embed_and_store(con, embedder, files, max_workers=None, progress_callback=None):
     """
     Process a list of files by generating embeddings and storing them in the database.
-    Now supports parallel processing and progress reporting with tqdm.
+    Uses sequential processing for reliability.
 
     Args:
         con: DuckDB database connection
-        embedder: SentenceTransformer model for generating embeddings (used for model name)
+        embedder: EmbeddingGenerator instance for generating embeddings
         files: List of Path objects to process
-        max_workers: Number of parallel workers (default: CPU count)
+        max_workers: Number of parallel workers (ignored - always sequential)
         progress_callback: Function to call with progress updates (deprecated, use tqdm)
     """
     if not files:
         return
     
-    if max_workers is None:
-        max_workers = min(4, multiprocessing.cpu_count(), len(files))
-    
     rows = []
     failed_files = []
     
-    # Get model name from the embedder instance
-    model_name = getattr(embedder, 'model_name', EMBED_MODEL) if hasattr(embedder, 'model_name') else EMBED_MODEL
-    
-    # Use tqdm for progress bar
+    # Use sequential processing for reliability
     with tqdm(total=len(files), desc="🔍 Generating embeddings", unit="files") as pbar:
-        # Process files in parallel
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks with model name instead of model instance
-            future_to_path = {executor.submit(process_single_file, path, model_name): path 
-                             for path in files}
+        for path in files:
+            try:
+                text = path.read_text(encoding="utf-8")
+                uid = compute_id(str(path) + text)
+                
+                emb = embedder.encode(text)
+                rows.append((uid, str(path), text, emb.tolist()))
+                
+            except Exception as e:
+                print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
+                failed_files.append(path)
             
-            # Collect results as they complete
-            for future in as_completed(future_to_path):
-                path = future_to_path[future]
-                result = future.result()
-                if result is not None:
-                    rows.append(result)
-                else:
-                    failed_files.append(path)
-                
-                pbar.update(1)
-                
-                # Maintain backward compatibility with progress_callback
-                if progress_callback:
-                    progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
+            pbar.update(1)
+            
+            # Maintain backward compatibility with progress_callback
+            if progress_callback:
+                progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
     
     # Report processing results
     if failed_files:
@@ -389,7 +356,7 @@ def search_index(con, embedder, query: str, k: int):
         Distance is cosine distance (lower = more similar)
     """
     # Generate embedding for the search query
-    q_emb = embedder.encode(query, show_progress_bar=False).astype(np.float32).tolist()
+    q_emb = embedder.encode(query).tolist()
 
     # Use DuckDB's array operations for cosine similarity search
     # Cosine similarity = dot(a,b) / (norm(a) * norm(b))
@@ -433,7 +400,7 @@ def embed_and_store_single(con, embedder, path: Path):
 
     # Generate unique ID and embedding
     uid = compute_id(str(path) + text)
-    emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
+    emb = embedder.encode(text)
 
     # Use write lock for database operations
     with _db_write_lock:
@@ -577,16 +544,13 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
 
     # Initialize database and ML model
     con = init_db(repo)
+    
     try:
-        embedder = SentenceTransformer(EMBED_MODEL)
+        embedder = EmbeddingGenerator(EMBED_MODEL)
+        print("✅ Embedding generator initialized for watch mode", file=sys.stderr)
     except Exception as e:
-        # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
-        if "meta tensor" in str(e) or "to_empty" in str(e):
-            print("🔧 Detected MPS compatibility issue, falling back to CPU...")
-            import torch
-            embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
-        else:
-            raise e
+        print(f"❌ Failed to initialize embedding generator: {e}", file=sys.stderr)
+        raise e
 
     # Verify database has embeddings
     embedding_count = build_full_index(con)
@@ -937,16 +901,13 @@ Examples:
 
     # Initialize the ML model (shared across all commands)
     print("⚡ Initializing AI model...")
+    
     try:
-        embedder = SentenceTransformer(EMBED_MODEL)
+        embedder = EmbeddingGenerator(EMBED_MODEL)
+        print("✅ Embedding generator initialized successfully")
     except Exception as e:
-        # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
-        if "meta tensor" in str(e) or "to_empty" in str(e):
-            print("🔧 Detected MPS compatibility issue, falling back to CPU...")
-            import torch
-            embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
-        else:
-            raise e
+        print(f"❌ Failed to initialize embedding generator: {e}")
+        raise e
 
     # Dispatch to appropriate command handler
     if args.cmd == "index":
