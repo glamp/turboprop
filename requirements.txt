@@ -1,0 +1,7 @@
+duckdb
+sentence-transformers
+hnswlib
+watchdog
+transformers
+fastapi
+uvicorn
