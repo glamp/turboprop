@@ -32,6 +32,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from tqdm import tqdm
 
 # Global locks for database operations to prevent concurrent access issues
 _db_init_lock = threading.Lock()
@@ -43,7 +44,7 @@ def get_version():
         from turboprop._version import __version__
         return __version__
     except ImportError:
-        return "0.1.5"
+        return "0.1.6"
 
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
@@ -141,13 +142,10 @@ def scan_repo(repo_path: Path, max_bytes: int):
     """
     Scan a Git repository for code files, respecting .gitignore rules.
 
-    This function:
-    1. Uses 'git ls-files' to get a list of files ignored by Git
-    2. Walks the repository directory tree
-    3. Filters files based on:
-       - Not being in the Git ignore list
-       - Having a code-related file extension
-       - Being under the specified size limit
+    This function uses a more efficient approach:
+    1. Gets all tracked files from Git
+    2. Gets all untracked files that are not ignored
+    3. Filters by code extensions and size
 
     Args:
         repo_path: Path to the Git repository root
@@ -159,44 +157,54 @@ def scan_repo(repo_path: Path, max_bytes: int):
     # Resolve to absolute path to avoid issues with relative paths
     repo_path = repo_path.resolve()
 
+    files = []
+    
     try:
-        # Get list of files that Git ignores (including .gitignore, .git/info/exclude, etc.)
-        result = subprocess.run(
-            ["git", "ls-files", "--exclude-standard", "-oi", "--directory"],
+        # Get all tracked files (already in git)
+        tracked_result = subprocess.run(
+            ["git", "ls-files"],
             cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, check=True
         )
-        # Convert the output to a set of resolved absolute paths for fast lookup
-        ignored = {str(Path(line.strip()).resolve()) if Path(line.strip()).is_absolute() 
-                   else str((repo_path / line.strip()).resolve())
-                   for line in result.stdout.splitlines()}
+        tracked_files = {line.strip() for line in tracked_result.stdout.splitlines() if line.strip()}
+        
+        # Get all untracked files that are not ignored
+        untracked_result = subprocess.run(
+            ["git", "ls-files", "--exclude-standard", "--others"],
+            cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, check=True
+        )
+        untracked_files = {line.strip() for line in untracked_result.stdout.splitlines() if line.strip()}
+        
+        # Combine tracked and untracked files
+        all_files = tracked_files | untracked_files
+        
     except subprocess.CalledProcessError:
-        # If git command fails (not a git repo, etc.), proceed without ignore list
-        ignored = set()
-
-    files = []
-    # Walk through all files in the repository
-    for root, _, names in os.walk(repo_path):
-        for name in names:
-            p = Path(root) / name
-
-            # Skip files that are ignored by Git
-            if str(p.resolve()) in ignored:
+        # If git commands fail (not a git repo, etc.), fall back to simple file walk
+        all_files = set()
+        for root, _, names in os.walk(repo_path):
+            for name in names:
+                rel_path = Path(root).relative_to(repo_path) / name
+                all_files.add(str(rel_path))
+    
+    # Process the files
+    for file_path_str in all_files:
+        p = repo_path / file_path_str
+        
+        # Only include files with code-related extensions
+        if p.suffix.lower() not in CODE_EXTENSIONS:
+            continue
+            
+        try:
+            # Skip files that are too large to process efficiently
+            if p.stat().st_size > max_bytes:
                 continue
-
-            # Only include files with code-related extensions
-            if p.suffix.lower() not in CODE_EXTENSIONS:
-                continue
-
-            try:
-                # Skip files that are too large to process efficiently
-                if p.stat().st_size > max_bytes:
-                    continue
-            except OSError:
-                # Skip files we can't read (permissions, broken symlinks, etc.)
-                continue
-
-            files.append(p)
+        except OSError:
+            # Skip files we can't read (permissions, broken symlinks, etc.)
+            continue
+        
+        files.append(p)
+    
     return files
 
 
@@ -242,13 +250,13 @@ def filter_changed_files(files, existing_hashes):
     return changed_files
 
 
-def process_single_file(path, embedder):
+def process_single_file(path, model_name=None):
     """
     Process a single file for embedding generation.
     
     Args:
         path: Path object to process
-        embedder: SentenceTransformer model
+        model_name: Name of the SentenceTransformer model to use
         
     Returns:
         Tuple of (uid, path_str, text, embedding_list) or None if failed
@@ -256,6 +264,22 @@ def process_single_file(path, embedder):
     try:
         text = path.read_text(encoding="utf-8")
         uid = compute_id(str(path) + text)
+        
+        # Create a new model instance for thread safety
+        if model_name is None:
+            model_name = EMBED_MODEL
+        
+        # Import here to avoid issues with multiprocessing
+        try:
+            embedder = SentenceTransformer(model_name)
+        except Exception as e:
+            # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
+            if "meta tensor" in str(e) or "to_empty" in str(e):
+                import torch
+                embedder = SentenceTransformer(model_name, device='cpu')
+            else:
+                raise e
+        
         emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
         return (uid, str(path), text, emb.tolist())
     except Exception:
@@ -265,42 +289,45 @@ def process_single_file(path, embedder):
 def embed_and_store(con, embedder, files, max_workers=None, progress_callback=None):
     """
     Process a list of files by generating embeddings and storing them in the database.
-    Now supports parallel processing and progress reporting.
+    Now supports parallel processing and progress reporting with tqdm.
 
     Args:
         con: DuckDB database connection
-        embedder: SentenceTransformer model for generating embeddings
+        embedder: SentenceTransformer model for generating embeddings (used for model name)
         files: List of Path objects to process
         max_workers: Number of parallel workers (default: CPU count)
-        progress_callback: Function to call with progress updates
+        progress_callback: Function to call with progress updates (deprecated, use tqdm)
     """
     if not files:
         return
     
     if max_workers is None:
-        max_workers = min(multiprocessing.cpu_count(), len(files))
+        max_workers = min(4, multiprocessing.cpu_count(), len(files))
     
     rows = []
-    completed = 0
     
-    if progress_callback:
-        progress_callback(0, len(files), "Starting embedding generation...")
+    # Get model name from the embedder instance
+    model_name = getattr(embedder, 'model_name', EMBED_MODEL) if hasattr(embedder, 'model_name') else EMBED_MODEL
     
-    # Process files in parallel
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
-        future_to_path = {executor.submit(process_single_file, path, embedder): path 
-                         for path in files}
-        
-        # Collect results as they complete
-        for future in as_completed(future_to_path):
-            result = future.result()
-            if result is not None:
-                rows.append(result)
+    # Use tqdm for progress bar
+    with tqdm(total=len(files), desc="🔍 Generating embeddings", unit="files") as pbar:
+        # Process files in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks with model name instead of model instance
+            future_to_path = {executor.submit(process_single_file, path, model_name): path 
+                             for path in files}
             
-            completed += 1
-            if progress_callback:
-                progress_callback(completed, len(files), f"Processed {completed}/{len(files)} files")
+            # Collect results as they complete
+            for future in as_completed(future_to_path):
+                result = future.result()
+                if result is not None:
+                    rows.append(result)
+                
+                pbar.update(1)
+                
+                # Maintain backward compatibility with progress_callback
+                if progress_callback:
+                    progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
     
     # Insert all rows in a single batch operation for better performance
     if rows:
@@ -618,21 +645,8 @@ def reindex_all(repo_path: Path, max_bytes: int, con, embedder, max_workers=None
         
         print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
     
-    # Progress reporting function
-    def show_progress(completed, total, message):
-        percent = (completed / total) * 100 if total > 0 else 0
-        elapsed = time.time() - start_time
-        
-        if completed > 0:
-            rate = completed / elapsed
-            eta = (total - completed) / rate if rate > 0 else 0
-            print(f"\r🧠 {message} ({percent:.1f}% | {rate:.1f} files/sec | ETA: {eta:.1f}s)", end="", flush=True)
-        else:
-            print(f"\r🧠 {message}", end="", flush=True)
-    
     # Generate embeddings and store them in the database
-    embed_and_store(con, embedder, files_to_process, max_workers, show_progress)
-    print()  # New line after progress
+    embed_and_store(con, embedder, files_to_process, max_workers)
     
     # Build the search index from all stored embeddings
     build_full_index(con)
@@ -930,7 +944,8 @@ Examples:
         if args.workers:
             print(f"👥 Using {args.workers} parallel workers")
         else:
-            print(f"👥 Using {multiprocessing.cpu_count()} parallel workers (auto-detected)")
+            auto_workers = min(4, multiprocessing.cpu_count())
+            print(f"👥 Using {auto_workers} parallel workers (auto-detected)")
         
         if args.force_all:
             print("🔄 Force mode: reprocessing all files")

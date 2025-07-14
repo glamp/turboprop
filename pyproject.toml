@@ -4,7 +4,7 @@
 
 [project]
 name = "turboprop"
-version = "0.1.5"
+version = "0.1.6"
 description = "Lightning-fast semantic code search and indexing with DuckDB vector operations"
 readme = "README.md"
 license = {text = "MIT"}
@@ -40,6 +40,9 @@ dependencies = [
     
     # File system monitoring
     "watchdog>=6.0.0",      # Cross-platform file system event monitoring for watch mode
+    
+    # Progress bars and CLI utilities
+    "tqdm>=4.65.0",         # Progress bars for better user experience
     
     # Model Context Protocol server
     "mcp>=1.0.0",           # MCP SDK for building MCP servers
