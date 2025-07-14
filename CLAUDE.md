@@ -61,6 +61,25 @@ uvicorn server:app --reload
 # Visit http://localhost:8000/docs for API documentation
 ```
 
+### Troubleshooting
+
+**Apple Silicon MPS Compatibility Issue:**
+If you see an error like "Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty() instead", this is automatically handled by falling back to CPU processing. This occurs due to PyTorch MPS backend compatibility issues with certain SentenceTransformer model configurations.
+
+**MCP Server Output:**
+The MCP server uses stderr for status messages to comply with the Model Context Protocol. When indexing completes, you'll see:
+```
+✅ Indexing complete! Processed X files with Y embeddings.
+🎯 Repository 'path' is ready for semantic search!
+```
+
+**Progress Indication:**
+During indexing, the system shows:
+- File scanning progress
+- Embedding generation status  
+- Index building completion
+- Final success message with file/embedding counts
+
 ## Architecture
 
 ### Core Components
@@ -96,7 +115,9 @@ CREATE TABLE code_files (
 **File Filtering:** Only processes files with code extensions (.py, .js, .ts, .java, .go, etc.) and respects Git ignore rules
 
 ### Database Files
-- `code_index.duckdb`: Main database containing file content and embeddings with native vector search
+- `turboprop/code_index.duckdb`: Main database containing file content and embeddings with native vector search (stored in `./turboprop/` directory within each repository)
+
+**Note:** Add `turboprop/` to your `.gitignore` file to avoid committing index files to version control.
 
 ## Common Development Patterns
 

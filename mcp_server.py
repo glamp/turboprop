@@ -17,6 +17,7 @@ The server uses stdio transport for communication with MCP clients.
 """
 
 import os
+import sys
 import asyncio
 import threading
 import argparse
@@ -30,11 +31,11 @@ from sentence_transformers import SentenceTransformer
 # Import our existing code indexing functionality
 from code_index import (
     init_db, scan_repo, embed_and_store, build_full_index, 
-    search_index, watch_mode, reindex_all, TABLE_NAME, DB_PATH, EMBED_MODEL, DIMENSIONS
+    search_index, watch_mode, reindex_all, TABLE_NAME, EMBED_MODEL, DIMENSIONS
 )
 
 # Initialize the MCP server
-mcp = FastMCP("Turboprop Code Search")
+mcp = FastMCP("🚀 Turboprop: Semantic Code Search & AI-Powered Discovery")
 
 # Global variables for shared resources and configuration
 _db_connection = None
@@ -53,7 +54,12 @@ def get_db_connection():
     """Get or create the database connection."""
     global _db_connection
     if _db_connection is None:
-        _db_connection = init_db()
+        if _config['repository_path']:
+            repo_path = Path(_config['repository_path'])
+            _db_connection = init_db(repo_path)
+        else:
+            # Use current directory as fallback
+            _db_connection = init_db(Path.cwd())
     return _db_connection
 
 
@@ -61,7 +67,17 @@ def get_embedder():
     """Get or create the sentence transformer model."""
     global _embedder
     if _embedder is None:
-        _embedder = SentenceTransformer(EMBED_MODEL)
+        # Initialize ML model with MPS compatibility handling
+        try:
+            _embedder = SentenceTransformer(EMBED_MODEL)
+        except Exception as e:
+            # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
+            if "meta tensor" in str(e) or "to_empty" in str(e):
+                print("🔧 Detected MPS compatibility issue, falling back to CPU...", file=sys.stderr)
+                import torch
+                _embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
+            else:
+                raise e
     return _embedder
 
 
@@ -71,17 +87,29 @@ def index_repository(
     max_file_size_mb: float = None
 ) -> str:
     """
-    Index a code repository for semantic search.
+    🚀 TURBOPROP: Index a code repository for semantic search
     
-    This tool scans a Git repository, generates semantic embeddings for all code files,
-    and builds a searchable index. The index is persistent and stored in a local database.
+    BUILD YOUR SEARCHABLE CODE INDEX! This tool scans any Git repository, generates 
+    semantic embeddings for all code files (.py, .js, .ts, .java, .go, .rs, etc.), 
+    and builds a lightning-fast searchable index using DuckDB + ML embeddings.
+    
+    💡 EXAMPLES:
+    • index_repository("/path/to/my/project") - Index specific repo
+    • index_repository() - Index current configured repo
+    • index_repository(max_file_size_mb=5.0) - Allow larger files
+    
+    🔍 WHAT IT INDEXES:
+    • Python (.py), JavaScript (.js/.ts/.tsx), Java (.java)
+    • Go (.go), Rust (.rs), C/C++ (.c/.cpp/.h)
+    • Config files (.json/.yaml/.yml), HTML/CSS
+    • And 20+ more code file types!
     
     Args:
-        repository_path: Path to the Git repository to index (uses configured path if not provided)
-        max_file_size_mb: Maximum file size in MB to include (uses configured value if not provided)
+        repository_path: Path to Git repo (optional - uses configured path)
+        max_file_size_mb: Max file size in MB (optional - uses configured limit)
     
     Returns:
-        Status message with the number of files indexed
+        Success message with file count and index status
     """
     try:
         # Use provided path or fall back to configured path
@@ -108,20 +136,23 @@ def index_repository(
         embedder = get_embedder()
         
         # Scan repository for code files
-        print(f"📂 Scanning for code files (max size: {max_file_size_mb} MB)...")
+        print(f"📂 Scanning for code files (max size: {max_file_size_mb} MB)...", file=sys.stderr)
         files = scan_repo(repo_path, max_bytes)
-        print(f"📄 Found {len(files)} code files to process")
+        print(f"📄 Found {len(files)} code files to process", file=sys.stderr)
         
         if not files:
             return f"No code files found in repository '{repository_path}'. Make sure it's a Git repository with code files."
         
         # Generate embeddings and store in database
-        print(f"🔍 Generating embeddings for {len(files)} files...")
+        print(f"🔍 Generating embeddings for {len(files)} files...", file=sys.stderr)
         embed_and_store(con, embedder, files)
         
         # Build search index
-        print(f"📊 Building search index...")
+        print(f"📊 Building search index...", file=sys.stderr)
         embedding_count = build_full_index(con)
+        
+        print(f"✅ Indexing complete! Processed {len(files)} files with {embedding_count} embeddings.", file=sys.stderr)
+        print(f"🎯 Repository '{repository_path}' is ready for semantic search!", file=sys.stderr)
         
         return f"Successfully indexed {len(files)} files from '{repository_path}'. Index contains {embedding_count} embeddings and is ready for search."
         
@@ -135,18 +166,31 @@ def search_code(
     max_results: int = 5
 ) -> str:
     """
-    Search for code using natural language queries.
+    🔍 TURBOPROP: Search code using natural language (SEMANTIC SEARCH!)
     
-    This tool performs semantic search over the indexed code files, finding
-    code that matches the meaning of your query rather than just keywords.
+    FIND CODE BY MEANING, NOT JUST KEYWORDS! This performs semantic search over 
+    your indexed code files, finding code that matches the INTENT of your query.
+    
+    🎯 SEARCH EXAMPLES:
+    • "JWT authentication" - Find auth-related code
+    • "database connection setup" - Find DB initialization
+    • "error handling for HTTP requests" - Find error handling patterns
+    • "password hashing function" - Find crypto/security code
+    • "React component for user profile" - Find UI components
+    • "API endpoint for user registration" - Find backend routes
+    
+    🚀 WHY IT'S AMAZING:
+    • Understands CODE MEANING, not just text matching
+    • Finds similar patterns across different languages
+    • Discovers code you forgot you wrote
+    • Perfect for exploring unfamiliar codebases
     
     Args:
         query: Natural language description of what you're looking for
-               (e.g., "JWT authentication", "function to parse JSON", "error handling")
-        max_results: Maximum number of results to return (default: 5, max: 20)
+        max_results: Number of results (default: 5, max: 20)
     
     Returns:
-        Formatted search results with file paths, similarity scores, and code snippets
+        Ranked results with file paths, similarity scores, and code previews
     """
     try:
         if max_results > 20:
@@ -186,12 +230,26 @@ def search_code(
 @mcp.tool()
 def get_index_status() -> str:
     """
-    Get the current status of the code index.
+    📊 TURBOPROP: Check your code index status and health
     
-    Returns information about the indexed files, database size, and readiness for search.
+    GET THE FULL PICTURE! See exactly what's indexed, how much space it's using,
+    and whether your search index is ready to rock.
+    
+    📈 WHAT YOU'LL SEE:
+    • Number of files indexed
+    • Database size and location
+    • Embedding model being used
+    • File watcher status
+    • Search readiness
+    
+    💡 USE CASES:
+    • Check if indexing completed successfully
+    • Monitor database growth over time
+    • Verify search is ready before querying
+    • Debug indexing issues
     
     Returns:
-        Status information including file count, database size, and index readiness
+        Complete status report with all index metrics
     """
     try:
         con = get_db_connection()
@@ -201,8 +259,13 @@ def get_index_status() -> str:
         
         # Get database size
         db_size_mb = 0
-        if Path(DB_PATH).exists():
-            db_size_mb = Path(DB_PATH).stat().st_size / (1024 * 1024)
+        if _config['repository_path']:
+            db_path = Path(_config['repository_path']) / "code_index.duckdb"
+        else:
+            db_path = Path.cwd() / "code_index.duckdb"
+        
+        if db_path.exists():
+            db_size_mb = db_path.stat().st_size / (1024 * 1024)
         
         # Check if index is ready
         index_ready = file_count > 0
@@ -215,7 +278,7 @@ def get_index_status() -> str:
             f"  Files indexed: {file_count}",
             f"  Database size: {db_size_mb:.2f} MB",
             f"  Search ready: {'Yes' if index_ready else 'No'}",
-            f"  Database path: {DB_PATH}",
+            f"  Database path: {db_path}",
             f"  Embedding model: {EMBED_MODEL} ({DIMENSIONS} dimensions)",
             f"  Configured repository: {_config['repository_path'] or 'Not configured'}",
             f"  File watcher: {watcher_status}"
@@ -237,19 +300,34 @@ def watch_repository(
     debounce_seconds: float = 5.0
 ) -> str:
     """
-    Start monitoring a repository for changes and update the index automatically.
+    👀 TURBOPROP: Watch repository for changes (LIVE INDEX UPDATES!)
     
-    This tool starts a background watcher that monitors the specified repository
-    for file changes and incrementally updates the search index. The watcher
-    uses debouncing to avoid excessive processing during rapid file changes.
+    KEEP YOUR INDEX FRESH! This starts a background watcher that monitors your 
+    repository for file changes and automatically updates the search index.
+    
+    ⚡ FEATURES:
+    • Real-time file change detection
+    • Smart debouncing (waits for editing to finish)
+    • Incremental updates (only processes changed files)
+    • Background processing (won't block your work)
+    
+    🎯 PERFECT FOR:
+    • Active development (index stays current)
+    • Team environments (catches all changes)
+    • Long-running projects (set and forget)
+    
+    ⚙️ SMART DEFAULTS:
+    • 5-second debounce (adjustable)
+    • 1MB file size limit (adjustable)
+    • Handles rapid file changes gracefully
     
     Args:
-        repository_path: Path to the Git repository to watch
-        max_file_size_mb: Maximum file size in MB to process (default: 1.0)
-        debounce_seconds: Seconds to wait before processing changes (default: 5.0)
+        repository_path: Path to Git repository to watch
+        max_file_size_mb: Max file size to process (default: 1.0)
+        debounce_seconds: Wait time before processing (default: 5.0)
     
     Returns:
-        Status message indicating whether the watcher was started successfully
+        Confirmation message with watcher configuration
     """
     try:
         global _watcher_thread
@@ -273,7 +351,7 @@ def watch_repository(
             except KeyboardInterrupt:
                 pass  # Normal shutdown
             except Exception as e:
-                print(f"Watcher error: {e}")
+                print(f"Watcher error: {e}", file=sys.stderr)
         
         _watcher_thread = threading.Thread(target=start_watcher, daemon=True)
         _watcher_thread.start()
@@ -287,15 +365,30 @@ def watch_repository(
 @mcp.tool()
 def list_indexed_files(limit: int = 20) -> str:
     """
-    List the files currently in the search index.
+    📋 TURBOPROP: List all files in your search index
     
-    Shows the files that have been indexed and are available for search.
+    SEE WHAT'S INDEXED! Browse all the files that have been processed and are 
+    available for semantic search, with file sizes and paths.
+    
+    🎯 USEFUL FOR:
+    • Verifying specific files were indexed
+    • Checking index coverage of your project
+    • Finding the largest files in your index
+    • Debugging missing files
+    
+    📊 WHAT YOU'LL GET:
+    • File paths (sorted alphabetically)
+    • File sizes in KB
+    • Total file count
+    • Pagination if there are many files
+    
+    💡 PRO TIP: Use a higher limit for comprehensive project audits!
     
     Args:
         limit: Maximum number of files to show (default: 20)
     
     Returns:
-        List of indexed file paths
+        Formatted list of indexed files with sizes and total count
     """
     try:
         con = get_db_connection()
@@ -337,27 +430,27 @@ def start_file_watcher():
     repo_path = Path(_config['repository_path']).resolve()
     
     if not repo_path.exists() or not repo_path.is_dir():
-        print(f"Warning: Cannot watch repository '{_config['repository_path']}' - path does not exist or is not a directory")
+        print(f"Warning: Cannot watch repository '{_config['repository_path']}' - path does not exist or is not a directory", file=sys.stderr)
         return
     
     # Stop existing watcher if running
     if _watcher_thread and _watcher_thread.is_alive():
-        print("File watcher already running")
+        print("File watcher already running", file=sys.stderr)
         return
     
     # Start new watcher in background thread
     def start_watcher():
         try:
-            print(f"Starting file watcher for repository: {repo_path}")
+            print(f"Starting file watcher for repository: {repo_path}", file=sys.stderr)
             watch_mode(str(repo_path), _config['max_file_size_mb'], _config['debounce_seconds'])
         except KeyboardInterrupt:
             pass  # Normal shutdown
         except Exception as e:
-            print(f"Watcher error: {e}")
+            print(f"Watcher error: {e}", file=sys.stderr)
     
     _watcher_thread = threading.Thread(target=start_watcher, daemon=True)
     _watcher_thread.start()
-    print(f"File watcher started for '{repo_path}' (max: {_config['max_file_size_mb']}MB, debounce: {_config['debounce_seconds']}s)")
+    print(f"File watcher started for '{repo_path}' (max: {_config['max_file_size_mb']}MB, debounce: {_config['debounce_seconds']}s)", file=sys.stderr)
 
 
 def parse_args():
@@ -443,40 +536,68 @@ def main():
     _config['auto_watch'] = args.auto_watch
     
     # Print configuration
-    print("🚀 Turboprop MCP Server Starting")
-    print("=" * 40)
+    print("🚀 Turboprop MCP Server Starting", file=sys.stderr)
+    print("=" * 40, file=sys.stderr)
+    print(f"🤖 Model: {EMBED_MODEL} ({DIMENSIONS}D)", file=sys.stderr)
     if _config['repository_path']:
-        print(f"📁 Repository: {_config['repository_path']}")
-        print(f"📊 Max file size: {_config['max_file_size_mb']} MB")
-        print(f"⏱️  Debounce delay: {_config['debounce_seconds']}s")
-        print(f"🔍 Auto-index: {'Yes' if _config['auto_index'] else 'No'}")
-        print(f"👀 Auto-watch: {'Yes' if _config['auto_watch'] else 'No'}")
-        print()
+        print(f"📁 Repository: {_config['repository_path']}", file=sys.stderr)
+        print(f"📊 Max file size: {_config['max_file_size_mb']} MB", file=sys.stderr)
+        print(f"⏱️  Debounce delay: {_config['debounce_seconds']}s", file=sys.stderr)
+        print(f"🔍 Auto-index: {'Yes' if _config['auto_index'] else 'No'}", file=sys.stderr)
+        print(f"👀 Auto-watch: {'Yes' if _config['auto_watch'] else 'No'}", file=sys.stderr)
+        print(file=sys.stderr)
     else:
-        print("📁 No repository configured - use tools to specify paths")
-        print()
+        print("📁 No repository configured - use tools to specify paths", file=sys.stderr)
+        print(file=sys.stderr)
     
     # Auto-index if configured (run in background to avoid MCP timeout)
     if _config['repository_path'] and _config['auto_index']:
         def start_auto_index():
-            print("🔍 Auto-indexing repository...")
-            print(f"📁 Scanning repository: {_config['repository_path']}")
+            import time
+            print("🔍 Auto-indexing repository...", file=sys.stderr)
+            print(f"📁 Scanning repository: {_config['repository_path']}", file=sys.stderr)
+            
+            start_time = time.time()
             result = index_repository()
-            print(f"✅ {result}")
-            print()
+            end_time = time.time()
+            
+            total_time = end_time - start_time
+            
+            # Extract file count from result message
+            import re
+            file_count_match = re.search(r'Successfully indexed (\d+) files', result)
+            if file_count_match:
+                file_count = int(file_count_match.group(1))
+                time_per_file = total_time / file_count if file_count > 0 else 0
+                print(f"🚀 Hey! We indexed {file_count} files and it took {total_time:.2f}s at {time_per_file:.3f}s per file", file=sys.stderr)
+            else:
+                print(f"🚀 Hey! Indexing completed in {total_time:.2f}s", file=sys.stderr)
+            
+            print(f"✅ {result}", file=sys.stderr)
+            print(file=sys.stderr)
         
         auto_index_thread = threading.Thread(target=start_auto_index, daemon=True)
         auto_index_thread.start()
-        print("🔍 Auto-indexing started in background...")
-        print()
+        print("🔍 Auto-indexing started in background...", file=sys.stderr)
+        print(file=sys.stderr)
     
     # Start file watcher if configured
     if _config['repository_path'] and _config['auto_watch']:
         start_file_watcher()
-        print()
+        print(file=sys.stderr)
     
-    print("🎯 MCP Server ready - listening for tool calls...")
-    print("=" * 40)
+    print("🎯 MCP Server ready - listening for tool calls...", file=sys.stderr)
+    print("=" * 40, file=sys.stderr)
+    print(file=sys.stderr)
+    print("🔥 AVAILABLE TOOLS (use 'tp:' prefix):", file=sys.stderr)
+    print("  • tp:search_code - Find code by meaning (semantic search)", file=sys.stderr)
+    print("  • tp:index_repository - Build searchable code index", file=sys.stderr)
+    print("  • tp:get_index_status - Check index health & stats", file=sys.stderr)
+    print("  • tp:watch_repository - Live index updates", file=sys.stderr)
+    print("  • tp:list_indexed_files - Browse indexed files", file=sys.stderr)
+    print(file=sys.stderr)
+    print("💡 START HERE: 'tp:search_code \"your query\"' or 'tp:get_index_status'", file=sys.stderr)
+    print("=" * 40, file=sys.stderr)
     
     # Run the MCP server
     mcp.run()

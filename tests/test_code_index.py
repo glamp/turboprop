@@ -60,28 +60,25 @@ class TestInitDb:
     
     def test_init_db_creates_table(self):
         """Test that init_db creates the code_files table with correct schema."""
-        with tempfile.NamedTemporaryFile(suffix='.duckdb', delete=False) as tmp:
-            tmp_path = tmp.name
-        
-        try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / "test.duckdb"
+            
             # Mock the DB_PATH to use our temporary file
-            with patch('code_index.DB_PATH', tmp_path):
+            with patch('code_index.DB_PATH', str(tmp_path)):
                 con = init_db()
                 
-                # Check that table exists with correct schema
-                result = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", 
+                # Check that table exists with correct schema (DuckDB syntax)
+                result = con.execute("SELECT table_name FROM information_schema.tables WHERE table_name = ?", 
                                    (TABLE_NAME,)).fetchone()
                 assert result is not None
                 
-                # Check column structure
-                columns = con.execute(f"PRAGMA table_info({TABLE_NAME})").fetchall()
-                column_names = [col[1] for col in columns]
+                # Check column structure (DuckDB syntax)
+                columns = con.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{TABLE_NAME}'").fetchall()
+                column_names = [col[0] for col in columns]
                 expected_columns = ['id', 'path', 'content', 'embedding']
                 assert all(col in column_names for col in expected_columns)
                 
                 con.close()
-        finally:
-            os.unlink(tmp_path)
 
 
 class TestScanRepo:
@@ -98,6 +95,7 @@ class TestScanRepo:
         # Create some test files
         (self.repo_path / "main.py").write_text("print('hello')")
         (self.repo_path / "config.json").write_text('{"key": "value"}')
+        (self.repo_path / "ignored.py").write_text("# This should be ignored")
         (self.repo_path / "README.md").write_text("# Test Project")
         (self.repo_path / "binary.exe").write_bytes(b"\\x00\\x01\\x02")
         
@@ -105,7 +103,7 @@ class TestScanRepo:
         subdir = self.repo_path / "src"
         subdir.mkdir()
         (subdir / "utils.py").write_text("def util_func(): pass")
-        (subdir / "large_file.py").write_text("x = 'a' * 1000000")  # Large file
+        (subdir / "large_file.py").write_text("x = '" + "a" * 1000000 + "'")  # Large file (>1MB)
         
     def teardown_method(self):
         """Clean up temporary files."""
@@ -142,15 +140,15 @@ class TestScanRepo:
         """Test that scan_repo respects .gitignore files."""
         with patch('subprocess.run') as mock_run:
             # Mock git ls-files to return ignored files
-            ignored_file = str(self.repo_path / "config.json")
-            mock_run.return_value = Mock(stdout=f"{ignored_file}\\n", returncode=0)
+            ignored_file = str(self.repo_path / "ignored.py")
+            mock_run.return_value = Mock(stdout=f"{ignored_file}\n", returncode=0)
             
             files = scan_repo(self.repo_path, max_bytes=1024*1024)
             
             # Should not include ignored files
             file_names = [f.name for f in files]
             assert "main.py" in file_names
-            assert "config.json" not in file_names
+            assert "ignored.py" not in file_names
 
 
 class TestEmbedAndStore:

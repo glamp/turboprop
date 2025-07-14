@@ -23,6 +23,8 @@ import hashlib
 import time
 import threading
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
 # Third-party imports for database, ML, and file monitoring
 import duckdb
@@ -34,9 +36,11 @@ from watchdog.events import FileSystemEventHandler
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
 TABLE_NAME = "code_files"
-DIMENSIONS = 768               # Embedding dimensions for nomic-embed-code model
+DIMENSIONS = 384               # Embedding dimensions for all-MiniLM-L6-v2 model
 # SentenceTransformer model name for generating embeddings
-EMBED_MODEL = "nomic-ai/nomic-embed-code"
+EMBED_MODEL = "all-MiniLM-L6-v2"
+# Backward compatibility for tests
+DB_PATH = "code_index.duckdb"
 
 # File extensions that we consider to be code files worth indexing
 # This covers most major programming languages and common config/markup files
@@ -64,7 +68,7 @@ def compute_id(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def init_db(repo_path: Path):
+def init_db(repo_path: Path = None):
     """
     Initialize the DuckDB database and create the code_files table if it doesn't exist.
 
@@ -75,13 +79,21 @@ def init_db(repo_path: Path):
     - embedding: FLOAT[768] - vector embedding for similarity search
 
     Args:
-        repo_path: Path to the repository where the database should be stored
+        repo_path: Path to the repository where the database should be stored.
+                  If None, uses current directory (for backward compatibility)
 
     Returns:
         DuckDB connection object ready for use
     """
-    # Create database in the repository directory
-    db_path = repo_path / "code_index.duckdb"
+    # Create database in the repository directory or current directory
+    if repo_path is None:
+        db_path = Path(DB_PATH)
+    else:
+        # Create turboprop directory if it doesn't exist
+        turboprop_dir = repo_path / "turboprop"
+        turboprop_dir.mkdir(exist_ok=True)
+        db_path = turboprop_dir / "code_index.duckdb"
+    
     con = duckdb.connect(str(db_path))
     con.execute(f"""
       CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
@@ -123,8 +135,9 @@ def scan_repo(repo_path: Path, max_bytes: int):
             cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, check=True
         )
-        # Convert the output to a set of absolute paths for fast lookup
-        ignored = {str(repo_path / line.strip())
+        # Convert the output to a set of resolved absolute paths for fast lookup
+        ignored = {str(Path(line.strip()).resolve()) if Path(line.strip()).is_absolute() 
+                   else str((repo_path / line.strip()).resolve())
                    for line in result.stdout.splitlines()}
     except subprocess.CalledProcessError:
         # If git command fails (not a git repo, etc.), proceed without ignore list
@@ -137,7 +150,7 @@ def scan_repo(repo_path: Path, max_bytes: int):
             p = Path(root) / name
 
             # Skip files that are ignored by Git
-            if str(p) in ignored:
+            if str(p.resolve()) in ignored:
                 continue
 
             # Only include files with code-related extensions
@@ -156,39 +169,108 @@ def scan_repo(repo_path: Path, max_bytes: int):
     return files
 
 
-def embed_and_store(con, embedder, files):
+def get_existing_file_hashes(con):
+    """
+    Retrieve existing file hashes from the database for smart re-indexing.
+    
+    Returns:
+        Dict mapping file paths to their content hashes
+    """
+    try:
+        result = con.execute(f"SELECT path, id FROM {TABLE_NAME}").fetchall()
+        return {path: hash_id for path, hash_id in result}
+    except Exception:
+        return {}
+
+
+def filter_changed_files(files, existing_hashes):
+    """
+    Filter files to only include those that have changed or are new.
+    
+    Args:
+        files: List of Path objects to check
+        existing_hashes: Dict of path -> hash from database
+        
+    Returns:
+        List of Path objects that need to be reprocessed
+    """
+    changed_files = []
+    
+    for path in files:
+        try:
+            text = path.read_text(encoding="utf-8")
+            current_hash = compute_id(str(path) + text)
+            
+            # If file is new or content has changed, include it
+            if str(path) not in existing_hashes or existing_hashes[str(path)] != current_hash:
+                changed_files.append(path)
+        except Exception:
+            # If we can't read the file, skip it
+            continue
+    
+    return changed_files
+
+
+def process_single_file(path, embedder):
+    """
+    Process a single file for embedding generation.
+    
+    Args:
+        path: Path object to process
+        embedder: SentenceTransformer model
+        
+    Returns:
+        Tuple of (uid, path_str, text, embedding_list) or None if failed
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+        uid = compute_id(str(path) + text)
+        emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
+        return (uid, str(path), text, emb.tolist())
+    except Exception:
+        return None
+
+
+def embed_and_store(con, embedder, files, max_workers=None, progress_callback=None):
     """
     Process a list of files by generating embeddings and storing them in the database.
-
-    For each file, this function:
-    1. Reads the file content as UTF-8 text
-    2. Generates a unique ID based on file path + content
-    3. Creates a semantic embedding using the SentenceTransformer model
-    4. Stores the file info and embedding in the database
+    Now supports parallel processing and progress reporting.
 
     Args:
         con: DuckDB database connection
         embedder: SentenceTransformer model for generating embeddings
         files: List of Path objects to process
+        max_workers: Number of parallel workers (default: CPU count)
+        progress_callback: Function to call with progress updates
     """
+    if not files:
+        return
+    
+    if max_workers is None:
+        max_workers = min(multiprocessing.cpu_count(), len(files))
+    
     rows = []
-    for path in files:
-        try:
-            # Read file content as UTF-8 text
-            text = path.read_text(encoding="utf-8")
-        except Exception:
-            # Skip files that can't be read (binary files, encoding issues, etc.)
-            continue
-
-        # Generate unique ID based on path and content
-        uid = compute_id(str(path) + text)
-
-        # Generate semantic embedding and convert to float32 for efficiency
-        emb = embedder.encode(text).astype(np.float32)
-
-        # Prepare row for batch insertion
-        rows.append((uid, str(path), text, emb.tolist()))
-
+    completed = 0
+    
+    if progress_callback:
+        progress_callback(0, len(files), "Starting embedding generation...")
+    
+    # Process files in parallel
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_path = {executor.submit(process_single_file, path, embedder): path 
+                         for path in files}
+        
+        # Collect results as they complete
+        for future in as_completed(future_to_path):
+            result = future.result()
+            if result is not None:
+                rows.append(result)
+            
+            completed += 1
+            if progress_callback:
+                progress_callback(completed, len(files), f"Processed {completed}/{len(files)} files")
+    
     # Insert all rows in a single batch operation for better performance
     if rows:
         con.executemany(
@@ -236,7 +318,7 @@ def search_index(con, embedder, query: str, k: int):
         Distance is cosine distance (lower = more similar)
     """
     # Generate embedding for the search query
-    q_emb = embedder.encode(query).astype(np.float32).tolist()
+    q_emb = embedder.encode(query, show_progress_bar=False).astype(np.float32).tolist()
 
     # Use DuckDB's array operations for cosine similarity search
     # Cosine similarity = dot(a,b) / (norm(a) * norm(b))
@@ -280,11 +362,14 @@ def embed_and_store_single(con, embedder, path: Path):
 
     # Generate unique ID and embedding
     uid = compute_id(str(path) + text)
-    emb = embedder.encode(text).astype(np.float32)
+    emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
 
-    # Store in database (INSERT OR REPLACE handles updates)
+    # First, delete any existing records for this path (handles content changes)
+    con.execute(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),))
+    
+    # Store in database
     con.execute(
-        f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
+        f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
         (uid, str(path), text, emb.tolist())
     )
 
@@ -446,44 +531,70 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
     observer.join()
 
 
-def reindex_all(repo_path: Path, max_bytes: int, con, embedder):
+def reindex_all(repo_path: Path, max_bytes: int, con, embedder, max_workers=None, force_all=False):
     """
-    Completely reindex a repository by scanning all files and rebuilding the search index.
+    Intelligently reindex a repository by only processing changed files.
 
-    This function provides a complete reindexing workflow that combines the
-    individual steps of scanning, embedding, and index building into a single
-    operation. It's particularly useful for:
-    - Initial indexing of a new repository
-    - Full refresh after configuration changes
-    - Recovery from corrupted index files
-    - API endpoints that need a simple "reindex everything" operation
-
-    The process includes:
-    1. Scan repository for all eligible code files
-    2. Generate embeddings for all file contents
-    3. Store embeddings in the database (replacing any existing entries)
-    4. Build a fresh HNSW index from all stored embeddings
+    This function provides a smart reindexing workflow that:
+    1. Scans repository for all eligible code files
+    2. Compares with existing database to find changed/new files
+    3. Only processes files that have actually changed
+    4. Uses parallel processing for faster embedding generation
 
     Args:
         repo_path: Path to the repository root directory
         max_bytes: Maximum file size in bytes to process
         con: DuckDB database connection
         embedder: SentenceTransformer model for generating embeddings
+        max_workers: Number of parallel workers (default: CPU count)
+        force_all: If True, reprocess all files regardless of changes
 
     Returns:
-        Number of files that were successfully indexed
+        Tuple of (total_files_found, files_processed, time_taken)
     """
+    start_time = time.time()
+    
     # Scan the repository for indexable files
+    print("🔍 Scanning repository for code files...")
     files = scan_repo(repo_path, max_bytes)
-
+    
+    if not files:
+        return 0, 0, 0
+    
+    # Smart re-indexing: only process changed files
+    files_to_process = files
+    if not force_all:
+        print("🧠 Checking for changed files...")
+        existing_hashes = get_existing_file_hashes(con)
+        files_to_process = filter_changed_files(files, existing_hashes)
+        
+        if not files_to_process:
+            print("✨ No changes detected - index is up to date!")
+            return len(files), 0, time.time() - start_time
+        
+        print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
+    
+    # Progress reporting function
+    def show_progress(completed, total, message):
+        percent = (completed / total) * 100 if total > 0 else 0
+        elapsed = time.time() - start_time
+        
+        if completed > 0:
+            rate = completed / elapsed
+            eta = (total - completed) / rate if rate > 0 else 0
+            print(f"\r🧠 {message} ({percent:.1f}% | {rate:.1f} files/sec | ETA: {eta:.1f}s)", end="", flush=True)
+        else:
+            print(f"\r🧠 {message}", end="", flush=True)
+    
     # Generate embeddings and store them in the database
-    embed_and_store(con, embedder, files)
-
-    # Build the HNSW search index from all stored embeddings
+    embed_and_store(con, embedder, files_to_process, max_workers, show_progress)
+    print()  # New line after progress
+    
+    # Build the search index from all stored embeddings
     build_full_index(con)
-
-    # Return count of processed files for reporting
-    return len(files)
+    
+    elapsed = time.time() - start_time
+    return len(files), len(files_to_process), elapsed
 
 
 def main():
@@ -570,6 +681,20 @@ Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, et
         metavar="SIZE",
         help="Maximum file size in MB to include (default: 1.0). "
              "Larger files are skipped to avoid memory issues."
+    )
+    p_i.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        metavar="NUM",
+        help="Number of parallel workers for embedding generation (default: CPU count). "
+             "More workers = faster processing but higher memory usage."
+    )
+    p_i.add_argument(
+        "--force-all",
+        action="store_true",
+        help="Force reprocessing of all files, even if unchanged. "
+             "Useful for model updates or index corruption recovery."
     )
 
     # 'search' command: Query the existing index
@@ -667,32 +792,58 @@ Press Ctrl+C to stop watching.
 
     # Initialize the ML model (shared across all commands)
     print("⚡ Initializing AI model...")
-    embedder = SentenceTransformer(EMBED_MODEL)
+    try:
+        embedder = SentenceTransformer(EMBED_MODEL)
+    except Exception as e:
+        # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
+        if "meta tensor" in str(e) or "to_empty" in str(e):
+            print("🔧 Detected MPS compatibility issue, falling back to CPU...")
+            import torch
+            embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
+        else:
+            raise e
 
     # Dispatch to appropriate command handler
     if args.cmd == "index":
         # Build full index from repository
-        print(f"\n🔍 Scanning repository: {args.repo}")
+        print(f"\n🔍 Indexing repository: {args.repo}")
         print(f"📁 Max file size: {args.max_mb} MB")
+        if args.workers:
+            print(f"👥 Using {args.workers} parallel workers")
+        else:
+            print(f"👥 Using {multiprocessing.cpu_count()} parallel workers (auto-detected)")
+        
+        if args.force_all:
+            print("🔄 Force mode: reprocessing all files")
 
         repo_path = Path(args.repo).resolve()
         con = init_db(repo_path)
 
-        files = scan_repo(repo_path, int(args.max_mb * 1024**2))
-        print(f"✨ Found {len(files)} code files to index")
+        # Use new smart reindex function
+        total_files, processed_files, elapsed = reindex_all(
+            repo_path, 
+            int(args.max_mb * 1024**2), 
+            con, 
+            embedder,
+            args.workers,
+            args.force_all
+        )
 
-        if len(files) == 0:
-            print(
-                "❌ No code files found. Make sure you're in a Git repository with code files.")
+        if total_files == 0:
+            print("❌ No code files found. Make sure you're in a Git repository with code files.")
             return
 
-        print("🧠 Generating embeddings and storing in database...")
-        embed_and_store(con, embedder, files)
-
-        print("🔧 Building search index...")
+        print(f"🎉 Indexing complete!")
+        print(f"📊 Files found: {total_files}")
+        print(f"📊 Files processed: {processed_files}")
+        print(f"⏱️  Time elapsed: {elapsed:.2f} seconds")
+        
+        if processed_files > 0:
+            print(f"⚡ Processing rate: {processed_files/elapsed:.1f} files/second")
+        
         embedding_count = build_full_index(con)
-        print(f"🎉 Index ready with {embedding_count} embeddings!")
-        print(f"💾 Database saved to: {repo_path / 'code_index.duckdb'}")
+        print(f"💾 Database saved to: {repo_path / 'turboprop' / 'code_index.duckdb'}")
+        print(f"🔍 Total embeddings in index: {embedding_count}")
         print("\n💡 Try searching: turboprop search \"your query here\"")
 
     elif args.cmd == "search":

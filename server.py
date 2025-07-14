@@ -47,7 +47,17 @@ app = FastAPI(
 # These are created once when the server starts
 current_dir = Path(".").resolve()  # Use current working directory as repo path
 con = init_db(current_dir)  # Database connection
-embedder = SentenceTransformer(EMBED_MODEL)  # ML model for embeddings
+# Initialize ML model with MPS compatibility handling
+try:
+    embedder = SentenceTransformer(EMBED_MODEL)  # ML model for embeddings
+except Exception as e:
+    # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
+    if "meta tensor" in str(e) or "to_empty" in str(e):
+        print("🔧 Detected MPS compatibility issue, falling back to CPU...")
+        import torch
+        embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
+    else:
+        raise e
 
 
 # Pydantic models for request/response validation and documentation
@@ -123,7 +133,7 @@ def http_index(req: IndexRequest):
     max_bytes = int(req.max_mb * 1024**2)
 
     # Trigger full reindexing of the specified repository
-    reindex_all(Path(req.repo), max_bytes, con, embedder)
+    total_files, processed_files, elapsed = reindex_all(Path(req.repo), max_bytes, con, embedder)
 
     # Count total files in database to report back to user
     count = con.execute(f"SELECT count(*) FROM {TABLE_NAME}").fetchone()[0]

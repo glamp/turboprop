@@ -42,8 +42,8 @@ class TestIndexEndpoint:
         with patch('server.reindex_all') as mock_reindex, \
              patch('server.con') as mock_con:
             
-            # Mock the reindex_all function
-            mock_reindex.return_value = 42
+            # Mock the reindex_all function to return (total_files, processed_files, elapsed)
+            mock_reindex.return_value = (42, 42, 1.0)
             
             # Mock the database count query
             mock_con.execute.return_value.fetchone.return_value = [42]
@@ -71,7 +71,7 @@ class TestIndexEndpoint:
         with patch('server.reindex_all') as mock_reindex, \
              patch('server.con') as mock_con:
             
-            mock_reindex.return_value = 10
+            mock_reindex.return_value = (10, 10, 1.0)
             mock_con.execute.return_value.fetchone.return_value = [10]
             
             # Make request without max_mb
@@ -241,7 +241,9 @@ class TestAppInitialization:
         client = TestClient(app)
         
         # Test route existence by checking responses
-        with patch('server.reindex_all'), patch('server.con'):
+        with patch('server.reindex_all') as mock_reindex, patch('server.con') as mock_con:
+            mock_reindex.return_value = (10, 10, 1.0)
+            mock_con.execute.return_value.fetchone.return_value = [10]
             response = client.post("/index", json={"repo": "/test"})
             assert response.status_code in [200, 422]  # Either success or validation error
             
@@ -338,7 +340,7 @@ class TestIntegrationWithMocks:
              patch('server.search_index') as mock_search:
             
             # Mock indexing
-            mock_reindex.return_value = 5
+            mock_reindex.return_value = (5, 5, 1.0)
             mock_con.execute.return_value.fetchone.return_value = [5]
             
             # Mock search
@@ -371,7 +373,7 @@ class TestIntegrationWithMocks:
              patch('server.search_index') as mock_search:
             
             # Mock functions to simulate slow operations
-            mock_reindex.return_value = 10
+            mock_reindex.return_value = (10, 10, 1.0)
             mock_con.execute.return_value.fetchone.return_value = [10]
             mock_search.return_value = []
             
