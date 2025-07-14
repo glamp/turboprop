@@ -47,7 +47,11 @@ testpaths = ["tests"]
 turboprop = "code_index:main"
 turboprop-mcp = "mcp_server:main"
 
-# Optional: You can add additional configuration sections here such as:
-# [tool.black] - for code formatting
-# [tool.mypy] - for type checking
-# [build-system] - for packaging and distribution
+# Build system configuration
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Setuptools configuration
+[tool.setuptools]
+py-modules = ["code_index", "server", "main", "mcp_server"]

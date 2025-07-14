@@ -30,7 +30,7 @@ from sentence_transformers import SentenceTransformer
 # Import our existing code indexing functionality
 from code_index import (
     init_db, scan_repo, embed_and_store, build_full_index, 
-    search_index, watch_mode, reindex_all, TABLE_NAME, DB_PATH
+    search_index, watch_mode, reindex_all, TABLE_NAME, DB_PATH, EMBED_MODEL, DIMENSIONS
 )
 
 # Initialize the MCP server
@@ -61,7 +61,7 @@ def get_embedder():
     """Get or create the sentence transformer model."""
     global _embedder
     if _embedder is None:
-        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        _embedder = SentenceTransformer(EMBED_MODEL)
     return _embedder
 
 
@@ -108,15 +108,19 @@ def index_repository(
         embedder = get_embedder()
         
         # Scan repository for code files
+        print(f"📂 Scanning for code files (max size: {max_file_size_mb} MB)...")
         files = scan_repo(repo_path, max_bytes)
+        print(f"📄 Found {len(files)} code files to process")
         
         if not files:
             return f"No code files found in repository '{repository_path}'. Make sure it's a Git repository with code files."
         
         # Generate embeddings and store in database
+        print(f"🔍 Generating embeddings for {len(files)} files...")
         embed_and_store(con, embedder, files)
         
         # Build search index
+        print(f"📊 Building search index...")
         embedding_count = build_full_index(con)
         
         return f"Successfully indexed {len(files)} files from '{repository_path}'. Index contains {embedding_count} embeddings and is ready for search."
@@ -212,7 +216,7 @@ def get_index_status() -> str:
             f"  Database size: {db_size_mb:.2f} MB",
             f"  Search ready: {'Yes' if index_ready else 'No'}",
             f"  Database path: {DB_PATH}",
-            f"  Embedding model: all-MiniLM-L6-v2 (384 dimensions)",
+            f"  Embedding model: {EMBED_MODEL} ({DIMENSIONS} dimensions)",
             f"  Configured repository: {_config['repository_path'] or 'Not configured'}",
             f"  File watcher: {watcher_status}"
         ]
@@ -452,11 +456,18 @@ def main():
         print("📁 No repository configured - use tools to specify paths")
         print()
     
-    # Auto-index if configured
+    # Auto-index if configured (run in background to avoid MCP timeout)
     if _config['repository_path'] and _config['auto_index']:
-        print("🔍 Auto-indexing repository...")
-        result = index_repository()
-        print(f"✅ {result}")
+        def start_auto_index():
+            print("🔍 Auto-indexing repository...")
+            print(f"📁 Scanning repository: {_config['repository_path']}")
+            result = index_repository()
+            print(f"✅ {result}")
+            print()
+        
+        auto_index_thread = threading.Thread(target=start_auto_index, daemon=True)
+        auto_index_thread.start()
+        print("🔍 Auto-indexing started in background...")
         print()
     
     # Start file watcher if configured
