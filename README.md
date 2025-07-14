@@ -1,123 +1,21 @@
 # Turboprop 🚀
 
-A lightning-fast, aviation-inspired semantic code search & indexing system with MCP integration.
-
-Turboprop transforms your codebase into a searchable knowledge base using AI embeddings and vector search. Instead of grepping for exact text matches, ask questions in natural language and find conceptually similar code across your entire repository.
+Lightning-fast semantic code search with AI embeddings. Transform your codebase into a searchable knowledge base using natural language queries.
 
 ## ✨ Key Features
 
 - 🔍 **Semantic Search**: Find code by meaning, not just keywords ("JWT authentication" finds auth logic)
-- 🐆 **Lightning Fast**: DuckDB + HNSWLib for sub-second search across large codebases
+- 🐆 **Lightning Fast**: DuckDB vector operations for sub-second search across large codebases
 - 🔄 **Live Updates**: Watch mode with intelligent debouncing - your index stays fresh as you code
-- 🚀 **HTTP API**: RESTful FastAPI server for integration with tools and IDEs
 - 🤖 **MCP Ready**: Perfect integration with Claude and other AI coding assistants
 - 📁 **Git-Aware**: Respects .gitignore and only indexes what matters
-- 💬 **Rich CLI**: Beautiful command-line interface with helpful guidance and examples
-
-## 🎯 Use Cases
-
-- **"Find similar functions"**: Search for `"parse JSON response"` and discover all JSON parsing code
-- **Documentation queries**: `"error handling patterns"` reveals how your team handles exceptions
-- **Architectural exploration**: `"database connection setup"` shows all DB-related initialization
-- **Code review assistance**: Quickly find existing implementations before writing new code
-- **AI pair programming**: Let Claude explore your codebase through natural language queries
-- **Onboarding new developers**: Help them explore the codebase through semantic search
-
----
+- 💻 **Simple CLI**: Clean command-line interface with helpful guidance
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### MCP Configuration (Claude Integration) - Front and Center!
 
-#### Option A: Using uvx (Recommended - Like npx for Python)
-```bash
-# No installation needed! Run directly:
-uvx turboprop mcp --repository /path/to/your/repo
-
-# Or install globally for repeated use:
-pip install turboprop
-```
-
-#### Option B: Development Setup
-```bash
-# Clone and setup for development
-git clone https://github.com/glamp/turboprop.git
-cd turboprop
-
-# Install with uv (recommended - fastest)
-uv sync
-
-# OR install with pip + virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e .
-```
-
-### 2. Index Your Code
-
-```bash
-# Using installed version
-turboprop index .
-
-# Or run directly without installation
-uvx turboprop index .
-# OR if you have activated the virtual environment:
-# python code_index.py index .
-
-# Example output:
-# 🚀 Turboprop - Semantic Code Search
-# ========================================
-# ⚡ Initializing database and AI model...
-# 🔍 Scanning repository: .
-# 📁 Max file size: 1.0 MB
-# ✨ Found 127 code files to index
-# 🧠 Generating embeddings and storing in database...
-# 🔧 Building search index...
-# 🎉 Index ready with 127 embeddings!
-```
-
-### 3. Search Your Code
-
-```bash
-# Search using natural language with beautiful results
-uv run python code_index.py search "JWT authentication" --k 5
-
-# Example output:
-# 🔎 Searching for: "JWT authentication"
-# 📊 Returning top 5 results...
-#
-# 🎯 Found 3 relevant results:
-#
-# ┌─ 1. src/auth/middleware.py
-# │  📈 Similarity: 94.2%
-# │
-# │  def verify_jwt_token(token: str):
-# │      """Verify JWT token and extract user claims"""
-# └────────────────────────────────────────────────────
-```
-
-## ⚙️ CLI Usage
-
-```bash
-python code_index.py index /path/to/repo --max-mb 1.0
-python code_index.py search "terms" --k 5
-python code_index.py watch /path/to/repo --max-mb 1.0 --debounce-sec 5.0
-```
-
-## 🤖 MCP Server (Claude Integration)
-
-### Quick Start with uvx (Recommended)
-```bash
-# Start MCP server directly (like npx)
-uvx turboprop mcp --repository /path/to/your/repo --auto-index
-
-# For continuous use
-pip install turboprop
-turboprop mcp --repository /path/to/your/repo
-```
-
-### Claude Desktop Configuration
-Add to your Claude Desktop MCP configuration:
+Add this to your Claude Desktop MCP configuration file:
 
 ```json
 {
@@ -128,28 +26,137 @@ Add to your Claude Desktop MCP configuration:
         "turboprop",
         "mcp",
         "--repository",
-        ".",
+        "/path/to/your/codebase",
         "--auto-index"
       ]
     }
   }
 }
+```
 
+Then restart Claude Desktop and start asking questions about your code:
+
+- "Find JWT authentication code"
+- "Show me error handling patterns"
+- "Where is the database connection setup?"
+
+### Installation & Basic Usage
+
+```bash
+# Install globally
+pip install turboprop
+
+# Index your codebase
+turboprop index .
+
+# Search with natural language
+turboprop search "JWT authentication"
+
+# Watch for changes (keeps index updated)
+turboprop watch .
+```
+
+## ⚙️ CLI Usage
+
+### `index` - Build Search Index
+
+```bash
+turboprop index <repository_path> [options]
+
+Options:
+  --max-mb FLOAT       Maximum file size in MB to index (default: 1.0)
+  --workers INTEGER    Number of parallel workers (default: CPU count)
+  --force-all         Force reprocessing of all files
+
+Examples:
+  turboprop index .                    # Index current directory
+  turboprop index ~/my-project         # Index specific project
+  turboprop index . --max-mb 2.0      # Allow larger files
+```
+
+### `search` - Semantic Code Search
+
+```bash
+turboprop search "<query>" [options]
+
+Options:
+  --repo PATH         Repository path (default: current directory)
+  --k INTEGER         Number of results to return (default: 5)
+
+Query Examples:
+  turboprop search "JWT authentication"              # Find auth-related code
+  turboprop search "parse JSON response"             # Discover JSON parsing logic
+  turboprop search "error handling middleware"       # Locate error handling patterns
+  turboprop search "database connection setup"       # Find DB initialization code
+  turboprop search "React component for forms"       # Find form-related components
+```
+
+### `watch` - Live Index Updates
+
+```bash
+turboprop watch <repository_path> [options]
+
+Options:
+  --max-mb FLOAT        Maximum file size in MB (default: 1.0)
+  --debounce-sec FLOAT  Seconds to wait before processing changes (default: 5.0)
+
+Example:
+  turboprop watch . --debounce-sec 3.0  # Faster updates
+```
+
+### `mcp` - Start MCP Server
+
+```bash
+turboprop mcp [options]
+
+Options:
+  --repository PATH     Repository to index and monitor (default: current directory)
+  --max-mb FLOAT       Maximum file size in MB (default: 1.0)
+  --debounce-sec FLOAT Seconds to wait before processing changes (default: 5.0)
+  --auto-index         Automatically index on startup (default: True)
+  --no-auto-index      Don't automatically index on startup
+  --auto-watch         Automatically watch for changes (default: True)
+  --no-auto-watch      Don't automatically watch for changes
+
+Examples:
+  turboprop mcp --repository .                     # Start MCP server for current directory
+  turboprop mcp --repository /path/to/repo         # Index specific repository
+  turboprop mcp --repository . --max-mb 2.0        # Allow larger files
+  turboprop mcp --repository . --no-auto-index     # Don't auto-index on startup
 ```
 
 ### Features Available in Claude
+
+When using the MCP server with Claude:
+
 - **🔍 Semantic Code Search**: Ask Claude to find code using natural language
 - **📁 Repository Indexing**: Automatically index and watch your codebase
 - **🔄 Real-time Updates**: Index stays fresh as you code
 - **💬 Natural Queries**: "Find JWT authentication code", "Show error handling patterns"
 
-### HTTP API Server
+## 💡 Pro Tips & Search Examples
 
-Run the HTTP API server:
+### Query Examples
 
-```bash
-uvicorn server:app --reload  # or uvx server:app --reload
-```
+- `"JWT authentication"` → Find auth-related code
+- `"parse JSON response"` → Discover JSON parsing logic
+- `"error handling middleware"` → Locate error handling patterns
+- `"database connection setup"` → Find DB initialization code
+- `"React component for forms"` → Find form-related components
+
+### Performance Tips
+
+- **File size limit**: Adjust `--max-mb` based on your repository size and available memory
+- **Debounce timing**: Lower `--debounce-sec` for faster updates, higher for less CPU usage
+- **Search results**: Increase `--k` to see more results, decrease for faster queries
+
+## 📄 License
+
+MIT License - feel free to use this in your projects!
+
+---
+
+**Ready to supercharge your code exploration? Get started in 60 seconds!** 🚀✨
 
 ## 🧠 Optimized for Claude Code
 
