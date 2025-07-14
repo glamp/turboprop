@@ -4,7 +4,7 @@
 
 [project]
 name = "turboprop"
-version = "0.1.7"
+version = "0.1.8"
 description = "Lightning-fast semantic code search and indexing with DuckDB vector operations"
 readme = "README.md"
 license = {text = "MIT"}
@@ -83,7 +83,7 @@ dev = [
 
 # Setuptools configuration
 [tool.setuptools]
-py-modules = ["code_index", "server", "mcp_server"]
+py-modules = ["code_index", "server", "mcp_server", "embedding_helper"]
 packages = ["turboprop"]
 
 [tool.setuptools.package-data]
