@@ -112,8 +112,15 @@ class TestScanRepo:
     def test_scan_repo_finds_code_files(self):
         """Test that scan_repo finds files with code extensions."""
         with patch('subprocess.run') as mock_run:
-            # Mock git ls-files to return no ignored files
-            mock_run.return_value = Mock(stdout="", returncode=0)
+            # Mock git ls-files to return the files we created
+            expected_files = [
+                "main.py",
+                "config.json", 
+                "ignored.py",
+                "src/utils.py",
+                "src/large_file.py"
+            ]
+            mock_run.return_value = Mock(stdout="\n".join(expected_files), returncode=0)
             
             files = scan_repo(self.repo_path, max_bytes=1024*1024)
             
@@ -127,7 +134,14 @@ class TestScanRepo:
     def test_scan_repo_respects_size_limit(self):
         """Test that scan_repo filters out files exceeding size limit."""
         with patch('subprocess.run') as mock_run:
-            mock_run.return_value = Mock(stdout="", returncode=0)
+            expected_files = [
+                "main.py",
+                "config.json", 
+                "ignored.py",
+                "src/utils.py",
+                "src/large_file.py"
+            ]
+            mock_run.return_value = Mock(stdout="\n".join(expected_files), returncode=0)
             
             files = scan_repo(self.repo_path, max_bytes=1000)  # Small size limit
             
@@ -139,9 +153,12 @@ class TestScanRepo:
     def test_scan_repo_handles_git_ignore(self):
         """Test that scan_repo respects .gitignore files."""
         with patch('subprocess.run') as mock_run:
-            # Mock git ls-files to return ignored files
-            ignored_file = str(self.repo_path / "ignored.py")
-            mock_run.return_value = Mock(stdout=f"{ignored_file}\n", returncode=0)
+            # Mock git ls-files to return only non-ignored files
+            # First call is for tracked files, second is for untracked
+            mock_run.side_effect = [
+                Mock(stdout="main.py\nconfig.json\nsrc/utils.py\n", returncode=0),  # tracked files
+                Mock(stdout="", returncode=0)  # untracked files (ignored.py is ignored)
+            ]
             
             files = scan_repo(self.repo_path, max_bytes=1024*1024)
             
@@ -179,14 +196,23 @@ class TestEmbedAndStore:
                 file_path.write_text(f"def func_{i}(): pass")
                 test_files.append(file_path)
             
-            embed_and_store(con, self.mock_embedder, test_files)
-            
-            # Check that files were stored in database
-            count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
-            assert count == 3
-            
-            # Check that embeddings were generated
-            assert self.mock_embedder.encode.call_count == 3
+            # Mock SentenceTransformer creation in process_single_file
+            with patch('code_index.SentenceTransformer') as mock_st_class:
+                mock_st_instance = Mock()
+                mock_st_instance.encode.return_value = np.random.rand(384).astype(np.float32)
+                mock_st_class.return_value = mock_st_instance
+                
+                # Set up mock embedder with model name
+                self.mock_embedder.model_name = "test-model"
+                
+                embed_and_store(con, self.mock_embedder, test_files)
+                
+                # Check that files were stored in database
+                count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+                assert count == 3
+                
+                # Check that embeddings were generated
+                assert mock_st_instance.encode.call_count == 3
             
             con.close()
             
@@ -206,6 +232,115 @@ class TestEmbedAndStore:
             # Should not have stored anything
             count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
             assert count == 0
+            
+            con.close()
+            
+    def test_embed_and_store_file_count_validation(self):
+        """Test that all readable files get indexed - regression test for silent failures."""
+        with patch('code_index.DB_PATH', str(self.db_path)):
+            con = init_db()
+            
+            # Create test files with various content types
+            test_files = []
+            
+            # Valid Python files
+            for i in range(5):
+                file_path = Path(self.temp_dir) / f"valid_{i}.py"
+                file_path.write_text(f"def func_{i}():\n    return {i}")
+                test_files.append(file_path)
+            
+            # Valid JSON file
+            json_file = Path(self.temp_dir) / "config.json"
+            json_file.write_text('{"key": "value", "number": 42}')
+            test_files.append(json_file)
+            
+            # Valid JavaScript file
+            js_file = Path(self.temp_dir) / "script.js"
+            js_file.write_text("function hello() { return 'world'; }")
+            test_files.append(js_file)
+            
+            # Count input files
+            input_file_count = len(test_files)
+            
+            # Mock SentenceTransformer creation in process_single_file
+            with patch('code_index.SentenceTransformer') as mock_st_class:
+                mock_st_instance = Mock()
+                mock_st_instance.encode.return_value = np.random.rand(384).astype(np.float32)
+                mock_st_class.return_value = mock_st_instance
+                
+                # Set up mock embedder with model name
+                self.mock_embedder.model_name = "test-model"
+                
+                # Process files
+                embed_and_store(con, self.mock_embedder, test_files)
+                
+                # Verify that ALL files were processed and stored
+                stored_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+                assert stored_count == input_file_count, (
+                    f"Expected {input_file_count} files to be indexed, but only {stored_count} were stored. "
+                    f"This suggests files are being silently skipped during processing."
+                )
+                
+                # Verify embeddings were generated for all files
+                assert mock_st_instance.encode.call_count == input_file_count
+                
+                # Verify all files have non-null embeddings
+                null_embedding_count = con.execute(
+                    f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NULL"
+                ).fetchone()[0]
+                assert null_embedding_count == 0, "Some files were stored without embeddings"
+            
+            con.close()
+            
+    def test_embed_and_store_mixed_success_and_failure(self):
+        """Test that successful files are indexed even when some files fail."""
+        with patch('code_index.DB_PATH', str(self.db_path)):
+            con = init_db()
+            
+            # Create a mix of valid and invalid files
+            test_files = []
+            
+            # Valid files
+            for i in range(3):
+                file_path = Path(self.temp_dir) / f"valid_{i}.py"
+                file_path.write_text(f"def func_{i}(): pass")
+                test_files.append(file_path)
+            
+            # Create a file with invalid UTF-8 encoding
+            invalid_file = Path(self.temp_dir) / "invalid.py"
+            with open(invalid_file, 'wb') as f:
+                f.write(b'print("hello")\n')
+                f.write(b'\xff\xfe\xfd')  # Invalid UTF-8 sequence
+                f.write(b'\nprint("world")')
+            test_files.append(invalid_file)
+            
+            # Mock SentenceTransformer creation in process_single_file
+            with patch('code_index.SentenceTransformer') as mock_st_class:
+                mock_st_instance = Mock()
+                mock_st_instance.encode.return_value = np.random.rand(384).astype(np.float32)
+                mock_st_class.return_value = mock_st_instance
+                
+                # Set up mock embedder with model name
+                self.mock_embedder.model_name = "test-model"
+                
+                # Capture stderr to check error reporting
+                import io
+                import contextlib
+                
+                stderr_capture = io.StringIO()
+                with contextlib.redirect_stderr(stderr_capture):
+                    embed_and_store(con, self.mock_embedder, test_files)
+                
+                # Check that valid files were stored
+                stored_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+                assert stored_count == 3, f"Expected 3 valid files to be stored, got {stored_count}"
+                
+                # Check that error was reported
+                stderr_output = stderr_capture.getvalue()
+                assert "Failed to process" in stderr_output
+                assert "invalid.py" in stderr_output
+                assert "Failed to process 1 files out of 4 total" in stderr_output
+                assert "Successfully processed 3 files" in stderr_output
             
             con.close()
 
@@ -454,11 +589,12 @@ class UtilityClass:
         with patch('code_index.DB_PATH', str(self.db_path)):
             # Mock git ls-files
             with patch('subprocess.run') as mock_run:
-                mock_run.return_value = Mock(stdout="", returncode=0)
+                mock_run.return_value = Mock(stdout="main.py\nutils.py\nconfig.json\n", returncode=0)
                 
                 # Mock embedder
                 mock_embedder = Mock()
                 mock_embedder.encode.return_value = np.random.rand(384).astype(np.float32)
+                mock_embedder.model_name = "test-model"
                 
                 # Initialize database
                 con = init_db()
@@ -467,22 +603,28 @@ class UtilityClass:
                 files = scan_repo(self.repo_path, max_bytes=1024*1024)
                 assert len(files) == 3  # Should find 3 files
                 
-                # Embed and store files
-                embed_and_store(con, mock_embedder, files)
-                
-                # Verify embeddings were created
-                embedding_count = build_full_index(con)
-                assert embedding_count == 3
-                
-                # Test search
-                results = search_index(con, mock_embedder, "hello world", k=2)
-                assert len(results) <= 2
-                
-                # Verify result structure
-                for path, snippet, distance in results:
-                    assert isinstance(path, str)
-                    assert isinstance(snippet, str)
-                    assert isinstance(distance, float)
+                # Mock SentenceTransformer creation in process_single_file
+                with patch('code_index.SentenceTransformer') as mock_st_class:
+                    mock_st_instance = Mock()
+                    mock_st_instance.encode.return_value = np.random.rand(384).astype(np.float32)
+                    mock_st_class.return_value = mock_st_instance
+                    
+                    # Embed and store files
+                    embed_and_store(con, mock_embedder, files)
+                    
+                    # Verify embeddings were created
+                    embedding_count = build_full_index(con)
+                    assert embedding_count == 3
+                    
+                    # Test search
+                    results = search_index(con, mock_embedder, "hello world", k=2)
+                    assert len(results) <= 2
+                    
+                    # Verify result structure
+                    for path, snippet, distance in results:
+                        assert isinstance(path, str)
+                        assert isinstance(snippet, str)
+                        assert isinstance(distance, float)
                 
                 con.close()
                 
@@ -522,6 +664,60 @@ class UtilityClass:
             assert "updated_function" in content
             
             con.close()
+            
+    def test_example_codebase_file_count_validation(self):
+        """Test that example codebase indexing processes all discoverable files."""
+        # Use the actual example codebase
+        example_path = Path(__file__).parent.parent / "example-codebases" / "bashplotlib"
+        
+        if not example_path.exists():
+            pytest.skip("Example codebase not found")
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "test.duckdb"
+            
+            with patch('code_index.DB_PATH', str(db_path)):
+                # Mock embedder
+                mock_embedder = Mock()
+                mock_embedder.encode.return_value = np.random.rand(384).astype(np.float32)
+                mock_embedder.model_name = "test-model"
+                
+                # Initialize database
+                con = init_db()
+                
+                # Scan repository to get expected file count (without mocking git)
+                expected_files = scan_repo(example_path, max_bytes=1024*1024)
+                
+                expected_count = len(expected_files)
+                
+                # Skip if no files found
+                if expected_count == 0:
+                    pytest.skip("No code files found in example codebase")
+                
+                # Mock SentenceTransformer creation in process_single_file
+                with patch('code_index.SentenceTransformer') as mock_st_class:
+                    mock_st_instance = Mock()
+                    mock_st_instance.encode.return_value = np.random.rand(384).astype(np.float32)
+                    mock_st_class.return_value = mock_st_instance
+                    
+                    # Process all files
+                    embed_and_store(con, mock_embedder, expected_files)
+                    
+                    # Verify all files were indexed
+                    actual_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+                    
+                    assert actual_count == expected_count, (
+                        f"Expected {expected_count} files from example codebase to be indexed, "
+                        f"but only {actual_count} were stored. Files found: {[f.name for f in expected_files]}"
+                    )
+                    
+                    # Verify all files have embeddings
+                    null_embedding_count = con.execute(
+                        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NULL"
+                    ).fetchone()[0]
+                    assert null_embedding_count == 0, "Some files were stored without embeddings"
+                
+                con.close()
 
 
 if __name__ == "__main__":

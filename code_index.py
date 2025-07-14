@@ -22,6 +22,7 @@ import argparse
 import hashlib
 import time
 import threading
+import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
@@ -282,7 +283,9 @@ def process_single_file(path, model_name=None):
         
         emb = embedder.encode(text, show_progress_bar=False).astype(np.float32)
         return (uid, str(path), text, emb.tolist())
-    except Exception:
+    except Exception as e:
+        # Log specific errors to help debug embedding failures
+        print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
         return None
 
 
@@ -305,6 +308,7 @@ def embed_and_store(con, embedder, files, max_workers=None, progress_callback=No
         max_workers = min(4, multiprocessing.cpu_count(), len(files))
     
     rows = []
+    failed_files = []
     
     # Get model name from the embedder instance
     model_name = getattr(embedder, 'model_name', EMBED_MODEL) if hasattr(embedder, 'model_name') else EMBED_MODEL
@@ -319,15 +323,22 @@ def embed_and_store(con, embedder, files, max_workers=None, progress_callback=No
             
             # Collect results as they complete
             for future in as_completed(future_to_path):
+                path = future_to_path[future]
                 result = future.result()
                 if result is not None:
                     rows.append(result)
+                else:
+                    failed_files.append(path)
                 
                 pbar.update(1)
                 
                 # Maintain backward compatibility with progress_callback
                 if progress_callback:
                     progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
+    
+    # Report processing results
+    if failed_files:
+        print(f"⚠️  Failed to process {len(failed_files)} files out of {len(files)} total", file=sys.stderr)
     
     # Insert all rows in a single batch operation for better performance
     if rows:
@@ -336,6 +347,7 @@ def embed_and_store(con, embedder, files, max_workers=None, progress_callback=No
                 f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
                 rows
             )
+        print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
 
 def build_full_index(con):
