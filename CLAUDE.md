@@ -1,0 +1,142 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+Turboprop is a semantic code search and indexing system that uses DuckDB for both storage and vector similarity search with ML embeddings for intelligent code discovery. It consists of a CLI tool and HTTP API server for searching code repositories using natural language queries.
+
+## Development Commands
+
+### Installation & Setup
+```bash
+# Setup virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install duckdb sentence-transformers watchdog fastapi uvicorn
+
+# Or install with development dependencies
+pip install -e ".[dev]"
+```
+
+### Running the Application
+
+**CLI Usage:**
+```bash
+# Index a repository
+python code_index.py index /path/to/repo --max-mb 1.0
+
+# Search the index
+python code_index.py search "your search query" --k 5
+
+# Watch for changes (continuous mode)
+python code_index.py watch /path/to/repo --max-mb 1.0 --debounce-sec 5.0
+```
+
+**HTTP API Server:**
+```bash
+# Start the FastAPI server
+uvicorn server:app --reload
+
+# Alternative using uvx
+uvx server:app --reload
+```
+
+### Testing
+```bash
+# Run unit tests
+pytest tests/
+
+# Run tests with coverage
+pytest --cov=. tests/
+
+# Test basic functionality
+python code_index.py index example-codebases/bashplotlib
+python code_index.py search "histogram plotting function"
+
+# Test server endpoints
+uvicorn server:app --reload
+# Visit http://localhost:8000/docs for API documentation
+```
+
+## Architecture
+
+### Core Components
+
+**code_index.py** - Main CLI application with three primary functions:
+- `scan_repo()`: Discovers code files using Git ls-files (respects .gitignore)
+- `embed_and_store()`: Generates sentence embeddings and stores in DuckDB
+- `build_full_index()`: Validates embeddings exist in database (no separate index needed)
+- `search_index()`: Performs semantic search using DuckDB's native vector operations
+- `watch_mode()`: Real-time file monitoring with debounced updates
+
+**server.py** - FastAPI wrapper providing HTTP endpoints:
+- `POST /index`: Trigger full repository reindexing
+- `GET /search`: Query the index for similar code
+- Background watcher automatically monitors current directory
+
+### Key Technical Details
+
+**Database Schema (DuckDB):**
+```sql
+CREATE TABLE code_files (
+  id VARCHAR PRIMARY KEY,        -- SHA-256 hash of path + content
+  path VARCHAR,                  -- Absolute file path
+  content TEXT,                  -- Full file content
+  embedding DOUBLE[384]          -- 384-dimension vector embeddings
+);
+```
+
+**ML Model:** Uses SentenceTransformer "all-MiniLM-L6-v2" (384 dimensions) for semantic embeddings
+
+**Search Algorithm:** DuckDB's native vector operations with cosine similarity for exact nearest neighbor search
+
+**File Filtering:** Only processes files with code extensions (.py, .js, .ts, .java, .go, etc.) and respects Git ignore rules
+
+### Database Files
+- `code_index.duckdb`: Main database containing file content and embeddings with native vector search
+
+## Common Development Patterns
+
+### Adding New File Types
+Extend `CODE_EXTENSIONS` set in code_index.py:
+```python
+CODE_EXTENSIONS = {".py", ".js", ".ts", ".new_extension"}
+```
+
+### Modifying Search Parameters
+- **Vector search**: Uses DuckDB's `list_dot_product()` for cosine similarity calculations
+- **Embedding model**: Change `EMBED_MODEL` constant (requires reindexing)
+- **Result limits**: Modify default `k` values in CLI args or API endpoints
+
+### Performance Tuning
+- **File size limits**: Adjust `max_mb` parameters to balance completeness vs. performance
+- **Debounce timing**: Tune `debounce_sec` for watch mode responsiveness
+- **Batch processing**: `embed_and_store()` processes files in batches for efficiency
+
+## Project Structure
+
+```
+turboprop/
+├── code_index.py      # Main CLI application
+├── server.py          # FastAPI HTTP server
+├── main.py           # Simple entry point
+├── pyproject.toml    # Dependencies and project config
+├── example-codebase/ # Sample repository for testing
+└── *.duckdb, *.idx   # Generated database and index files
+```
+
+## Dependencies
+
+**Core:**
+- `duckdb`: Fast analytical database for embeddings storage and vector search
+- `sentence-transformers`: ML models for semantic embeddings
+- `watchdog`: File system monitoring
+
+**Web API:**
+- `fastapi`: Modern Python web framework
+- `uvicorn`: ASGI server for running FastAPI
+
+This system is designed for semantic code discovery - finding code by meaning rather than exact text matches, making it ideal for AI-assisted development workflows. The use of DuckDB for vector operations eliminates the need for separate indexing libraries and provides excellent performance for most use cases.

@@ -1,0 +1,53 @@
+# pyproject.toml: Python project configuration and dependency management
+# This file defines the project metadata, dependencies, and build configuration
+# for the turboprop code indexing and search system.
+
+[project]
+name = "turboprop"
+version = "0.1.0"
+description = "Lightning-fast semantic code search and indexing with DuckDB vector operations"
+readme = "README.md"
+requires-python = ">=3.12"
+
+# Core dependencies for the code indexing and search functionality
+dependencies = [
+    # Database and storage
+    "duckdb>=1.3.2",        # Fast analytical database for storing file content and embeddings
+    
+    # Web API framework  
+    "fastapi>=0.116.1",     # Modern, fast web framework for building the HTTP API
+    "uvicorn>=0.35.0",      # ASGI server for running the FastAPI application
+    
+    # Machine learning and vector search
+    "sentence-transformers>=5.0.0",  # Pre-trained models for generating semantic embeddings
+    "transformers>=4.53.2",          # Underlying ML framework for sentence-transformers
+    
+    # File system monitoring
+    "watchdog>=6.0.0",      # Cross-platform file system event monitoring for watch mode
+    
+    # Model Context Protocol server
+    "mcp>=1.0.0",           # MCP SDK for building MCP servers
+]
+
+# Development dependencies
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",        # Testing framework
+    "pytest-cov>=4.0.0",    # Coverage reporting
+]
+
+# Test configuration
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+# Command-line entry points
+[project.scripts]
+turboprop = "code_index:main"
+turboprop-mcp = "mcp_server:main"
+
+# Optional: You can add additional configuration sections here such as:
+# [tool.black] - for code formatting
+# [tool.mypy] - for type checking
+# [build-system] - for packaging and distribution

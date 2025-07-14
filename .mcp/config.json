@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "turboprop": {
+      "command": "uvx",
+      "args": [
+        "--from", ".",
+        "turboprop-mcp",
+        ".",
+        "--max-mb", "2.0",
+        "--debounce-sec", "3.0"
+      ],
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+}
