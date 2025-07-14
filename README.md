@@ -29,8 +29,18 @@ Turboprop transforms your codebase into a searchable knowledge base using AI emb
 
 ### 1. Installation
 
+#### Option A: Using uvx (Recommended - Like npx for Python)
 ```bash
-# Clone and setup
+# No installation needed! Run directly:
+uvx turboprop mcp --repository /path/to/your/repo
+
+# Or install globally for repeated use:
+pip install turboprop
+```
+
+#### Option B: Development Setup
+```bash
+# Clone and setup for development
 git clone https://github.com/glamp/turboprop.git
 cd turboprop
 
@@ -46,8 +56,11 @@ pip install -e .
 ### 2. Index Your Code
 
 ```bash
-# Index current project with helpful output
-uv run python code_index.py index .
+# Using installed version
+turboprop index .
+
+# Or run directly without installation
+uvx turboprop index .
 # OR if you have activated the virtual environment:
 # python code_index.py index .
 
@@ -91,15 +104,44 @@ python code_index.py search "terms" --k 5
 python code_index.py watch /path/to/repo --max-mb 1.0 --debounce-sec 5.0
 ```
 
-## 🚀 MCP Server
+## 🤖 MCP Server (Claude Integration)
 
-Run the Model Context Protocol server for integration with Claude:
-
+### Quick Start with uvx (Recommended)
 ```bash
-python mcp_server.py
-# or
-turboprop-mcp
+# Start MCP server directly (like npx)
+uvx turboprop mcp --repository /path/to/your/repo --auto-index
+
+# For continuous use
+pip install turboprop
+turboprop mcp --repository /path/to/your/repo
 ```
+
+### Claude Desktop Configuration
+Add to your Claude Desktop MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "turboprop": {
+      "command": "uvx",
+      "args": [
+        "turboprop",
+        "mcp",
+        "--repository",
+        ".",
+        "--auto-index"
+      ]
+    }
+  }
+}
+
+```
+
+### Features Available in Claude
+- **🔍 Semantic Code Search**: Ask Claude to find code using natural language
+- **📁 Repository Indexing**: Automatically index and watch your codebase
+- **🔄 Real-time Updates**: Index stays fresh as you code
+- **💬 Natural Queries**: "Find JWT authentication code", "Show error handling patterns"
 
 ### HTTP API Server
 
