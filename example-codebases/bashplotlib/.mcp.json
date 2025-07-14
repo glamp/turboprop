@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "turboprop": {
+      "command": "uvx",
+      "args": [
+        "turboprop",
+        "mcp",
+        "--repository",
+        ".",
+        "--auto-index"
+      ]
+    }
+  }
+}

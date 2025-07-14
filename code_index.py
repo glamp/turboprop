@@ -511,7 +511,16 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
 
     # Initialize database and ML model
     con = init_db(repo)
-    embedder = SentenceTransformer(EMBED_MODEL)
+    try:
+        embedder = SentenceTransformer(EMBED_MODEL)
+    except Exception as e:
+        # Handle MPS/Metal Performance Shaders compatibility issues on Apple Silicon
+        if "meta tensor" in str(e) or "to_empty" in str(e):
+            print("🔧 Detected MPS compatibility issue, falling back to CPU...")
+            import torch
+            embedder = SentenceTransformer(EMBED_MODEL, device='cpu')
+        else:
+            raise e
 
     # Verify database has embeddings
     embedding_count = build_full_index(con)
