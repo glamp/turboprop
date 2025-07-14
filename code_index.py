@@ -97,8 +97,8 @@ def init_db(repo_path: Path = None):
     if repo_path is None:
         db_path = Path(DB_PATH)
     else:
-        # Create turboprop directory if it doesn't exist
-        turboprop_dir = repo_path / "turboprop"
+        # Create .turboprop directory if it doesn't exist
+        turboprop_dir = repo_path / ".turboprop"
         turboprop_dir.mkdir(exist_ok=True)
         db_path = turboprop_dir / "code_index.duckdb"
     
@@ -925,7 +925,7 @@ Examples:
             print(f"⚡ Processing rate: {processed_files/elapsed:.1f} files/second")
         
         embedding_count = build_full_index(con)
-        print(f"💾 Database saved to: {repo_path / 'turboprop' / 'code_index.duckdb'}")
+        print(f"💾 Database saved to: {repo_path / '.turboprop' / 'code_index.duckdb'}")
         print(f"🔍 Total embeddings in index: {embedding_count}")
         print("\n💡 Try searching: turboprop search \"your query here\"")
 

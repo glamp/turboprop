@@ -115,9 +115,9 @@ CREATE TABLE code_files (
 **File Filtering:** Only processes files with code extensions (.py, .js, .ts, .java, .go, etc.) and respects Git ignore rules
 
 ### Database Files
-- `turboprop/code_index.duckdb`: Main database containing file content and embeddings with native vector search (stored in `./turboprop/` directory within each repository)
+- `.turboprop/code_index.duckdb`: Main database containing file content and embeddings with native vector search (stored in `./.turboprop/` directory within each repository)
 
-**Note:** Add `turboprop/` to your `.gitignore` file to avoid committing index files to version control.
+**Note:** Add `.turboprop/` to your `.gitignore` file to avoid committing index files to version control.
 
 ## Common Development Patterns
 

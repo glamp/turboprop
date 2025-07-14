@@ -102,3 +102,6 @@ cython_debug/
 
 # UV lock file
 uv.lock
+
+# Turboprop database files
+.turboprop/
