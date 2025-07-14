@@ -25,13 +25,13 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, Prompt
 from sentence_transformers import SentenceTransformer
 
 # Import our existing code indexing functionality
 from code_index import (
     init_db, scan_repo, embed_and_store, build_full_index, 
-    search_index, watch_mode, reindex_all, TABLE_NAME, EMBED_MODEL, DIMENSIONS
+    search_index, watch_mode, reindex_all, TABLE_NAME, EMBED_MODEL, DIMENSIONS, get_version
 )
 
 # Initialize the MCP server
@@ -420,6 +420,120 @@ def list_indexed_files(limit: int = 20) -> str:
         return f"Error listing indexed files: {str(e)}"
 
 
+@mcp.prompt()
+def quick_search(query: str = "") -> str:
+    """
+    🔍 Quick semantic search for code
+    
+    Usage: /mcp__turboprop__quick_search your search query
+    
+    Args:
+        query: What to search for in the code
+    """
+    if not query:
+        return "Please provide a search query. Example: /mcp__turboprop__quick_search JWT authentication"
+    
+    result = search_code(query, 3)
+    return f"Quick search results for '{query}':\n\n{result}"
+
+
+@mcp.prompt()
+def index_current() -> str:
+    """
+    📊 Index the current configured repository
+    
+    Usage: /mcp__turboprop__index_current
+    """
+    if not _config['repository_path']:
+        return "No repository configured. Please specify a repository path when starting the MCP server."
+    
+    result = index_repository()
+    return f"Indexing results:\n\n{result}"
+
+
+@mcp.prompt()
+def status() -> str:
+    """
+    📊 Show current index status
+    
+    Usage: /mcp__turboprop__status
+    """
+    result = get_index_status()
+    return f"Current index status:\n\n{result}"
+
+
+@mcp.prompt()
+def files(limit: str = "10") -> str:
+    """
+    📋 List indexed files
+    
+    Usage: /mcp__turboprop__files [limit]
+    
+    Args:
+        limit: Maximum number of files to show (default: 10)
+    """
+    try:
+        limit_int = int(limit)
+    except ValueError:
+        limit_int = 10
+    
+    result = list_indexed_files(limit_int)
+    return f"Indexed files:\n\n{result}"
+
+
+@mcp.prompt()
+def search_by_type(file_type: str, query: str = "") -> str:
+    """
+    🔍 Search for specific file types
+    
+    Usage: /mcp__turboprop__search_by_type python authentication
+    
+    Args:
+        file_type: File type to search (python, javascript, java, etc.)
+        query: Search query
+    """
+    if not query:
+        return f"Please provide both file type and search query. Example: /mcp__turboprop__search_by_type python {file_type}"
+    
+    # Combine file type and query for more targeted search
+    combined_query = f"{file_type} {query}"
+    result = search_code(combined_query, 5)
+    return f"Search results for '{query}' in {file_type} files:\n\n{result}"
+
+
+@mcp.prompt()
+def help_commands() -> str:
+    """
+    ❓ Show available Turboprop slash commands
+    
+    Usage: /mcp__turboprop__help_commands
+    """
+    return """🚀 Turboprop Slash Commands:
+
+**Quick Actions:**
+• /mcp__turboprop__quick_search <query> - Fast semantic search (3 results)
+• /mcp__turboprop__status - Show index status
+• /mcp__turboprop__files [limit] - List indexed files
+
+**Advanced Search:**
+• /mcp__turboprop__search_by_type <type> <query> - Search specific file types
+  Example: /mcp__turboprop__search_by_type python authentication
+
+**Management:**
+• /mcp__turboprop__index_current - Reindex current repository
+• /mcp__turboprop__help_commands - Show this help
+
+**Examples:**
+• /mcp__turboprop__quick_search JWT authentication
+• /mcp__turboprop__search_by_type javascript error handling
+• /mcp__turboprop__files 20
+
+💡 For more advanced operations, use the full tools:
+• tp:search_code - Full semantic search with more options
+• tp:index_repository - Index specific repositories
+• tp:watch_repository - Start file watching"""
+
+
 def start_file_watcher():
     """Start the file watcher if configured to do so."""
     global _watcher_thread
@@ -466,6 +580,13 @@ Examples:
   turboprop-mcp /path/to/repo --no-auto-index    # Don't auto-index on startup
   turboprop-mcp /path/to/repo --no-auto-watch    # Don't auto-watch for changes
         """
+    )
+    
+    # Add version argument
+    parser.add_argument(
+        '--version', '-v',
+        action='version',
+        version=f'turboprop-mcp {get_version()}'
     )
     
     parser.add_argument(
@@ -596,7 +717,13 @@ def main():
     print("  • tp:watch_repository - Live index updates", file=sys.stderr)
     print("  • tp:list_indexed_files - Browse indexed files", file=sys.stderr)
     print(file=sys.stderr)
-    print("💡 START HERE: 'tp:search_code \"your query\"' or 'tp:get_index_status'", file=sys.stderr)
+    print("⚡ SLASH COMMANDS (type '/' to see all):", file=sys.stderr)
+    print("  • /mcp__turboprop__quick_search <query> - Fast semantic search", file=sys.stderr)
+    print("  • /mcp__turboprop__status - Show index status", file=sys.stderr)
+    print("  • /mcp__turboprop__files [limit] - List indexed files", file=sys.stderr)
+    print("  • /mcp__turboprop__help_commands - Show all slash commands", file=sys.stderr)
+    print(file=sys.stderr)
+    print("💡 START HERE: '/mcp__turboprop__quick_search \"your query\"' or '/mcp__turboprop__status'", file=sys.stderr)
     print("=" * 40, file=sys.stderr)
     
     # Run the MCP server

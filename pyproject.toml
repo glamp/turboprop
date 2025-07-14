@@ -4,10 +4,26 @@
 
 [project]
 name = "turboprop"
-version = "0.1.0"
+version = "0.1.2"
 description = "Lightning-fast semantic code search and indexing with DuckDB vector operations"
 readme = "README.md"
-requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Greg Lamp", email = "greg@example.com"}
+]
+keywords = ["code", "search", "semantic", "embedding", "mcp", "ai", "indexing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.11"
 
 # Core dependencies for the code indexing and search functionality
 dependencies = [
@@ -29,6 +45,11 @@ dependencies = [
     "mcp>=1.0.0",           # MCP SDK for building MCP servers
 ]
 
+[project.urls]
+Homepage = "https://github.com/glamp/turboprop"
+Repository = "https://github.com/glamp/turboprop"
+Issues = "https://github.com/glamp/turboprop/issues"
+
 # Development dependencies
 [project.optional-dependencies]
 dev = [
@@ -45,13 +66,22 @@ testpaths = ["tests"]
 # Command-line entry points
 [project.scripts]
 turboprop = "code_index:main"
-turboprop-mcp = "mcp_server:main"
 
 # Build system configuration
 [build-system]
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+    "build>=1.2.2.post1",
+    "twine>=6.1.0",
+]
+
 # Setuptools configuration
 [tool.setuptools]
-py-modules = ["code_index", "server", "main", "mcp_server"]
+py-modules = ["code_index", "server", "mcp_server"]
+packages = ["turboprop"]
+
+[tool.setuptools.package-data]
+turboprop = ["py.typed"]
