@@ -33,6 +33,14 @@ from sentence_transformers import SentenceTransformer
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+def get_version():
+    """Get the version of turboprop."""
+    try:
+        from _version import __version__
+        return __version__
+    except ImportError:
+        return "0.1.0"
+
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
 TABLE_NAME = "code_files"
@@ -638,6 +646,13 @@ Examples:
         """
     )
 
+    # Add version argument
+    parser.add_argument(
+        '--version', '-v',
+        action='version',
+        version=f'turboprop {get_version()}'
+    )
+
     sub = parser.add_subparsers(
         dest="cmd",
         required=True,
@@ -783,6 +798,74 @@ Press Ctrl+C to stop watching.
              "Higher values reduce CPU usage during rapid file changes."
     )
 
+    # 'mcp' command: Start MCP server
+    p_m = sub.add_parser(
+        "mcp",
+        help="🔗 Start Model Context Protocol (MCP) server",
+        description="""
+Start a Model Context Protocol server for semantic code search.
+
+This enables Claude and other MCP clients to search and index your codebase
+using natural language queries. The server provides tools for indexing,
+searching, and monitoring repositories.
+
+Perfect for AI-assisted development workflows.
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  turboprop mcp --repository .                     # Start MCP server for current directory
+  turboprop mcp --repository /path/to/repo         # Index specific repository
+  turboprop mcp --repository . --max-mb 2.0        # Allow larger files
+  turboprop mcp --repository . --no-auto-index     # Don't auto-index on startup
+
+💡 Pro Tip: Use with Claude Code or other MCP clients for AI-powered code exploration.
+        """
+    )
+    p_m.add_argument(
+        "--repository",
+        default=".",
+        help="Path to the repository to index and monitor (default: current directory)"
+    )
+    p_m.add_argument(
+        "--max-mb",
+        type=float,
+        default=1.0,
+        metavar="SIZE",
+        help="Maximum file size in MB to process (default: 1.0)"
+    )
+    p_m.add_argument(
+        "--debounce-sec",
+        type=float,
+        default=5.0,
+        metavar="SECONDS",
+        help="Seconds to wait before processing file changes (default: 5.0)"
+    )
+    p_m.add_argument(
+        "--auto-index",
+        action="store_true",
+        default=True,
+        help="Automatically index the repository on startup (default: True)"
+    )
+    p_m.add_argument(
+        "--no-auto-index",
+        action="store_false",
+        dest="auto_index",
+        help="Don't automatically index the repository on startup"
+    )
+    p_m.add_argument(
+        "--auto-watch",
+        action="store_true",
+        default=True,
+        help="Automatically watch for file changes (default: True)"
+    )
+    p_m.add_argument(
+        "--no-auto-watch",
+        action="store_false",
+        dest="auto_watch",
+        help="Don't automatically watch for file changes"
+    )
+
     # Parse command line arguments
     args = parser.parse_args()
 
@@ -884,7 +967,7 @@ Press Ctrl+C to stop watching.
             print("└" + "─" * 60)
             print()
 
-    else:  # watch command
+    elif args.cmd == "watch":
         # Start continuous monitoring mode
         print(f"\n👀 Starting watch mode for: {args.repo}")
         print(f"📁 Max file size: {args.max_mb} MB")
@@ -898,7 +981,51 @@ Press Ctrl+C to stop watching.
         except Exception as e:
             print(f"\n❌ Watch mode failed: {e}")
 
-    print("\n✨ Done!")
+    elif args.cmd == "mcp":
+        # Start MCP server
+        print(f"\n🔗 Starting MCP server...")
+        print("📞 Invoking MCP server module...")
+        
+        # Import and run the MCP server with the provided arguments
+        try:
+            from mcp_server import main as mcp_main
+            import sys
+            
+            # Build arguments for MCP server
+            mcp_args = []
+            if args.repository:
+                mcp_args.extend(["--repository", args.repository])
+            
+            mcp_args.extend([
+                "--max-mb", str(args.max_mb),
+                "--debounce-sec", str(args.debounce_sec)
+            ])
+            
+            if not args.auto_index:
+                mcp_args.append("--no-auto-index")
+            if not args.auto_watch:
+                mcp_args.append("--no-auto-watch")
+            
+            # Override sys.argv for MCP server
+            original_argv = sys.argv[:]
+            sys.argv = ["turboprop-mcp"] + mcp_args
+            
+            try:
+                mcp_main()
+            finally:
+                # Restore original argv
+                sys.argv = original_argv
+                
+        except ImportError:
+            print("❌ MCP server module not available.")
+            print("💡 Make sure you've installed the MCP dependencies: pip install turboprop[mcp]")
+            return
+        except Exception as e:
+            print(f"❌ MCP server failed to start: {e}")
+            return
+
+    if args.cmd != "mcp":
+        print("\n✨ Done!")
 
 
 if __name__ == "__main__":

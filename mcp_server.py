@@ -596,6 +596,12 @@ Examples:
     )
     
     parser.add_argument(
+        "--repository",
+        dest="repository_flag",
+        help="Path to the repository to index and watch (alternative to positional argument)"
+    )
+    
+    parser.add_argument(
         "--max-mb",
         type=float,
         default=1.0,
@@ -648,8 +654,17 @@ def main():
     args = parse_args()
     
     # Update configuration with command-line arguments
-    if args.repository:
-        _config['repository_path'] = str(Path(args.repository).resolve())
+    # Handle both positional and named repository arguments
+    repository_path = None
+    if args.repository_flag:
+        # --repository flag takes precedence
+        repository_path = args.repository_flag
+    elif args.repository:
+        # Use positional argument
+        repository_path = args.repository
+    
+    if repository_path:
+        _config['repository_path'] = str(Path(repository_path).resolve())
     
     _config['max_file_size_mb'] = args.max_mb
     _config['debounce_seconds'] = args.debounce_sec

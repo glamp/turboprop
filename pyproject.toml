@@ -4,7 +4,7 @@
 
 [project]
 name = "turboprop"
-version = "0.1.2"
+version = "0.1.3"
 description = "Lightning-fast semantic code search and indexing with DuckDB vector operations"
 readme = "README.md"
 license = {text = "MIT"}
