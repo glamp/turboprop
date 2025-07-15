@@ -58,7 +58,7 @@ def get_version():
         from turboprop._version import __version__
         return __version__
     except ImportError:
-        return "0.2.0"
+        return "0.2.2"
 
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
@@ -121,15 +121,32 @@ def init_db(repo_path: Path = None):
             
             _db_manager = DatabaseManager(db_path)
             
-            # Initialize table schema
+            # Initialize table schema with modification time tracking
             _db_manager.execute_with_retry(f"""
                 CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     id VARCHAR PRIMARY KEY,
                     path VARCHAR,
                     content TEXT,
-                    embedding DOUBLE[{DIMENSIONS}]
+                    embedding DOUBLE[{DIMENSIONS}],
+                    last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    file_mtime TIMESTAMP
                 )
             """)
+            
+            # Add new columns to existing tables if they don't exist
+            try:
+                _db_manager.execute_with_retry(f"""
+                    ALTER TABLE {TABLE_NAME} ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                """)
+            except Exception:
+                pass  # Column already exists
+            
+            try:
+                _db_manager.execute_with_retry(f"""
+                    ALTER TABLE {TABLE_NAME} ADD COLUMN file_mtime TIMESTAMP
+                """)
+            except Exception:
+                pass  # Column already exists
         
         return _db_manager
 
@@ -186,10 +203,6 @@ def scan_repo(repo_path: Path, max_bytes: int):
     # Process the files
     for file_path_str in all_files:
         p = repo_path / file_path_str
-        
-        # Only include files with code-related extensions
-        if p.suffix.lower() not in CODE_EXTENSIONS:
-            continue
             
         try:
             # Skip files that are too large to process efficiently
@@ -274,7 +287,10 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
                 uid = compute_id(str(path) + text)
                 
                 emb = embedder.encode(text)
-                rows.append((uid, str(path), text, emb.tolist()))
+                # Get file modification time
+                import datetime
+                file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
+                rows.append((uid, str(path), text, emb.tolist(), file_mtime))
                 
             except Exception as e:
                 print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
@@ -292,7 +308,7 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
     
     # Insert all rows in a single batch operation for better performance
     if rows:
-        operations = [(f"INSERT OR REPLACE INTO {TABLE_NAME} VALUES (?, ?, ?, ?)", row) for row in rows]
+        operations = [(f"INSERT OR REPLACE INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)", row) for row in rows]
         db_manager.execute_transaction(operations)
         print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
@@ -383,10 +399,14 @@ def embed_and_store_single(db_manager, embedder, path: Path):
     uid = compute_id(str(path) + text)
     emb = embedder.encode(text)
 
+    # Get file modification time
+    import datetime
+    file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
+
     # Use transaction for database operations
     operations = [
         (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),)),
-        (f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)", (uid, str(path), text, emb.tolist()))
+        (f"INSERT INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)", (uid, str(path), text, emb.tolist(), file_mtime))
     ]
     db_manager.execute_transaction(operations)
 
@@ -453,10 +473,7 @@ class DebouncedHandler(FileSystemEventHandler):
 
         # For deletions, we should always process to remove from database
         # For creates/modifies, we'll check if file should be indexed in _process
-        if event.event_type != "deleted":
-            # Basic check - must be a code file
-            if p.suffix.lower() not in CODE_EXTENSIONS:
-                return
+        # (No extension filtering - index all Git-tracked files)
 
         # Cancel any existing timer for this file (debouncing logic)
         if p in self.timers:
@@ -478,9 +495,7 @@ class DebouncedHandler(FileSystemEventHandler):
         Returns:
             True if the file should be indexed, False otherwise
         """
-        # Check if file has a code extension
-        if file_path.suffix.lower() not in CODE_EXTENSIONS:
-            return False
+        # Index all files that are tracked by Git (no extension filtering)
             
         # Check if file is too large
         try:
@@ -708,6 +723,155 @@ def remove_orphaned_files(db_manager, current_files):
         print(f"🗑️  Removed {removed_count} orphaned files from index")
     
     return removed_count
+
+
+def get_last_index_time(db_manager):
+    """
+    Get the timestamp of the most recent indexing operation.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        
+    Returns:
+        datetime or None if no files are indexed
+    """
+    try:
+        result = db_manager.execute_with_retry(
+            f"SELECT MAX(last_modified) FROM {TABLE_NAME}")
+        if result and result[0] and result[0][0]:
+            return result[0][0]
+        return None
+    except Exception:
+        return None
+
+
+def has_repository_changed(repo_path: Path, max_bytes: int, db_manager):
+    """
+    Check if any files in the repository have changed since the last indexing.
+    
+    This function provides a fast way to determine if reindexing is needed by:
+    1. Comparing the number of files in the repo vs database
+    2. Checking if any files have newer modification times than the last index
+    3. Detecting new files that aren't in the database
+    
+    Args:
+        repo_path: Path to the repository
+        max_bytes: Maximum file size to consider
+        db_manager: DatabaseManager instance
+        
+    Returns:
+        tuple: (has_changed: bool, reason: str, changed_count: int)
+    """
+    try:
+        # Get current files in repository
+        current_files = scan_repo(repo_path, max_bytes)
+        
+        if not current_files:
+            return False, "No files found in repository", 0
+            
+        # Get existing file info from database
+        existing_files = {}
+        try:
+            result = db_manager.execute_with_retry(
+                f"SELECT path, file_mtime FROM {TABLE_NAME}")
+            existing_files = {row[0]: row[1] for row in result}
+        except Exception:
+            return True, "Database error - need to rebuild index", len(current_files)
+        
+        # Check if file counts differ
+        if len(current_files) != len(existing_files):
+            file_diff = len(current_files) - len(existing_files)
+            return True, f"File count changed ({file_diff:+d} files)", abs(file_diff)
+        
+        # Check modification times
+        changed_files = []
+        for file_path in current_files:
+            try:
+                file_mtime = file_path.stat().st_mtime
+                str_path = str(file_path)
+                
+                # File is new if not in database
+                if str_path not in existing_files:
+                    changed_files.append(str_path)
+                    continue
+                
+                # Check if file has been modified
+                db_mtime = existing_files[str_path]
+                if db_mtime is None or file_mtime > db_mtime.timestamp():
+                    changed_files.append(str_path)
+                    
+            except OSError:
+                # File might have been deleted, count as changed
+                changed_files.append(str(file_path))
+        
+        if changed_files:
+            return True, f"Files modified or added", len(changed_files)
+        
+        return False, "Repository is up to date", 0
+        
+    except Exception as e:
+        return True, f"Error checking repository: {str(e)}", 0
+
+
+def check_index_freshness(repo_path: Path, max_bytes: int, db_manager):
+    """
+    Check if the index is fresh and up-to-date.
+    
+    This is a comprehensive check that determines if reindexing is needed.
+    
+    Args:
+        repo_path: Path to the repository
+        max_bytes: Maximum file size to consider
+        db_manager: DatabaseManager instance
+        
+    Returns:
+        dict: {
+            'is_fresh': bool,
+            'reason': str,
+            'last_index_time': datetime or None,
+            'changed_files': int,
+            'total_files': int
+        }
+    """
+    # Check if index exists
+    try:
+        file_count = db_manager.execute_with_retry(
+            f"SELECT COUNT(*) FROM {TABLE_NAME}")[0][0]
+    except Exception:
+        return {
+            'is_fresh': False,
+            'reason': 'No index found',
+            'last_index_time': None,
+            'changed_files': 0,
+            'total_files': 0
+        }
+    
+    if file_count == 0:
+        return {
+            'is_fresh': False,
+            'reason': 'Index is empty',
+            'last_index_time': None,
+            'changed_files': 0,
+            'total_files': 0
+        }
+    
+    # Get last index time
+    last_index_time = get_last_index_time(db_manager)
+    
+    # Check if repository has changed
+    has_changed, reason, changed_count = has_repository_changed(
+        repo_path, max_bytes, db_manager)
+    
+    # Count current files
+    current_files = scan_repo(repo_path, max_bytes)
+    
+    return {
+        'is_fresh': not has_changed,
+        'reason': reason,
+        'last_index_time': last_index_time,
+        'changed_files': changed_count,
+        'total_files': len(current_files)
+    }
 
 
 def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_workers=None, force_all=False):
@@ -1068,11 +1232,30 @@ Examples:
 
         repo_path = Path(args.repo).resolve()
         db_manager = init_db(repo_path)
+        max_bytes = int(args.max_mb * 1024**2)
+
+        # Check index freshness and provide user feedback
+        if not args.force_all:
+            print("\n🔍 Checking index freshness...")
+            freshness = check_index_freshness(repo_path, max_bytes, db_manager)
+            print(f"📊 {freshness['reason']}")
+            print(f"📁 Repository files: {freshness['total_files']}")
+            
+            if freshness['is_fresh']:
+                print("✨ Index is up-to-date!")
+                if freshness['last_index_time']:
+                    print(f"📅 Last indexed: {freshness['last_index_time']}")
+                print("💡 Use --force-all to reindex anyway")
+                return
+            elif freshness['changed_files'] > 0:
+                print(f"🔄 Found {freshness['changed_files']} changed files")
+        else:
+            print("\n🔄 Force reindexing all files...")
 
         # Use new smart reindex function
         total_files, processed_files, elapsed = reindex_all(
             repo_path, 
-            int(args.max_mb * 1024**2), 
+            max_bytes, 
             db_manager, 
             embedder,
             args.workers,

@@ -23,9 +23,13 @@ class DatabaseManager:
         self._file_lock = None
         self._lock_file_path = db_path.with_suffix('.lock')
         
-        # Register cleanup handlers
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGINT, self._signal_handler)
+        # Register cleanup handlers only in main thread
+        try:
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
+        except ValueError:
+            # Signal handling only works in main thread, ignore in other threads
+            pass
     
     def _signal_handler(self, signum, frame):
         """Handle termination signals gracefully."""

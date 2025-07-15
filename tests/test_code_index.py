@@ -124,18 +124,18 @@ class TestScanRepo:
         """Clean up temporary files."""
         shutil.rmtree(self.temp_dir)
     
-    def test_scan_repo_finds_code_files(self):
-        """Test that scan_repo finds code files and respects file extensions."""
+    def test_scan_repo_finds_all_tracked_files(self):
+        """Test that scan_repo finds all Git-tracked files regardless of extension."""
         files = scan_repo(self.repo_path, 1024*1024)  # 1MB limit
         file_names = [f.name for f in files]
         
-        # Should find Python and JSON files
+        # Should find all Git-tracked files
         assert "main.py" in file_names
         assert "utils.py" in file_names
         assert "config.json" in file_names
         
-        # Should not find non-code files
-        assert "README.md" not in file_names
+        # Should now find .md files too (no extension filtering)
+        assert "README.md" in file_names
         
     def test_scan_repo_respects_gitignore(self):
         """Test that scan_repo respects .gitignore rules."""

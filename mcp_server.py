@@ -29,7 +29,8 @@ from mcp.types import Tool, TextContent, Prompt
 # Import our existing code indexing functionality
 from code_index import (
     init_db, scan_repo, embed_and_store, build_full_index,
-    search_index, watch_mode, reindex_all, TABLE_NAME, EMBED_MODEL, DIMENSIONS, get_version
+    search_index, watch_mode, reindex_all, TABLE_NAME, EMBED_MODEL, DIMENSIONS, get_version,
+    check_index_freshness, has_repository_changed
 )
 from embedding_helper import EmbeddingGenerator
 
@@ -48,7 +49,8 @@ _config = {
     'max_file_size_mb': 1.0,
     'debounce_seconds': 5.0,
     'auto_index': False,
-    'auto_watch': False
+    'auto_watch': False,
+    'force_reindex': False
 }
 
 
@@ -84,7 +86,8 @@ def get_embedder():
 @mcp.tool()
 def index_repository(
     repository_path: str = None,
-    max_file_size_mb: float = None
+    max_file_size_mb: float = None,
+    force_all: bool = False
 ) -> str:
     """
     🚀 TURBOPROP: Index a code repository for semantic search
@@ -99,10 +102,11 @@ def index_repository(
     • index_repository(max_file_size_mb=5.0) - Allow larger files
 
     🔍 WHAT IT INDEXES:
-    • Python (.py), JavaScript (.js/.ts/.tsx), Java (.java)
-    • Go (.go), Rust (.rs), C/C++ (.c/.cpp/.h)
-    • Config files (.json/.yaml/.yml), HTML/CSS
-    • And 20+ more code file types!
+    • ALL Git-tracked files (no extension filtering!)
+    • Source code in any language
+    • Configuration files (.json/.yaml/.toml/.ini)
+    • Documentation (.md/.rst/.txt)
+    • Build files, scripts, and any other tracked files
 
     Args:
         repository_path: Path to Git repo (optional - uses configured path)
@@ -148,7 +152,7 @@ def index_repository(
         print(
             f"🔍 Processing {len(files)} files with smart incremental updates...", file=sys.stderr)
         total_files, processed_files, elapsed = reindex_all(
-            repo_path, max_bytes, con, embedder, max_workers=None, force_all=False)
+            repo_path, max_bytes, con, embedder, max_workers=None, force_all=force_all)
         
         # Get final embedding count
         embedding_count = build_full_index(con)
@@ -231,6 +235,92 @@ def search_code(
 
     except Exception as e:
         return f"Error searching code: {str(e)}"
+
+
+@mcp.tool()
+def check_index_freshness_tool(repository_path: str = None, max_file_size_mb: float = None) -> str:
+    """
+    🔍 TURBOPROP: Check if your index is fresh and up-to-date
+    
+    SMART INDEX ANALYSIS! This tool checks if your code index is current with the
+    actual files in your repository. It analyzes file modification times and counts
+    to determine if reindexing is needed.
+    
+    🎯 WHAT IT CHECKS:
+    • File modification times vs last index update
+    • New files that aren't indexed yet
+    • Deleted files that are still in the index
+    • Total file count changes
+    
+    💡 PERFECT FOR:
+    • Deciding if you need to reindex
+    • Understanding why searches might be outdated
+    • Monitoring index health
+    • Optimizing development workflow
+    
+    Args:
+        repository_path: Path to repository (optional - uses configured path)
+        max_file_size_mb: Max file size in MB (optional - uses configured limit)
+    
+    Returns:
+        Detailed freshness report with recommendations
+    """
+    try:
+        # Use provided path or fall back to configured path
+        if repository_path is None:
+            repository_path = _config['repository_path']
+        
+        if repository_path is None:
+            return "Error: No repository path specified. Either provide a path or configure one at startup."
+        
+        repo_path = Path(repository_path).resolve()
+        
+        if not repo_path.exists():
+            return f"Error: Repository path '{repository_path}' does not exist"
+        
+        # Use provided max file size or fall back to configured value
+        if max_file_size_mb is None:
+            max_file_size_mb = _config['max_file_size_mb']
+        
+        max_bytes = int(max_file_size_mb * 1024 * 1024)
+        con = get_db_connection()
+        
+        # Get freshness information
+        freshness = check_index_freshness(repo_path, max_bytes, con)
+        
+        # Format the report
+        report = []
+        report.append(f"📊 Index Freshness Report for: {repository_path}")
+        report.append("=" * 50)
+        
+        if freshness['is_fresh']:
+            report.append("✅ Index Status: UP-TO-DATE")
+        else:
+            report.append("⚠️  Index Status: NEEDS UPDATE")
+        
+        report.append(f"📝 Reason: {freshness['reason']}")
+        report.append(f"📁 Total files in repository: {freshness['total_files']}")
+        report.append(f"🔄 Files that need updating: {freshness['changed_files']}")
+        
+        if freshness['last_index_time']:
+            report.append(f"📅 Last indexed: {freshness['last_index_time']}")
+        else:
+            report.append("📅 Last indexed: Never")
+        
+        report.append("")
+        
+        if freshness['is_fresh']:
+            report.append("🎉 Your index is current! No reindexing needed.")
+        else:
+            if freshness['changed_files'] > 0:
+                report.append(f"💡 Recommendation: Run index_repository() to update {freshness['changed_files']} changed files")
+            else:
+                report.append("💡 Recommendation: Run index_repository() to build the initial index")
+        
+        return "\n".join(report)
+        
+    except Exception as e:
+        return f"Error checking index freshness: {str(e)}"
 
 
 @mcp.tool()
@@ -657,6 +747,13 @@ Examples:
         help="Don't automatically watch for file changes"
     )
 
+    parser.add_argument(
+        "--force-reindex",
+        action="store_true",
+        default=False,
+        help="Force complete reindexing, ignoring freshness checks"
+    )
+
     return parser.parse_args()
 
 
@@ -684,6 +781,7 @@ def main():
     _config['debounce_seconds'] = args.debounce_sec
     _config['auto_index'] = args.auto_index
     _config['auto_watch'] = args.auto_watch
+    _config['force_reindex'] = args.force_reindex
 
     # Print configuration
     print("🚀 Turboprop MCP Server Starting", file=sys.stderr)
@@ -705,40 +803,68 @@ def main():
               file=sys.stderr)
         print(file=sys.stderr)
 
-    # Auto-index if configured (run in background to avoid MCP timeout)
+    # Smart auto-indexing with freshness checks
     if _config['repository_path'] and _config['auto_index']:
-        def start_auto_index():
+        def start_smart_auto_index():
             import time
-            print("🔍 Auto-indexing repository...", file=sys.stderr)
-            print(
-                f"📁 Scanning repository: {_config['repository_path']}", file=sys.stderr)
-
-            start_time = time.time()
-            result = index_repository()
-            end_time = time.time()
-
-            total_time = end_time - start_time
-
-            # Extract file count from result message
-            import re
-            file_count_match = re.search(
-                r'Successfully indexed (\d+) files', result)
-            if file_count_match:
-                file_count = int(file_count_match.group(1))
-                time_per_file = total_time / file_count if file_count > 0 else 0
-                print(
-                    f"🚀 Hey! We indexed {file_count} files and it took {total_time:.2f}s at {time_per_file:.3f}s per file", file=sys.stderr)
-            else:
-                print(
-                    f"🚀 Hey! Indexing completed in {total_time:.2f}s", file=sys.stderr)
-
-            print(f"✅ {result}", file=sys.stderr)
+            print("🔍 Checking if repository needs indexing...", file=sys.stderr)
+            
+            repo_path = Path(_config['repository_path'])
+            max_bytes = int(_config['max_file_size_mb'] * 1024 * 1024)
+            
+            # Check index freshness (unless force reindex is requested)
+            try:
+                con = get_db_connection()
+                freshness = check_index_freshness(repo_path, max_bytes, con)
+                
+                print(f"📊 Index status: {freshness['reason']}", file=sys.stderr)
+                print(f"📊 Total files: {freshness['total_files']}", file=sys.stderr)
+                
+                if _config['force_reindex']:
+                    print("🔄 Force reindexing requested, rebuilding entire index...", file=sys.stderr)
+                elif freshness['is_fresh']:
+                    print("✨ Index is up-to-date, skipping reindexing", file=sys.stderr)
+                    print(f"📅 Last indexed: {freshness['last_index_time']}", file=sys.stderr)
+                    return
+                
+                # Index needs updating
+                if freshness['changed_files'] > 0:
+                    print(f"🔄 Found {freshness['changed_files']} changed files, updating index...", file=sys.stderr)
+                else:
+                    print(f"🔍 {freshness['reason']}, building index...", file=sys.stderr)
+                
+                start_time = time.time()
+                result = index_repository(force_all=_config['force_reindex'])
+                end_time = time.time()
+                
+                total_time = end_time - start_time
+                
+                # Extract file count from result message
+                import re
+                file_count_match = re.search(r'Successfully indexed (\d+) files', result)
+                if file_count_match:
+                    file_count = int(file_count_match.group(1))
+                    if freshness['changed_files'] < file_count:
+                        print(f"⚡ Smart indexing: processed {freshness['changed_files']} changed files out of {file_count} total", file=sys.stderr)
+                    time_per_file = total_time / max(1, freshness['changed_files'])
+                    print(f"🚀 Indexing completed in {total_time:.2f}s at {time_per_file:.3f}s per file", file=sys.stderr)
+                else:
+                    print(f"🚀 Indexing completed in {total_time:.2f}s", file=sys.stderr)
+                
+                print(f"✅ {result}", file=sys.stderr)
+                
+            except Exception as e:
+                print(f"❌ Error during smart indexing: {e}", file=sys.stderr)
+                print("🔄 Falling back to standard indexing...", file=sys.stderr)
+                result = index_repository()
+                print(f"✅ {result}", file=sys.stderr)
+            
             print(file=sys.stderr)
 
         auto_index_thread = threading.Thread(
-            target=start_auto_index, daemon=True)
+            target=start_smart_auto_index, daemon=True)
         auto_index_thread.start()
-        print("🔍 Auto-indexing started in background...", file=sys.stderr)
+        print("🧠 Smart auto-indexing started in background...", file=sys.stderr)
         print(file=sys.stderr)
 
     # Start file watcher if configured

@@ -108,29 +108,31 @@ class TestRemoveOrphanedFiles:
         with patch('code_index.DB_PATH', str(self.db_path)):
             self.db_manager = init_db()
             
-        # Ensure table exists
+        # Ensure table exists with new schema
         self.db_manager.execute_with_retry(f"""
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                 id VARCHAR PRIMARY KEY,
                 path VARCHAR,
                 content TEXT,
-                embedding DOUBLE[384]
+                embedding DOUBLE[384],
+                last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_mtime TIMESTAMP
             )
         """)
         
         # Clear any existing data
         self.db_manager.execute_with_retry(f"DELETE FROM {TABLE_NAME}")
             
-        # Insert some test data
+        # Insert some test data with new schema
         test_data = [
-            ("id1", "/path/to/existing.py", "code1", [0.1] * 384),
-            ("id2", "/path/to/deleted.py", "code2", [0.2] * 384),
-            ("id3", "/path/to/another_existing.py", "code3", [0.3] * 384),
+            ("id1", "/path/to/existing.py", "code1", [0.1] * 384, None, None),
+            ("id2", "/path/to/deleted.py", "code2", [0.2] * 384, None, None),
+            ("id3", "/path/to/another_existing.py", "code3", [0.3] * 384, None, None),
         ]
         
         for data in test_data:
             self.db_manager.execute_with_retry(
-                f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)", data)
+                f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?)", data)
         
     def teardown_method(self):
         """Clean up test environment."""
@@ -236,8 +238,8 @@ class TestEnhancedReindexAll:
         """Test that reindex_all removes orphaned files."""
         # First, manually add an orphaned entry
         self.db_manager.execute_with_retry(
-            f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?)",
-            ("orphan_id", str(self.repo_path / "deleted.py"), "old code", [0.5] * 384)
+            f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?)",
+            ("orphan_id", str(self.repo_path / "deleted.py"), "old code", [0.5] * 384, None, None)
         )
         
         # Run reindex_all
@@ -306,20 +308,16 @@ class TestDebouncedHandlerShouldIndexFile:
         # Should NOT index .env file (in .gitignore)
         assert not self.handler._should_index_file(self.repo_path / ".env")
         
-    def test_should_index_file_checks_extensions(self):
-        """Test that _should_index_file checks file extensions."""
+    def test_should_index_file_no_extension_filtering(self):
+        """Test that _should_index_file indexes all Git-tracked files regardless of extension."""
         # Create files with different extensions
         (self.repo_path / "document.txt").write_text("text content")
         (self.repo_path / "image.png").write_text("binary content")
         (self.repo_path / "script.py").write_text("python code")
         
-        # Should NOT index .txt file
-        assert not self.handler._should_index_file(self.repo_path / "document.txt")
-        
-        # Should NOT index .png file
-        assert not self.handler._should_index_file(self.repo_path / "image.png")
-        
-        # Should index .py file
+        # Should index ALL files (no extension filtering)
+        assert self.handler._should_index_file(self.repo_path / "document.txt")
+        assert self.handler._should_index_file(self.repo_path / "image.png")
         assert self.handler._should_index_file(self.repo_path / "script.py")
         
     def test_should_index_file_checks_file_size(self):

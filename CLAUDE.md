@@ -112,7 +112,7 @@ CREATE TABLE code_files (
 
 **Search Algorithm:** DuckDB's native vector operations with cosine similarity for exact nearest neighbor search
 
-**File Filtering:** Only processes files with code extensions (.py, .js, .ts, .java, .go, etc.) and respects Git ignore rules
+**File Filtering:** Processes all Git-tracked files (regardless of extension) and respects Git ignore rules
 
 ### Database Files
 - `.turboprop/code_index.duckdb`: Main database containing file content and embeddings with native vector search (stored in `./.turboprop/` directory within each repository)
@@ -121,11 +121,12 @@ CREATE TABLE code_files (
 
 ## Common Development Patterns
 
-### Adding New File Types
-Extend `CODE_EXTENSIONS` set in code_index.py:
-```python
-CODE_EXTENSIONS = {".py", ".js", ".ts", ".new_extension"}
-```
+### File Type Support
+The system now indexes all Git-tracked files regardless of extension. This includes:
+- All source code files (.py, .js, .ts, .java, .go, .rs, .cpp, etc.)
+- Configuration files (.json, .yaml, .toml, .ini, etc.)
+- Documentation files (.md, .rst, .txt, etc.)
+- Any other files tracked in your Git repository
 
 ### Modifying Search Parameters
 - **Vector search**: Uses DuckDB's `list_dot_product()` for cosine similarity calculations
