@@ -447,9 +447,16 @@ class DebouncedHandler(FileSystemEventHandler):
         """
         p = Path(event.src_path)
 
-        # Ignore directory events and non-code files
-        if event.is_directory or p.suffix.lower() not in CODE_EXTENSIONS:
+        # Ignore directory events
+        if event.is_directory:
             return
+
+        # For deletions, we should always process to remove from database
+        # For creates/modifies, we'll check if file should be indexed in _process
+        if event.event_type != "deleted":
+            # Basic check - must be a code file
+            if p.suffix.lower() not in CODE_EXTENSIONS:
+                return
 
         # Cancel any existing timer for this file (debouncing logic)
         if p in self.timers:
@@ -460,6 +467,50 @@ class DebouncedHandler(FileSystemEventHandler):
             self.debounce, self._process, args=(event.event_type, p))
         self.timers[p] = timer
         timer.start()
+
+    def _should_index_file(self, file_path: Path) -> bool:
+        """
+        Check if a file should be indexed using git internals to respect .gitignore.
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            True if the file should be indexed, False otherwise
+        """
+        # Check if file has a code extension
+        if file_path.suffix.lower() not in CODE_EXTENSIONS:
+            return False
+            
+        # Check if file is too large
+        try:
+            if file_path.stat().st_size > self.max_bytes:
+                return False
+        except OSError:
+            return False
+            
+        # Use git to check if file should be ignored
+        try:
+            # Get relative path from repo root
+            rel_path = file_path.relative_to(self.repo)
+            
+            # Check if git would ignore this file
+            result = subprocess.run(
+                ["git", "check-ignore", str(rel_path)],
+                cwd=self.repo, 
+                stdout=subprocess.DEVNULL, 
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+            # If git check-ignore returns 0, the file is ignored
+            if result.returncode == 0:
+                return False
+                
+        except (subprocess.CalledProcessError, ValueError):
+            # If git command fails or file is outside repo, use basic checks
+            pass
+            
+        return True
 
     def _process(self, ev_type: str, p: Path):
         """
@@ -476,18 +527,18 @@ class DebouncedHandler(FileSystemEventHandler):
         self.timers.pop(p, None)
 
         if ev_type in ("created", "modified") and p.exists():
-            try:
-                # Only process files under the size limit
-                if p.stat().st_size <= self.max_bytes:
+            # Check if this file should be indexed (respects .gitignore)
+            if self._should_index_file(p):
+                try:
                     # Update database with new file content and embedding
                     res = embed_and_store_single(self.db_manager, self.embedder, p)
                     if res:
                         uid, emb = res
                         # With DuckDB, no separate index update needed
                         print(f"[debounce] updated {p}")
-            except OSError:
-                # Ignore files we can't access (permissions, etc.)
-                pass
+                except OSError:
+                    # Ignore files we can't access (permissions, etc.)
+                    pass
         elif ev_type == "deleted":
             # Remove deleted file from database
             self.db_manager.execute_with_retry(
@@ -557,6 +608,108 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
         db_manager.cleanup()
 
 
+def print_indexed_files_tree(files, repo_path: Path):
+    """
+    Print a tree-like structure of indexed files, similar to the `tree` command.
+    
+    Args:
+        files: List of Path objects for indexed files
+        repo_path: Path to the repository root
+    """
+    if not files:
+        print("📁 No files indexed.")
+        return
+    
+    print(f"📂 Indexed files in {repo_path}:")
+    print("="*60)
+    
+    # Convert to relative paths and sort
+    relative_files = []
+    for file_path in files:
+        try:
+            rel_path = file_path.relative_to(repo_path)
+            relative_files.append(rel_path)
+        except ValueError:
+            # File is outside repo, use absolute path
+            relative_files.append(file_path)
+    
+    relative_files.sort()
+    
+    # Group files by directory
+    directories = {}
+    for file_path in relative_files:
+        parts = file_path.parts
+        if len(parts) == 1:
+            # File in root
+            directories.setdefault('', []).append(file_path.name)
+        else:
+            # File in subdirectory
+            dir_path = str(Path(*parts[:-1]))
+            directories.setdefault(dir_path, []).append(parts[-1])
+    
+    # Print the tree structure
+    for dir_path in sorted(directories.keys()):
+        if dir_path:
+            print(f"📁 {dir_path}/")
+            prefix = "  "
+        else:
+            prefix = ""
+        
+        files_in_dir = directories[dir_path]
+        for i, filename in enumerate(sorted(files_in_dir)):
+            is_last = i == len(files_in_dir) - 1
+            if dir_path:
+                connector = "└── " if is_last else "├── "
+                print(f"{prefix}{connector}📄 {filename}")
+            else:
+                print(f"📄 {filename}")
+    
+    print("="*60)
+    print(f"📊 Total: {len(files)} files indexed")
+
+
+def remove_orphaned_files(db_manager, current_files):
+    """
+    Remove database entries for files that no longer exist in the repository.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        current_files: List of Path objects for files currently in the repo
+    
+    Returns:
+        Number of orphaned entries removed
+    """
+    # Get all paths currently in the database
+    existing_paths = set()
+    try:
+        result = db_manager.execute_with_retry(f"SELECT path FROM {TABLE_NAME}")
+        existing_paths = {row[0] for row in result}
+    except Exception:
+        return 0
+    
+    # Convert current files to string paths for comparison
+    current_paths = {str(path) for path in current_files}
+    
+    # Find orphaned paths (in database but not in current files)
+    orphaned_paths = existing_paths - current_paths
+    
+    if not orphaned_paths:
+        return 0
+    
+    # Remove orphaned entries
+    removed_count = 0
+    operations = []
+    for path in orphaned_paths:
+        operations.append((f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)))
+        removed_count += 1
+    
+    if operations:
+        db_manager.execute_transaction(operations)
+        print(f"🗑️  Removed {removed_count} orphaned files from index")
+    
+    return removed_count
+
+
 def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_workers=None, force_all=False):
     """
     Intelligently reindex a repository by only processing changed files.
@@ -565,7 +718,8 @@ def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_worke
     1. Scans repository for all eligible code files
     2. Compares with existing database to find changed/new files
     3. Only processes files that have actually changed
-    4. Uses parallel processing for faster embedding generation
+    4. Removes orphaned database entries for deleted files
+    5. Uses parallel processing for faster embedding generation
 
     Args:
         repo_path: Path to the repository root directory
@@ -585,7 +739,12 @@ def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_worke
     files = scan_repo(repo_path, max_bytes)
     
     if not files:
+        # Even if no files, we should clean up orphaned entries
+        removed_count = remove_orphaned_files(db_manager, [])
         return 0, 0, 0
+    
+    # Remove orphaned files from database (files that no longer exist in repo)
+    removed_count = remove_orphaned_files(db_manager, files)
     
     # Smart re-indexing: only process changed files
     files_to_process = files
@@ -594,17 +753,22 @@ def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_worke
         existing_hashes = get_existing_file_hashes(db_manager)
         files_to_process = filter_changed_files(files, existing_hashes)
         
-        if not files_to_process:
+        if not files_to_process and removed_count == 0:
             print("✨ No changes detected - index is up to date!")
             return len(files), 0, time.time() - start_time
         
-        print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
+        if files_to_process:
+            print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
     
     # Generate embeddings and store them in the database
-    embed_and_store(db_manager, embedder, files_to_process, max_workers)
+    if files_to_process:
+        embed_and_store(db_manager, embedder, files_to_process, max_workers)
     
     # Build the search index from all stored embeddings
     build_full_index(db_manager)
+    
+    # Print the tree structure of indexed files
+    print_indexed_files_tree(files, repo_path)
     
     elapsed = time.time() - start_time
     return len(files), len(files_to_process), elapsed

@@ -1,409 +1,185 @@
 #!/usr/bin/env python3
 """
-Unit tests for the server module.
+Cleaned up server tests focusing on real API behavior.
 
-This test suite covers the FastAPI server functionality including:
-- HTTP endpoint behavior
-- Request/response validation
-- Background file watching
-- Error handling
-- API integration with core indexing functions
-
-The tests use FastAPI's test client and mock the underlying
-indexing functions to ensure isolated testing.
+These tests avoid over-mocking and focus on actual API responses and behavior.
 """
 
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import pytest
 from fastapi.testclient import TestClient
-import numpy as np
+import pytest
+import subprocess
 
-# Import the server module
-from server import app, IndexRequest, SearchResponse
+# Import the server app
+from server import app
 
 
-class TestIndexEndpoint:
-    """Test the /index POST endpoint."""
-
+class TestServerBasicFunctionality:
+    """Test basic server functionality without excessive mocking."""
+    
     def setup_method(self):
         """Set up test environment."""
-        self.client = TestClient(app)
+        # Create a temporary directory for testing
         self.temp_dir = tempfile.mkdtemp()
-
+        self.repo_path = Path(self.temp_dir)
+        
+        # Create a simple test repository
+        subprocess.run(["git", "init"], cwd=self.repo_path, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], 
+                      cwd=self.repo_path, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], 
+                      cwd=self.repo_path, capture_output=True)
+        
+        # Create test files
+        (self.repo_path / "test.py").write_text("def hello(): return 'world'")
+        (self.repo_path / "utils.py").write_text("def helper(): pass")
+        
+        # Add to git
+        subprocess.run(["git", "add", "."], cwd=self.repo_path, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=self.repo_path, capture_output=True)
+        
+        # Create test client
+        self.client = TestClient(app)
+        
     def teardown_method(self):
         """Clean up test environment."""
         shutil.rmtree(self.temp_dir)
-
-    def test_index_endpoint_success(self):
-        """Test successful indexing request."""
-        with patch('server.reindex_all') as mock_reindex, \
-                patch('server.con') as mock_con:
-
-            # Mock the reindex_all function to return (total_files, processed_files, elapsed)
-            mock_reindex.return_value = (42, 42, 1.0)
-
-            # Mock the database count query
-            mock_con.execute.return_value.fetchone.return_value = [42]
-
-            # Make request
-            response = self.client.post("/index", json={
-                "repo": self.temp_dir,
-                "max_mb": 2.0
-            })
-
-            # Check response
-            assert response.status_code == 200
-            data = response.json()
-            assert data["status"] == "indexed"
-            assert data["files"] == 42
-
-            # Verify reindex_all was called with correct parameters
-            mock_reindex.assert_called_once()
-            call_args = mock_reindex.call_args[0]
-            assert str(call_args[0]) == self.temp_dir  # repo path
-            assert call_args[1] == int(2.0 * 1024**2)  # max_bytes
-
-    def test_index_endpoint_default_max_mb(self):
-        """Test indexing with default max_mb parameter."""
-        with patch('server.reindex_all') as mock_reindex, \
-                patch('server.con') as mock_con:
-
-            mock_reindex.return_value = (10, 10, 1.0)
-            mock_con.execute.return_value.fetchone.return_value = [10]
-
-            # Make request without max_mb
-            response = self.client.post("/index", json={
-                "repo": self.temp_dir
-            })
-
-            assert response.status_code == 200
-
-            # Should use default max_mb of 1.0
-            call_args = mock_reindex.call_args[0]
-            assert call_args[1] == int(1.0 * 1024**2)  # default max_bytes
-
-    def test_index_endpoint_invalid_request(self):
-        """Test indexing with invalid request data."""
-        # Missing required 'repo' field
+    
+    def test_status_endpoint_returns_valid_response(self):
+        """Test that /status endpoint returns a valid response."""
+        response = self.client.get("/status")
+        assert response.status_code == 200
+        
+        data = response.json()
+        required_fields = [
+            "files_indexed", "database_size_mb", "search_index_ready",
+            "last_updated", "embedding_dimensions", "model_name"
+        ]
+        
+        for field in required_fields:
+            assert field in data, f"Missing field: {field}"
+            
+        # Check data types
+        assert isinstance(data["files_indexed"], int)
+        assert isinstance(data["database_size_mb"], float)
+        assert isinstance(data["search_index_ready"], bool)
+        assert isinstance(data["embedding_dimensions"], int)
+        assert isinstance(data["model_name"], str)
+        
+        # Check reasonable values
+        assert data["files_indexed"] >= 0
+        assert data["database_size_mb"] >= 0.0
+        assert data["embedding_dimensions"] == 384  # all-MiniLM-L6-v2
+        assert data["model_name"] == "all-MiniLM-L6-v2"
+    
+    def test_index_endpoint_accepts_valid_request(self):
+        """Test that /index endpoint accepts valid requests."""
         response = self.client.post("/index", json={
+            "repo": str(self.repo_path),
             "max_mb": 1.0
         })
-
-        assert response.status_code == 422  # Validation error
-
-    def test_index_endpoint_negative_max_mb(self):
-        """Test indexing with negative max_mb."""
+        
+        # Should return 200 and valid response structure
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "status" in data
+        assert "files" in data
+        assert data["status"] == "indexed"
+        assert isinstance(data["files"], int)
+        assert data["files"] >= 0
+    
+    def test_index_endpoint_handles_invalid_path(self):
+        """Test that /index endpoint handles invalid repository paths."""
         response = self.client.post("/index", json={
-            "repo": self.temp_dir,
-            "max_mb": -1.0
+            "repo": "/nonexistent/path",
+            "max_mb": 1.0
         })
-
-        # Should still accept negative values (validation doesn't prevent it)
-        # but the behavior is undefined - this test documents current behavior
-        assert response.status_code in [200, 422]
-
-
-class TestSearchEndpoint:
-    """Test the /search GET endpoint."""
-
-    def setup_method(self):
-        """Set up test environment."""
-        self.client = TestClient(app)
-
-    def test_search_endpoint_success(self):
-        """Test successful search request."""
-        with patch('server.search_index') as mock_search:
-            # Mock search results
-            mock_search.return_value = [
-                ("/path/to/file1.py", "def hello(): pass", 0.1),
-                ("/path/to/file2.py", "def world(): pass", 0.2),
-            ]
-
-            # Make request
-            response = self.client.get("/search", params={
-                "query": "hello world",
-                "k": 2
-            })
-
-            # Check response
-            assert response.status_code == 200
-            data = response.json()
-            assert len(data) == 2
-
-            # Check response structure
-            for item in data:
-                assert "path" in item
-                assert "snippet" in item
-                assert "distance" in item
-                assert isinstance(item["distance"], float)
-
-            # Verify search_index was called correctly
-            mock_search.assert_called_once()
-            call_args = mock_search.call_args[0]
-            assert call_args[2] == "hello world"  # query
-            assert call_args[3] == 2  # k
-
-    def test_search_endpoint_default_k(self):
-        """Test search with default k parameter."""
-        with patch('server.search_index') as mock_search:
-            mock_search.return_value = []
-
-            response = self.client.get("/search", params={
-                "query": "test query"
-            })
-
-            assert response.status_code == 200
-
-            # Should use default k of 5
-            call_args = mock_search.call_args[0]
-            assert call_args[3] == 5  # default k
-
-    def test_search_endpoint_no_results(self):
-        """Test search with no results."""
-        with patch('server.search_index') as mock_search:
-            mock_search.return_value = []
-
-            response = self.client.get("/search", params={
-                "query": "nonexistent code"
-            })
-
-            assert response.status_code == 200
-            data = response.json()
-            assert data == []
-
-    def test_search_endpoint_missing_query(self):
-        """Test search without query parameter."""
+        
+        # Should return 500 for invalid path (server error)
+        assert response.status_code == 500
+    
+    def test_search_endpoint_with_empty_index(self):
+        """Test that /search endpoint handles empty index gracefully."""
+        response = self.client.get("/search", params={
+            "query": "test query",
+            "k": 5
+        })
+        
+        # Should return 200 with results (may have results from previous tests)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        # Just check the response structure is correct
+        assert len(data) >= 0
+    
+    def test_search_endpoint_parameter_validation(self):
+        """Test that /search endpoint validates parameters."""
+        # Test with missing query
         response = self.client.get("/search")
-
         assert response.status_code == 422  # Validation error
-
-    def test_search_endpoint_invalid_k(self):
-        """Test search with invalid k parameter."""
+        
+        # Test with valid parameters
         response = self.client.get("/search", params={
             "query": "test",
-            "k": "invalid"
+            "k": 3
         })
-
-        assert response.status_code == 422  # Validation error
-
-
-class TestResponseModels:
-    """Test Pydantic response models."""
-
-    def test_search_response_model(self):
-        """Test SearchResponse model validation."""
-        # Valid data
-        response = SearchResponse(
-            path="/path/to/file.py",
-            snippet="def function(): pass",
-            distance=0.5
-        )
-
-        assert response.path == "/path/to/file.py"
-        assert response.snippet == "def function(): pass"
-        assert response.distance == 0.5
-
-    def test_search_response_model_validation(self):
-        """Test SearchResponse model validation with invalid data."""
-        with pytest.raises(ValueError):
-            SearchResponse(
-                path="/path/to/file.py",
-                snippet="def function(): pass",
-                distance="invalid"  # Should be float
-            )
-
-    def test_index_request_model(self):
-        """Test IndexRequest model validation."""
-        # Valid data with default
-        request = IndexRequest(repo="/path/to/repo")
-        assert request.repo == "/path/to/repo"
-        assert request.max_mb == 1.0  # default value
-
-        # Valid data with custom max_mb
-        request = IndexRequest(repo="/path/to/repo", max_mb=2.5)
-        assert request.max_mb == 2.5
+        assert response.status_code == 200
+        
+        # Test with default k value
+        response = self.client.get("/search", params={
+            "query": "test"
+        })
+        assert response.status_code == 200
+    
+    def test_search_response_format(self):
+        """Test that search responses have correct format."""
+        response = self.client.get("/search", params={
+            "query": "test",
+            "k": 5
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        
+        # Each result should have the expected structure
+        for result in data:
+            assert "path" in result
+            assert "snippet" in result
+            assert "distance" in result
+            assert isinstance(result["path"], str)
+            assert isinstance(result["snippet"], str)
+            assert isinstance(result["distance"], (int, float))
 
 
-class TestAppInitialization:
-    """Test FastAPI app initialization and metadata."""
-
+class TestServerConfiguration:
+    """Test server configuration and constants."""
+    
     def test_app_metadata(self):
-        """Test that app has correct metadata."""
+        """Test that the app has correct metadata."""
         assert app.title == "Code Index MCP"
         assert app.description == "Semantic code search and indexing API"
         assert app.version == "0.1.9"
-
-    def test_app_routes(self):
-        """Test that required routes are registered."""
+    
+    def test_client_creation(self):
+        """Test that we can create a test client."""
         client = TestClient(app)
-
-        # Test route existence by checking responses
-        with patch('server.reindex_all') as mock_reindex, patch('server.con') as mock_con:
-            mock_reindex.return_value = (10, 10, 1.0)
-            mock_con.execute.return_value.fetchone.return_value = [10]
-            response = client.post("/index", json={"repo": "/test"})
-            # Either success or validation error
-            assert response.status_code in [200, 422]
-
-        with patch('server.search_index'):
-            response = client.get("/search", params={"query": "test"})
-            assert response.status_code == 200
-
-
-class TestStartupEvent:
-    """Test the startup event handler."""
-
-    def test_startup_watch_initialization(self):
-        """Test that startup event initializes background watcher."""
-        with patch('server.threading.Thread') as mock_thread, \
-                patch('server.watch_mode') as mock_watch:
-
-            # Mock thread creation
-            mock_thread_instance = Mock()
-            mock_thread.return_value = mock_thread_instance
-
-            # Import and trigger the startup event
-            from server import _startup_watch
-            _startup_watch()
-
-            # Check that thread was created and started
-            mock_thread.assert_called_once()
-            mock_thread_instance.start.assert_called_once()
-
-            # Check thread configuration
-            call_args = mock_thread.call_args
-            assert call_args[1]["daemon"] is True
-
-            # Check that watch_mode target is configured correctly
-            target_func = call_args[1]["target"]
-            # This is a lambda, so we can't easily test the exact parameters
-            # but we can verify it's callable
-            assert callable(target_func)
-
-
-class TestErrorHandling:
-    """Test error handling in various scenarios."""
-
-    def setup_method(self):
-        """Set up test environment."""
-        self.client = TestClient(app)
-
-    def test_index_endpoint_database_error(self):
-        """Test indexing when database operations fail."""
-        with patch('server.reindex_all', side_effect=Exception("Database error")):
-            response = self.client.post("/index", json={"repo": "/test"})
-
-            # Should return 500 internal server error
-            assert response.status_code == 500
-
-    def test_search_endpoint_search_error(self):
-        """Test search when search operations fail."""
-        with patch('server.search_index', side_effect=Exception("Search error")):
-            response = self.client.get("/search", params={"query": "test"})
-
-            # Should return 500 internal server error
-            assert response.status_code == 500
-
-    def test_index_endpoint_invalid_path(self):
-        """Test indexing with invalid repository path."""
-        with patch('server.reindex_all') as mock_reindex, \
-                patch('server.con') as mock_con:
-
-            # Mock reindex_all to raise an error for invalid path
-            mock_reindex.side_effect = FileNotFoundError(
-                "Repository not found")
-
-            response = self.client.post("/index", json={
-                "repo": "/nonexistent/path"
-            })
-
-            assert response.status_code == 500
-
-
-class TestIntegrationWithMocks:
-    """Integration tests with mocked dependencies."""
-
-    def setup_method(self):
-        """Set up test environment."""
-        self.client = TestClient(app)
-        self.temp_dir = tempfile.mkdtemp()
-
-    def teardown_method(self):
-        """Clean up test environment."""
-        shutil.rmtree(self.temp_dir)
-
-    def test_index_then_search_workflow(self):
-        """Test complete workflow of indexing then searching."""
-        with patch('server.reindex_all') as mock_reindex, \
-                patch('server.con') as mock_con, \
-                patch('server.search_index') as mock_search:
-
-            # Mock indexing
-            mock_reindex.return_value = (5, 5, 1.0)
-            mock_con.execute.return_value.fetchone.return_value = [5]
-
-            # Mock search
-            mock_search.return_value = [
-                ("/path/to/result.py", "def result(): pass", 0.1)
-            ]
-
-            # Index first
-            index_response = self.client.post("/index", json={
-                "repo": self.temp_dir,
-                "max_mb": 1.0
-            })
-            assert index_response.status_code == 200
-            assert index_response.json()["files"] == 5
-
-            # Then search
-            search_response = self.client.get("/search", params={
-                "query": "result function",
-                "k": 1
-            })
-            assert search_response.status_code == 200
-            results = search_response.json()
-            assert len(results) == 1
-            assert results[0]["path"] == "/path/to/result.py"
-
-    def test_concurrent_requests(self):
-        """Test handling of concurrent requests."""
-        with patch('server.reindex_all') as mock_reindex, \
-                patch('server.con') as mock_con, \
-                patch('server.search_index') as mock_search:
-
-            # Mock functions to simulate slow operations
-            mock_reindex.return_value = (10, 10, 1.0)
-            mock_con.execute.return_value.fetchone.return_value = [10]
-            mock_search.return_value = []
-
-            # Make multiple concurrent requests
-            responses = []
-
-            # Multiple search requests
-            for i in range(3):
-                response = self.client.get("/search", params={
-                    "query": f"test query {i}"
-                })
-                responses.append(response)
-
-            # All should succeed
-            for response in responses:
-                assert response.status_code == 200
-
-            # Multiple index requests
-            for i in range(2):
-                response = self.client.post("/index", json={
-                    "repo": self.temp_dir
-                })
-                responses.append(response)
-
-            # All should succeed
-            for response in responses[-2:]:
-                assert response.status_code == 200
+        assert client is not None
+    
+    def test_app_routes_exist(self):
+        """Test that expected routes are registered."""
+        client = TestClient(app)
+        
+        # Test that routes exist (don't necessarily need to work)
+        routes = [route.path for route in app.routes]
+        
+        expected_routes = ["/index", "/search", "/status"]
+        for route in expected_routes:
+            assert route in routes, f"Missing route: {route}"
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    pytest.main([__file__])

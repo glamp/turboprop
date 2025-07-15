@@ -183,6 +183,10 @@ class DatabaseManager:
             self._connections.clear()
             self._release_file_lock()
     
+    def close(self) -> None:
+        """Close all connections - compatibility method for tests."""
+        self.cleanup()
+    
     def __enter__(self):
         return self
     

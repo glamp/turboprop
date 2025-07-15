@@ -124,18 +124,23 @@ def http_index(req: IndexRequest):
             "files": 1247
         }
     """
-    # Convert megabytes to bytes for internal processing
-    max_bytes = int(req.max_mb * 1024**2)
+    try:
+        # Convert megabytes to bytes for internal processing
+        max_bytes = int(req.max_mb * 1024**2)
 
-    # Trigger full reindexing of the specified repository
-    total_files, processed_files, elapsed = reindex_all(
-        Path(req.repo), max_bytes, db_manager, embedder)
+        # Trigger full reindexing of the specified repository
+        total_files, processed_files, elapsed = reindex_all(
+            Path(req.repo), max_bytes, db_manager, embedder)
 
-    # Count total files in database to report back to user
-    count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
-    count = count_result[0][0] if count_result and count_result[0] else 0
+        # Count total files in database to report back to user
+        count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+        count = count_result[0][0] if count_result and count_result[0] else 0
 
-    return {"status": "indexed", "files": count}
+        return {"status": "indexed", "files": count}
+    
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
 
 
 @app.get("/search", response_model=list[SearchResponse])
@@ -174,15 +179,20 @@ def http_search(query: str, k: int = 5):
             ...
         ]
     """
-    # Perform semantic search using the core search function
-    results = search_index(db_manager, embedder, query, k)
+    try:
+        # Perform semantic search using the core search function
+        results = search_index(db_manager, embedder, query, k)
 
-    # Convert results to the standardized response format
-    # The list comprehension transforms tuples to structured objects
-    return [
-        SearchResponse(path=p, snippet=s, distance=d)
-        for p, s, d in results
-    ]
+        # Convert results to the standardized response format
+        # The list comprehension transforms tuples to structured objects
+        return [
+            SearchResponse(path=p, snippet=s, distance=d)
+            for p, s, d in results
+        ]
+    
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
 @app.get("/status")

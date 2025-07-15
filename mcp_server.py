@@ -144,13 +144,13 @@ def index_repository(
         if not files:
             return f"No code files found in repository '{repository_path}'. Make sure it's a Git repository with code files."
 
-        # Generate embeddings and store in database
+        # Use the improved reindexing function that handles orphaned files
         print(
-            f"🔍 Generating embeddings for {len(files)} files...", file=sys.stderr)
-        embed_and_store(con, embedder, files)
-
-        # Build search index
-        print(f"📊 Building search index...", file=sys.stderr)
+            f"🔍 Processing {len(files)} files with smart incremental updates...", file=sys.stderr)
+        total_files, processed_files, elapsed = reindex_all(
+            repo_path, max_bytes, con, embedder, max_workers=None, force_all=False)
+        
+        # Get final embedding count
         embedding_count = build_full_index(con)
 
         print(
