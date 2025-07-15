@@ -3,7 +3,7 @@
     "turboprop": {
       "command": "uvx",
       "args": [
-        "turboprop",
+        "turboprop@latest",
         "mcp",
         "--repository",
         ".",
