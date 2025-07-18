@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional, Set
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from config import config
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from indexing_operations import embed_and_store_single
@@ -42,7 +43,7 @@ class DebouncedHandler(FileSystemEventHandler):
         max_bytes: int,
         db_manager: DatabaseManager,
         embedder: EmbeddingGenerator,
-        debounce_sec: float = 5.0,
+        debounce_sec: Optional[float] = None,
     ):
         """
         Initialize the debounced handler.
@@ -59,7 +60,7 @@ class DebouncedHandler(FileSystemEventHandler):
         self.max_bytes = max_bytes
         self.db_manager = db_manager
         self.embedder = embedder
-        self.debounce_sec = debounce_sec
+        self.debounce_sec = debounce_sec or config.file_processing.DEBOUNCE_SECONDS
 
         # Track pending changes
         self.pending_changes: Set[Path] = set()
@@ -110,7 +111,7 @@ class DebouncedHandler(FileSystemEventHandler):
     def _cleanup_recent_files(self):
         """Clean up the recently processed files set periodically."""
         current_time = time.time()
-        if current_time - self.last_cleanup > 300:  # 5 minutes
+        if current_time - self.last_cleanup > config.file_processing.CLEANUP_INTERVAL:
             self.recently_processed.clear()
             self.last_cleanup = current_time
 
@@ -267,7 +268,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
 
     # Initialize database and embedder
     db_manager = init_db(repo_path_obj)
-    embedder = EmbeddingGenerator("all-MiniLM-L6-v2")
+    embedder = EmbeddingGenerator()
 
     # Create the debounced handler
     handler = DebouncedHandler(repo_path_obj, max_bytes, db_manager, embedder, debounce_sec)
@@ -305,7 +306,7 @@ def start_background_watcher(
     max_bytes: int,
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
-    debounce_sec: float = 5.0,
+    debounce_sec: Optional[float] = None,
 ) -> tuple[Observer, DebouncedHandler]:
     """
     Start a background file watcher that doesn't block the main thread.
@@ -321,7 +322,8 @@ def start_background_watcher(
         Tuple of (Observer, DebouncedHandler) for management
     """
     # Create the debounced handler
-    handler = DebouncedHandler(repo_path, max_bytes, db_manager, embedder, debounce_sec)
+    effective_debounce = debounce_sec or config.file_processing.DEBOUNCE_SECONDS
+    handler = DebouncedHandler(repo_path, max_bytes, db_manager, embedder, effective_debounce)
 
     # Set up the file system observer
     observer = Observer()
@@ -367,15 +369,19 @@ def get_watcher_status(observer: Observer) -> Dict[str, Any]:
     }
 
 
-def monitor_repository_health(repo_path: Path, db_manager: DatabaseManager, check_interval: int = 3600) -> None:
+def monitor_repository_health(
+    repo_path: Path, db_manager: DatabaseManager, check_interval: Optional[int] = None
+) -> None:
     """
     Monitor repository health and detect issues.
 
     Args:
         repo_path: Path to the repository
         db_manager: DatabaseManager instance
-        check_interval: Check interval in seconds
+        check_interval: Check interval in seconds (defaults to config value)
     """
+    effective_check_interval = check_interval or config.file_processing.HEALTH_CHECK_INTERVAL
+
     while True:
         try:
             # Check if repository still exists
@@ -399,7 +405,7 @@ def monitor_repository_health(repo_path: Path, db_manager: DatabaseManager, chec
             logger.debug(f"Repository health check passed for {repo_path}")
 
             # Wait for next check
-            time.sleep(check_interval)
+            time.sleep(effective_check_interval)
 
         except Exception as e:
             logger.error(f"Error during repository health check: {e}")

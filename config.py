@@ -21,9 +21,30 @@ class DatabaseConfig:
     MAX_RETRIES: int = int(os.getenv("TURBOPROP_DB_MAX_RETRIES", "3"))
     RETRY_DELAY: float = float(os.getenv("TURBOPROP_DB_RETRY_DELAY", "0.1"))
 
+    # Connection pool and timeout settings
+    MAX_CONNECTIONS_PER_THREAD: int = int(os.getenv("TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", "1"))
+    CONNECTION_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_CONNECTION_TIMEOUT", "30.0"))
+    STATEMENT_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_STATEMENT_TIMEOUT", "60.0"))
+
+    # File lock settings
+    LOCK_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_LOCK_TIMEOUT", "10.0"))
+    LOCK_RETRY_INTERVAL: float = float(os.getenv("TURBOPROP_DB_LOCK_RETRY_INTERVAL", "0.1"))
+
     # Database file configuration
     DEFAULT_DB_NAME: str = "code_index.duckdb"
     DEFAULT_DB_DIR: str = ".turboprop"
+
+    # Database optimization settings
+    CHECKPOINT_INTERVAL: int = int(os.getenv("TURBOPROP_DB_CHECKPOINT_INTERVAL", "1000"))
+    AUTO_VACUUM: bool = os.getenv("TURBOPROP_DB_AUTO_VACUUM", "true").lower() == "true"
+    TEMP_DIRECTORY: Optional[str] = os.getenv("TURBOPROP_DB_TEMP_DIRECTORY")
+
+    # Connection management settings
+    CONNECTION_MAX_AGE: float = float(os.getenv("TURBOPROP_DB_CONNECTION_MAX_AGE", "3600.0"))  # 1 hour
+    CONNECTION_IDLE_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", "300.0"))  # 5 minutes
+    CONNECTION_HEALTH_CHECK_INTERVAL: float = float(
+        os.getenv("TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", "60.0")
+    )  # 1 minute
 
     @classmethod
     def get_db_path(cls, repo_path: Optional[Path] = None) -> Path:
@@ -48,6 +69,15 @@ class FileProcessingConfig:
 
     # Batch processing settings
     BATCH_SIZE: int = int(os.getenv("TURBOPROP_BATCH_SIZE", "100"))
+
+    # File watching cleanup and health check intervals
+    CLEANUP_INTERVAL: int = int(os.getenv("TURBOPROP_CLEANUP_INTERVAL", "300"))  # 5 minutes
+    HEALTH_CHECK_INTERVAL: int = int(os.getenv("TURBOPROP_HEALTH_CHECK_INTERVAL", "3600"))  # 1 hour
+
+    # Parallel processing settings
+    MAX_WORKERS: int = int(os.getenv("TURBOPROP_MAX_WORKERS", "4"))
+    MIN_FILES_FOR_PARALLEL: int = int(os.getenv("TURBOPROP_MIN_FILES_FOR_PARALLEL", "10"))
+    PARALLEL_CHUNK_SIZE: int = int(os.getenv("TURBOPROP_PARALLEL_CHUNK_SIZE", "50"))
 
 
 class SearchConfig:
@@ -144,6 +174,10 @@ Database:
   Threads: {cls.database.THREADS}
   Max Retries: {cls.database.MAX_RETRIES}
   Retry Delay: {cls.database.RETRY_DELAY}s
+  Connection Timeout: {cls.database.CONNECTION_TIMEOUT}s
+  Statement Timeout: {cls.database.STATEMENT_TIMEOUT}s
+  Lock Timeout: {cls.database.LOCK_TIMEOUT}s
+  Auto Vacuum: {cls.database.AUTO_VACUUM}
 
 File Processing:
   Max File Size: {cls.file_processing.MAX_FILE_SIZE_MB}MB
