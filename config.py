@@ -37,33 +37,36 @@ def validate_positive_int(value: str, var_name: str, default: int) -> int:
     """Validate and convert string to positive integer."""
     try:
         result = int(value)
-        if result <= 0:
-            raise ConfigValidationError(f"{var_name} must be positive, got {result}")
-        return result
     except ValueError:
         raise ConfigValidationError(f"{var_name} must be a valid integer, got '{value}'")
+
+    if result <= 0:
+        raise ConfigValidationError(f"{var_name} must be positive, got {result}")
+    return result
 
 
 def validate_positive_float(value: str, var_name: str, default: float) -> float:
     """Validate and convert string to positive float."""
     try:
         result = float(value)
-        if result <= 0:
-            raise ConfigValidationError(f"{var_name} must be positive, got {result}")
-        return result
     except ValueError:
         raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+
+    if result <= 0:
+        raise ConfigValidationError(f"{var_name} must be positive, got {result}")
+    return result
 
 
 def validate_non_negative_float(value: str, var_name: str, default: float) -> float:
     """Validate and convert string to non-negative float."""
     try:
         result = float(value)
-        if result < 0:
-            raise ConfigValidationError(f"{var_name} must be non-negative, got {result}")
-        return result
     except ValueError:
         raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+
+    if result < 0:
+        raise ConfigValidationError(f"{var_name} must be non-negative, got {result}")
+    return result
 
 
 def validate_memory_limit(value: str, var_name: str) -> str:
@@ -107,11 +110,12 @@ def validate_range_float(value: str, var_name: str, min_val: float, max_val: flo
     """Validate float is within specified range."""
     try:
         result = float(value)
-        if result < min_val or result > max_val:
-            raise ConfigValidationError(f"{var_name} must be between {min_val} and {max_val}, got {result}")
-        return result
     except ValueError:
         raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+
+    if result < min_val or result > max_val:
+        raise ConfigValidationError(f"{var_name} must be between {min_val} and {max_val}, got {result}")
+    return result
 
 
 class DatabaseConfig:
