@@ -14,14 +14,7 @@ from pathlib import Path
 import pytest
 
 # Import the modules to test
-from code_index import (
-    CODE_EXTENSIONS,
-    DIMENSIONS,
-    TABLE_NAME,
-    compute_id,
-    init_db,
-    scan_repo,
-)
+from code_index import CODE_EXTENSIONS, DIMENSIONS, TABLE_NAME, compute_id, init_db, scan_repo
 
 
 class TestComputeId:
@@ -107,9 +100,7 @@ class TestScanRepo:
         (self.repo_path / "utils.py").write_text("def helper(): pass")
         (self.repo_path / "config.json").write_text('{"key": "value"}')
         (self.repo_path / "README.md").write_text("# Project")
-        (self.repo_path / "large_file.py").write_text(
-            "x = '" + "a" * 1000000 + "'"
-        )  # >1MB
+        (self.repo_path / "large_file.py").write_text("x = '" + "a" * 1000000 + "'")  # >1MB
 
         # Create subdirectory
         subdir = self.repo_path / "subdir"

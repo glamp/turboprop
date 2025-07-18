@@ -277,9 +277,7 @@ def main():
         default="default",
         dest="colour",
     )
-    parser.add_option(
-        "-d", "--demo", help="run demos", action="store_true", dest="demo"
-    )
+    parser.add_option("-d", "--demo", help="run demos", action="store_true", dest="demo")
     parser.add_option(
         "-n",
         "--nosummary",

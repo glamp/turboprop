@@ -58,9 +58,7 @@ class SearchConfig:
     MAX_RESULTS_LIMIT: int = int(os.getenv("TURBOPROP_MAX_RESULTS_LIMIT", "20"))
 
     # Similarity and distance thresholds
-    MIN_SIMILARITY_THRESHOLD: float = float(
-        os.getenv("TURBOPROP_MIN_SIMILARITY", "0.1")
-    )
+    MIN_SIMILARITY_THRESHOLD: float = float(os.getenv("TURBOPROP_MIN_SIMILARITY", "0.1"))
 
     # Display formatting
     SEPARATOR_LENGTH: int = int(os.getenv("TURBOPROP_SEPARATOR_LENGTH", "50"))
@@ -87,18 +85,12 @@ class ServerConfig:
 
     # Watcher settings for server mode
     WATCH_DIRECTORY: str = os.getenv("TURBOPROP_WATCH_DIR", ".")
-    WATCH_MAX_FILE_SIZE_MB: float = float(
-        os.getenv("TURBOPROP_WATCH_MAX_FILE_SIZE_MB", "1.0")
-    )
-    WATCH_DEBOUNCE_SECONDS: float = float(
-        os.getenv("TURBOPROP_WATCH_DEBOUNCE_SECONDS", "5.0")
-    )
+    WATCH_MAX_FILE_SIZE_MB: float = float(os.getenv("TURBOPROP_WATCH_MAX_FILE_SIZE_MB", "1.0"))
+    WATCH_DEBOUNCE_SECONDS: float = float(os.getenv("TURBOPROP_WATCH_DEBOUNCE_SECONDS", "5.0"))
 
     # API rate limiting and timeouts
     REQUEST_TIMEOUT: float = float(os.getenv("TURBOPROP_REQUEST_TIMEOUT", "30.0"))
-    MAX_CONCURRENT_REQUESTS: int = int(
-        os.getenv("TURBOPROP_MAX_CONCURRENT_REQUESTS", "10")
-    )
+    MAX_CONCURRENT_REQUESTS: int = int(os.getenv("TURBOPROP_MAX_CONCURRENT_REQUESTS", "10"))
 
 
 class LoggingConfig:
@@ -108,9 +100,7 @@ class LoggingConfig:
     LOG_LEVEL: str = os.getenv("TURBOPROP_LOG_LEVEL", "INFO")
 
     # Log formatting
-    LOG_FORMAT: str = os.getenv(
-        "TURBOPROP_LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    LOG_FORMAT: str = os.getenv("TURBOPROP_LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # File logging
     LOG_FILE: Optional[str] = os.getenv("TURBOPROP_LOG_FILE")
@@ -122,12 +112,8 @@ class MCPConfig:
     """MCP (Model Context Protocol) server configuration."""
 
     # Default settings for MCP operations
-    DEFAULT_MAX_FILE_SIZE_MB: float = float(
-        os.getenv("TURBOPROP_MCP_MAX_FILE_SIZE_MB", "1.0")
-    )
-    DEFAULT_DEBOUNCE_SECONDS: float = float(
-        os.getenv("TURBOPROP_MCP_DEBOUNCE_SECONDS", "5.0")
-    )
+    DEFAULT_MAX_FILE_SIZE_MB: float = float(os.getenv("TURBOPROP_MCP_MAX_FILE_SIZE_MB", "1.0"))
+    DEFAULT_DEBOUNCE_SECONDS: float = float(os.getenv("TURBOPROP_MCP_DEBOUNCE_SECONDS", "5.0"))
 
     # MCP server limits
     MAX_FILES_LIST: int = int(os.getenv("TURBOPROP_MCP_MAX_FILES_LIST", "100"))
