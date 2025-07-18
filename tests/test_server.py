@@ -171,8 +171,6 @@ class TestServerConfiguration:
 
     def test_app_routes_exist(self):
         """Test that expected routes are registered."""
-        client = TestClient(app)
-
         # Test that routes exist (don't necessarily need to work)
         routes = [route.path for route in app.routes]
 

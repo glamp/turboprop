@@ -14,7 +14,7 @@ def test_embedder():
     print(f"Expected dimensions: {DIMENSIONS}")
 
     embedder = get_embedder()
-    print(f"Loaded model successfully")
+    print("Loaded model successfully")
 
     # Test embedding
     test_text = "def hello_world():"

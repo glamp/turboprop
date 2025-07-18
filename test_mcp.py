@@ -3,12 +3,7 @@
 Test script for the Turboprop MCP server.
 """
 
-import json
-import os
-import signal
-import subprocess
 import sys
-import time
 
 
 def test_mcp_server():
@@ -18,8 +13,10 @@ def test_mcp_server():
 
     # Test 1: Basic import
     try:
-        from mcp_server import mcp
+        import mcp_server
 
+        # Verify the module has expected attributes
+        assert hasattr(mcp_server, 'get_index_status')
         print("✓ MCP server module imports successfully")
     except Exception as e:
         print(f"✗ Failed to import MCP server: {e}")
