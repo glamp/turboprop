@@ -16,7 +16,7 @@ def test_mcp_server():
         import mcp_server
 
         # Verify the module has expected attributes
-        assert hasattr(mcp_server, 'get_index_status')
+        assert hasattr(mcp_server, "get_index_status")
         print("✓ MCP server module imports successfully")
     except Exception as e:
         print(f"✗ Failed to import MCP server: {e}")

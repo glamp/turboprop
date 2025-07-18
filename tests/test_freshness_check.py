@@ -12,8 +12,14 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from code_index import (TABLE_NAME, check_index_freshness, embed_and_store,
-                        get_last_index_time, has_repository_changed, init_db)
+from code_index import (
+    TABLE_NAME,
+    check_index_freshness,
+    embed_and_store,
+    get_last_index_time,
+    has_repository_changed,
+    init_db,
+)
 
 
 class TestFreshnessCheck:

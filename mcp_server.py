@@ -24,9 +24,19 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 # Import our existing code indexing functionality
-from code_index import (DIMENSIONS, EMBED_MODEL, TABLE_NAME, build_full_index,
-                        check_index_freshness, get_version, init_db,
-                        reindex_all, scan_repo, search_index, watch_mode)
+from code_index import (
+    DIMENSIONS,
+    EMBED_MODEL,
+    TABLE_NAME,
+    build_full_index,
+    check_index_freshness,
+    get_version,
+    init_db,
+    reindex_all,
+    scan_repo,
+    search_index,
+    watch_mode,
+)
 from config import config
 from embedding_helper import EmbeddingGenerator
 
@@ -164,7 +174,10 @@ def index_repository(
             file=sys.stderr,
         )
 
-        return f"Successfully indexed {len(files)} files from '{repository_path}'. Index contains {embedding_count} embeddings and is ready for search."
+        return (
+            f"Successfully indexed {len(files)} files from '{repository_path}'. "
+            f"Index contains {embedding_count} embeddings and is ready for search."
+        )
 
     except Exception as e:
         return f"Error indexing repository: {str(e)}"
@@ -463,7 +476,10 @@ def watch_repository(
         _watcher_thread = threading.Thread(target=start_watcher, daemon=True)
         _watcher_thread.start()
 
-        return f"Started watching repository '{repository_path}' for changes. Files up to {max_file_size_mb} MB will be processed with {debounce_seconds}s debounce delay."
+        return (
+            f"Started watching repository '{repository_path}' for changes. "
+            f"Files up to {max_file_size_mb} MB will be processed with {debounce_seconds}s debounce delay."
+        )
 
     except Exception as e:
         return f"Error starting repository watcher: {str(e)}"

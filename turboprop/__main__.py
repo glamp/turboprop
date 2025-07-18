@@ -11,9 +11,7 @@ Also supports running the MCP server with:
 - python -m turboprop mcp --repository /path/to/repo
 """
 
-import argparse
 import sys
-from pathlib import Path
 
 
 def main():

@@ -357,7 +357,10 @@ def embed_and_store(
     if rows:
         operations = [
             (
-                f"INSERT OR REPLACE INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)",
+                (
+                    f"INSERT OR REPLACE INTO {TABLE_NAME} "
+                    f"(id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)"
+                ),
                 row,
             )
             for row in rows

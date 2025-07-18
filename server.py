@@ -34,8 +34,15 @@ from pydantic import BaseModel
 
 # Import our core indexing functionality
 # Note: reindex_all is referenced but may need to be implemented
-from code_index import (DIMENSIONS, EMBED_MODEL, TABLE_NAME, init_db,
-                        reindex_all, search_index, watch_mode)
+from code_index import (
+    DIMENSIONS,
+    EMBED_MODEL,
+    TABLE_NAME,
+    init_db,
+    reindex_all,
+    search_index,
+    watch_mode,
+)
 from config import config
 from embedding_helper import EmbeddingGenerator
 
