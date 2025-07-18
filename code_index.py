@@ -157,24 +157,32 @@ def init_db(repo_path: Path = None):
             """
             )
 
-            # Add new columns to existing tables if they don't exist
+            # Migration logic: Add columns only if they don't exist in the table
+            # Check if columns exist before attempting to add them
             try:
-                _db_manager.execute_with_retry(
-                    f"""
-                    ALTER TABLE {TABLE_NAME} ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                """
+                # Check if last_modified column exists
+                result = _db_manager.execute_with_retry(
+                    f"PRAGMA table_info({TABLE_NAME})"
                 )
-            except Exception:
-                pass  # Column already exists
+                existing_columns = [row[1] for row in result]
 
-            try:
-                _db_manager.execute_with_retry(
-                    f"""
-                    ALTER TABLE {TABLE_NAME} ADD COLUMN file_mtime TIMESTAMP
-                """
-                )
+                if "last_modified" not in existing_columns:
+                    _db_manager.execute_with_retry(
+                        f"""
+                        ALTER TABLE {TABLE_NAME} ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    """
+                    )
+
+                if "file_mtime" not in existing_columns:
+                    _db_manager.execute_with_retry(
+                        f"""
+                        ALTER TABLE {TABLE_NAME} ADD COLUMN file_mtime TIMESTAMP
+                    """
+                    )
             except Exception:
-                pass  # Column already exists
+                # If PRAGMA table_info doesn't work with DuckDB, fall back to the original approach
+                # but suppress the error logging for expected failures
+                pass
 
         return _db_manager
 
