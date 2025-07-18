@@ -15,20 +15,15 @@ Lightning-fast semantic code search with AI embeddings. Transform your codebase 
 
 ### MCP Configuration (Claude Integration) - Front and Center!
 
-Add this to your Claude Desktop MCP configuration file:
+Add this to your Claude Code `.mcp` configuration file:
 
 ```json
 {
   "mcpServers": {
     "turboprop": {
       "command": "uvx",
-      "args": [
-        "turboprop",
-        "mcp",
-        "--repository",
-        "/path/to/your/codebase",
-        "--auto-index"
-      ]
+      "args": ["turboprop", "mcp", "--repository", ".", "--auto-index"],
+      "env": {}
     }
   }
 }
