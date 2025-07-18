@@ -374,9 +374,9 @@ def get_index_status() -> str:
         # Get database size
         db_size_mb = 0
         if _config["repository_path"]:
-            db_path = Path(_config["repository_path"]) / "code_index.duckdb"
+            db_path = Path(_config["repository_path"]) / ".turboprop" / "code_index.duckdb"
         else:
-            db_path = Path.cwd() / "code_index.duckdb"
+            db_path = Path.cwd() / ".turboprop" / "code_index.duckdb"
 
         if db_path.exists():
             db_size_mb = db_path.stat().st_size / (1024 * 1024)

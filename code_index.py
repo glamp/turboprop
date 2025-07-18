@@ -134,7 +134,10 @@ def init_db(repo_path: Path = None):
         if _db_manager is None:
             # Create database in the repository directory or current directory
             if repo_path is None:
-                db_path = Path(DB_PATH)
+                # Use current directory with .turboprop subdirectory
+                turboprop_dir = Path.cwd() / ".turboprop"
+                turboprop_dir.mkdir(exist_ok=True)
+                db_path = turboprop_dir / "code_index.duckdb"
             else:
                 # Create .turboprop directory if it doesn't exist
                 turboprop_dir = repo_path / ".turboprop"
