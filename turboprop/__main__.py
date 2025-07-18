@@ -11,22 +11,26 @@ Also supports running the MCP server with:
 - python -m turboprop mcp --repository /path/to/repo
 """
 
-import sys
 import argparse
+import sys
 from pathlib import Path
+
 
 def main():
     """Main entry point for module execution."""
     # Check if first argument is 'mcp' to route to MCP server
-    if len(sys.argv) > 1 and sys.argv[1] == 'mcp':
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
         # Remove 'mcp' from args and run MCP server
         sys.argv.pop(1)
         from mcp_server import main as mcp_main
+
         mcp_main()
     else:
         # Run regular CLI
         from code_index import main as cli_main
+
         cli_main()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

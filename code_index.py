@@ -18,52 +18,50 @@ The system supports three main operations:
 # Force CPU usage for PyTorch before any imports to avoid MPS issues on Apple Silicon
 import os
 import platform
-is_apple_silicon = platform.processor() == 'arm' or platform.machine() == 'arm64'
+
+is_apple_silicon = platform.processor() == "arm" or platform.machine() == "arm64"
 
 if is_apple_silicon:
-    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
-    os.environ['PYTORCH_DISABLE_MPS'] = '1'
-    os.environ['PYTORCH_DEVICE'] = 'cpu'
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+    os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
+    os.environ["PYTORCH_DISABLE_MPS"] = "1"
+    os.environ["PYTORCH_DEVICE"] = "cpu"
 
-# Standard library imports for file operations, process management, and utilities
-import subprocess
 import argparse
 import hashlib
-import time
-import threading
-import sys
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
 
-# Third-party imports for database, ML, and file monitoring
-import duckdb
-import numpy as np
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 from tqdm import tqdm
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
-# Import our custom embedding helper
-from embedding_helper import EmbeddingGenerator
 from database_manager import DatabaseManager
+from embedding_helper import EmbeddingGenerator
 
 # Global database manager instance
 _db_manager = None
 _db_manager_lock = threading.Lock()
 
+
 def get_version():
     """Get the version of turboprop."""
     try:
         from turboprop._version import __version__
+
         return __version__
     except ImportError:
         return "0.2.2"
 
+
 # Configuration constants - these control the behavior of the indexing system
 # Name of the table that stores file content and embeddings
 TABLE_NAME = "code_files"
-DIMENSIONS = 384               # Embedding dimensions for all-MiniLM-L6-v2 model
+DIMENSIONS = 384  # Embedding dimensions for all-MiniLM-L6-v2 model
 # SentenceTransformer model name for generating embeddings
 EMBED_MODEL = "all-MiniLM-L6-v2"
 # Backward compatibility for tests
@@ -71,10 +69,32 @@ DB_PATH = "code_index.duckdb"
 
 # File extensions that we consider to be code files worth indexing
 # This covers most major programming languages and common config/markup files
-CODE_EXTENSIONS = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".c", ".cpp",
-                   ".h", ".cs", ".go", ".rs", ".swift", ".kt", ".m", ".rb",
-                   ".php", ".sh", ".html", ".css", ".json", ".yaml", ".yml",
-                   ".xml"}
+CODE_EXTENSIONS = {
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".cs",
+    ".go",
+    ".rs",
+    ".swift",
+    ".kt",
+    ".m",
+    ".rb",
+    ".php",
+    ".sh",
+    ".html",
+    ".css",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".xml",
+}
 
 
 def compute_id(text: str) -> str:
@@ -107,7 +127,7 @@ def init_db(repo_path: Path = None):
         DatabaseManager instance
     """
     global _db_manager
-    
+
     with _db_manager_lock:
         if _db_manager is None:
             # Create database in the repository directory or current directory
@@ -118,11 +138,12 @@ def init_db(repo_path: Path = None):
                 turboprop_dir = repo_path / ".turboprop"
                 turboprop_dir.mkdir(exist_ok=True)
                 db_path = turboprop_dir / "code_index.duckdb"
-            
+
             _db_manager = DatabaseManager(db_path)
-            
+
             # Initialize table schema with modification time tracking
-            _db_manager.execute_with_retry(f"""
+            _db_manager.execute_with_retry(
+                f"""
                 CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     id VARCHAR PRIMARY KEY,
                     path VARCHAR,
@@ -131,23 +152,28 @@ def init_db(repo_path: Path = None):
                     last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     file_mtime TIMESTAMP
                 )
-            """)
-            
+            """
+            )
+
             # Add new columns to existing tables if they don't exist
             try:
-                _db_manager.execute_with_retry(f"""
+                _db_manager.execute_with_retry(
+                    f"""
                     ALTER TABLE {TABLE_NAME} ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                """)
+                """
+                )
             except Exception:
                 pass  # Column already exists
-            
+
             try:
-                _db_manager.execute_with_retry(f"""
+                _db_manager.execute_with_retry(
+                    f"""
                     ALTER TABLE {TABLE_NAME} ADD COLUMN file_mtime TIMESTAMP
-                """)
+                """
+                )
             except Exception:
                 pass  # Column already exists
-        
+
         return _db_manager
 
 
@@ -171,27 +197,39 @@ def scan_repo(repo_path: Path, max_bytes: int):
     repo_path = repo_path.resolve()
 
     files = []
-    
+
     try:
         # Get all tracked files (already in git)
         tracked_result = subprocess.run(
             ["git", "ls-files"],
-            cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, check=True
+            cwd=repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=True,
         )
-        tracked_files = {line.strip() for line in tracked_result.stdout.splitlines() if line.strip()}
-        
+        tracked_files = {
+            line.strip() for line in tracked_result.stdout.splitlines() if line.strip()
+        }
+
         # Get all untracked files that are not ignored
         untracked_result = subprocess.run(
             ["git", "ls-files", "--exclude-standard", "--others"],
-            cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, check=True
+            cwd=repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=True,
         )
-        untracked_files = {line.strip() for line in untracked_result.stdout.splitlines() if line.strip()}
-        
+        untracked_files = {
+            line.strip()
+            for line in untracked_result.stdout.splitlines()
+            if line.strip()
+        }
+
         # Combine tracked and untracked files
         all_files = tracked_files | untracked_files
-        
+
     except subprocess.CalledProcessError:
         # If git commands fail (not a git repo, etc.), fall back to simple file walk
         all_files = set()
@@ -199,11 +237,11 @@ def scan_repo(repo_path: Path, max_bytes: int):
             for name in names:
                 rel_path = Path(root).relative_to(repo_path) / name
                 all_files.add(str(rel_path))
-    
+
     # Process the files
     for file_path_str in all_files:
         p = repo_path / file_path_str
-            
+
         try:
             # Skip files that are too large to process efficiently
             if p.stat().st_size > max_bytes:
@@ -211,16 +249,16 @@ def scan_repo(repo_path: Path, max_bytes: int):
         except OSError:
             # Skip files we can't read (permissions, broken symlinks, etc.)
             continue
-        
+
         files.append(p)
-    
+
     return files
 
 
 def get_existing_file_hashes(db_manager):
     """
     Retrieve existing file hashes from the database for smart re-indexing.
-    
+
     Returns:
         Dict mapping file paths to their content hashes
     """
@@ -234,34 +272,37 @@ def get_existing_file_hashes(db_manager):
 def filter_changed_files(files, existing_hashes):
     """
     Filter files to only include those that have changed or are new.
-    
+
     Args:
         files: List of Path objects to check
         existing_hashes: Dict of path -> hash from database
-        
+
     Returns:
         List of Path objects that need to be reprocessed
     """
     changed_files = []
-    
+
     for path in files:
         try:
             text = path.read_text(encoding="utf-8")
             current_hash = compute_id(str(path) + text)
-            
+
             # If file is new or content has changed, include it
-            if str(path) not in existing_hashes or existing_hashes[str(path)] != current_hash:
+            if (
+                str(path) not in existing_hashes
+                or existing_hashes[str(path)] != current_hash
+            ):
                 changed_files.append(path)
         except Exception:
             # If we can't read the file, skip it
             continue
-    
+
     return changed_files
 
 
-
-
-def embed_and_store(db_manager, embedder, files, max_workers=None, progress_callback=None):
+def embed_and_store(
+    db_manager, embedder, files, max_workers=None, progress_callback=None
+):
     """
     Process a list of files by generating embeddings and storing them in the database.
     Uses sequential processing for reliability.
@@ -275,40 +316,52 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
     """
     if not files:
         return
-    
+
     rows = []
     failed_files = []
-    
+
     # Use sequential processing for reliability
     with tqdm(total=len(files), desc="🔍 Generating embeddings", unit="files") as pbar:
         for path in files:
             try:
                 text = path.read_text(encoding="utf-8")
                 uid = compute_id(str(path) + text)
-                
+
                 emb = embedder.encode(text)
                 # Get file modification time
                 import datetime
+
                 file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
                 rows.append((uid, str(path), text, emb.tolist(), file_mtime))
-                
+
             except Exception as e:
                 print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
                 failed_files.append(path)
-            
+
             pbar.update(1)
-            
+
             # Maintain backward compatibility with progress_callback
             if progress_callback:
-                progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
-    
+                progress_callback(
+                    pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files"
+                )
+
     # Report processing results
     if failed_files:
-        print(f"⚠️  Failed to process {len(failed_files)} files out of {len(files)} total", file=sys.stderr)
-    
+        print(
+            f"⚠️  Failed to process {len(failed_files)} files out of {len(files)} total",
+            file=sys.stderr,
+        )
+
     # Insert all rows in a single batch operation for better performance
     if rows:
-        operations = [(f"INSERT OR REPLACE INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)", row) for row in rows]
+        operations = [
+            (
+                f"INSERT OR REPLACE INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)",
+                row,
+            )
+            for row in rows
+        ]
         db_manager.execute_transaction(operations)
         print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
@@ -328,7 +381,8 @@ def build_full_index(db_manager):
     """
     # Check if we have any embeddings in the database
     result = db_manager.execute_with_retry(
-        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
+        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL"
+    )
     return result[0][0] if result and result[0] else 0
 
 
@@ -358,17 +412,20 @@ def search_index(db_manager, embedder, query: str, k: int):
     # Cosine similarity = dot(a,b) / (norm(a) * norm(b))
     # Cosine distance = 1 - cosine similarity
     with db_manager.get_connection() as con:
-        results = con.execute(f"""
-            SELECT 
+        results = con.execute(
+            f"""
+            SELECT
                 path,
                 substr(content, 1, 300) as snippet,
-                1 - (list_dot_product(embedding, $1) / 
+                1 - (list_dot_product(embedding, $1) /
                     (sqrt(list_dot_product(embedding, embedding)) * sqrt(list_dot_product($1, $1)))) as distance
             FROM {TABLE_NAME}
             WHERE embedding IS NOT NULL
             ORDER BY distance ASC
             LIMIT {k}
-        """, [q_emb]).fetchall()
+        """,
+            [q_emb],
+        ).fetchall()
 
     return results
 
@@ -401,12 +458,16 @@ def embed_and_store_single(db_manager, embedder, path: Path):
 
     # Get file modification time
     import datetime
+
     file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
 
     # Use transaction for database operations
     operations = [
         (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),)),
-        (f"INSERT INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)", (uid, str(path), text, emb.tolist(), file_mtime))
+        (
+            f"INSERT INTO {TABLE_NAME} (id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)",
+            (uid, str(path), text, emb.tolist(), file_mtime),
+        ),
     ]
     db_manager.execute_transaction(operations)
 
@@ -436,7 +497,9 @@ class DebouncedHandler(FileSystemEventHandler):
     4. This ensures we only process the "final" version of rapid changes
     """
 
-    def __init__(self, repo: Path, max_bytes: int, db_manager, embedder, debounce_sec: float):
+    def __init__(
+        self, repo: Path, max_bytes: int, db_manager, embedder, debounce_sec: float
+    ):
         """
         Initialize the debounced file handler.
 
@@ -481,50 +544,51 @@ class DebouncedHandler(FileSystemEventHandler):
 
         # Start a new timer that will process this file after the debounce period
         timer = threading.Timer(
-            self.debounce, self._process, args=(event.event_type, p))
+            self.debounce, self._process, args=(event.event_type, p)
+        )
         self.timers[p] = timer
         timer.start()
 
     def _should_index_file(self, file_path: Path) -> bool:
         """
         Check if a file should be indexed using git internals to respect .gitignore.
-        
+
         Args:
             file_path: Path to the file to check
-            
+
         Returns:
             True if the file should be indexed, False otherwise
         """
         # Index all files that are tracked by Git (no extension filtering)
-            
+
         # Check if file is too large
         try:
             if file_path.stat().st_size > self.max_bytes:
                 return False
         except OSError:
             return False
-            
+
         # Use git to check if file should be ignored
         try:
             # Get relative path from repo root
             rel_path = file_path.relative_to(self.repo)
-            
+
             # Check if git would ignore this file
             result = subprocess.run(
                 ["git", "check-ignore", str(rel_path)],
-                cwd=self.repo, 
-                stdout=subprocess.DEVNULL, 
+                cwd=self.repo,
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                text=True
+                text=True,
             )
             # If git check-ignore returns 0, the file is ignored
             if result.returncode == 0:
                 return False
-                
+
         except (subprocess.CalledProcessError, ValueError):
             # If git command fails or file is outside repo, use basic checks
             pass
-            
+
         return True
 
     def _process(self, ev_type: str, p: Path):
@@ -557,7 +621,8 @@ class DebouncedHandler(FileSystemEventHandler):
         elif ev_type == "deleted":
             # Remove deleted file from database
             self.db_manager.execute_with_retry(
-                f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
+                f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),)
+            )
             print(f"[debounce] {p} deleted from database")
 
 
@@ -586,7 +651,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
 
     # Initialize database and ML model
     db_manager = init_db(repo)
-    
+
     try:
         embedder = EmbeddingGenerator(EMBED_MODEL)
         print("✅ Embedding generator initialized for watch mode", file=sys.stderr)
@@ -599,15 +664,13 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
     print(f"[watch] found {embedding_count} embeddings in database")
 
     # Set up the debounced file handler
-    handler = DebouncedHandler(
-        repo, max_bytes, db_manager, embedder, debounce_sec)
+    handler = DebouncedHandler(repo, max_bytes, db_manager, embedder, debounce_sec)
 
     # Create and configure the file system observer
     observer = Observer()
     observer.schedule(handler, str(repo), recursive=True)
 
-    print(
-        f"[watch] watching {repo} (max {max_mb} MB, debounce {debounce_sec}s)")
+    print(f"[watch] watching {repo} (max {max_mb} MB, debounce {debounce_sec}s)")
     observer.start()
 
     try:
@@ -626,7 +689,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
 def print_indexed_files_tree(files, repo_path: Path):
     """
     Print a tree-like structure of indexed files, similar to the `tree` command.
-    
+
     Args:
         files: List of Path objects for indexed files
         repo_path: Path to the repository root
@@ -634,10 +697,10 @@ def print_indexed_files_tree(files, repo_path: Path):
     if not files:
         print("📁 No files indexed.")
         return
-    
+
     print(f"📂 Indexed files in {repo_path}:")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Convert to relative paths and sort
     relative_files = []
     for file_path in files:
@@ -647,21 +710,21 @@ def print_indexed_files_tree(files, repo_path: Path):
         except ValueError:
             # File is outside repo, use absolute path
             relative_files.append(file_path)
-    
+
     relative_files.sort()
-    
+
     # Group files by directory
     directories = {}
     for file_path in relative_files:
         parts = file_path.parts
         if len(parts) == 1:
             # File in root
-            directories.setdefault('', []).append(file_path.name)
+            directories.setdefault("", []).append(file_path.name)
         else:
             # File in subdirectory
             dir_path = str(Path(*parts[:-1]))
             directories.setdefault(dir_path, []).append(parts[-1])
-    
+
     # Print the tree structure
     for dir_path in sorted(directories.keys()):
         if dir_path:
@@ -669,7 +732,7 @@ def print_indexed_files_tree(files, repo_path: Path):
             prefix = "  "
         else:
             prefix = ""
-        
+
         files_in_dir = directories[dir_path]
         for i, filename in enumerate(sorted(files_in_dir)):
             is_last = i == len(files_in_dir) - 1
@@ -678,19 +741,19 @@ def print_indexed_files_tree(files, repo_path: Path):
                 print(f"{prefix}{connector}📄 {filename}")
             else:
                 print(f"📄 {filename}")
-    
-    print("="*60)
+
+    print("=" * 60)
     print(f"📊 Total: {len(files)} files indexed")
 
 
 def remove_orphaned_files(db_manager, current_files):
     """
     Remove database entries for files that no longer exist in the repository.
-    
+
     Args:
         db_manager: DatabaseManager instance
         current_files: List of Path objects for files currently in the repo
-    
+
     Returns:
         Number of orphaned entries removed
     """
@@ -701,43 +764,44 @@ def remove_orphaned_files(db_manager, current_files):
         existing_paths = {row[0] for row in result}
     except Exception:
         return 0
-    
+
     # Convert current files to string paths for comparison
     current_paths = {str(path) for path in current_files}
-    
+
     # Find orphaned paths (in database but not in current files)
     orphaned_paths = existing_paths - current_paths
-    
+
     if not orphaned_paths:
         return 0
-    
+
     # Remove orphaned entries
     removed_count = 0
     operations = []
     for path in orphaned_paths:
         operations.append((f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)))
         removed_count += 1
-    
+
     if operations:
         db_manager.execute_transaction(operations)
         print(f"🗑️  Removed {removed_count} orphaned files from index")
-    
+
     return removed_count
 
 
 def get_last_index_time(db_manager):
     """
     Get the timestamp of the most recent indexing operation.
-    
+
     Args:
         db_manager: DatabaseManager instance
-        
+
     Returns:
         datetime or None if no files are indexed
     """
     try:
         result = db_manager.execute_with_retry(
-            f"SELECT MAX(last_modified) FROM {TABLE_NAME}")
+            f"SELECT MAX(last_modified) FROM {TABLE_NAME}"
+        )
         if result and result[0] and result[0][0]:
             return result[0][0]
         return None
@@ -748,67 +812,68 @@ def get_last_index_time(db_manager):
 def has_repository_changed(repo_path: Path, max_bytes: int, db_manager):
     """
     Check if any files in the repository have changed since the last indexing.
-    
+
     This function provides a fast way to determine if reindexing is needed by:
     1. Comparing the number of files in the repo vs database
     2. Checking if any files have newer modification times than the last index
     3. Detecting new files that aren't in the database
-    
+
     Args:
         repo_path: Path to the repository
         max_bytes: Maximum file size to consider
         db_manager: DatabaseManager instance
-        
+
     Returns:
         tuple: (has_changed: bool, reason: str, changed_count: int)
     """
     try:
         # Get current files in repository
         current_files = scan_repo(repo_path, max_bytes)
-        
+
         if not current_files:
             return False, "No files found in repository", 0
-            
+
         # Get existing file info from database
         existing_files = {}
         try:
             result = db_manager.execute_with_retry(
-                f"SELECT path, file_mtime FROM {TABLE_NAME}")
+                f"SELECT path, file_mtime FROM {TABLE_NAME}"
+            )
             existing_files = {row[0]: row[1] for row in result}
         except Exception:
             return True, "Database error - need to rebuild index", len(current_files)
-        
+
         # Check if file counts differ
         if len(current_files) != len(existing_files):
             file_diff = len(current_files) - len(existing_files)
             return True, f"File count changed ({file_diff:+d} files)", abs(file_diff)
-        
+
         # Check modification times
         changed_files = []
         for file_path in current_files:
             try:
                 file_mtime = file_path.stat().st_mtime
                 str_path = str(file_path)
-                
+
                 # File is new if not in database
                 if str_path not in existing_files:
                     changed_files.append(str_path)
                     continue
-                
+
                 # Check if file has been modified
                 db_mtime = existing_files[str_path]
                 if db_mtime is None or file_mtime > db_mtime.timestamp():
                     changed_files.append(str_path)
-                    
+
             except OSError:
                 # File might have been deleted, count as changed
                 changed_files.append(str(file_path))
-        
+
         if changed_files:
-            return True, f"Files modified or added", len(changed_files)
-        
+            return True, "Files modified or added", len(changed_files)
+
         return False, "Repository is up to date", 0
-        
+
     except Exception as e:
         return True, f"Error checking repository: {str(e)}", 0
 
@@ -816,14 +881,14 @@ def has_repository_changed(repo_path: Path, max_bytes: int, db_manager):
 def check_index_freshness(repo_path: Path, max_bytes: int, db_manager):
     """
     Check if the index is fresh and up-to-date.
-    
+
     This is a comprehensive check that determines if reindexing is needed.
-    
+
     Args:
         repo_path: Path to the repository
         max_bytes: Maximum file size to consider
         db_manager: DatabaseManager instance
-        
+
     Returns:
         dict: {
             'is_fresh': bool,
@@ -836,45 +901,54 @@ def check_index_freshness(repo_path: Path, max_bytes: int, db_manager):
     # Check if index exists
     try:
         file_count = db_manager.execute_with_retry(
-            f"SELECT COUNT(*) FROM {TABLE_NAME}")[0][0]
+            f"SELECT COUNT(*) FROM {TABLE_NAME}"
+        )[0][0]
     except Exception:
         return {
-            'is_fresh': False,
-            'reason': 'No index found',
-            'last_index_time': None,
-            'changed_files': 0,
-            'total_files': 0
+            "is_fresh": False,
+            "reason": "No index found",
+            "last_index_time": None,
+            "changed_files": 0,
+            "total_files": 0,
         }
-    
+
     if file_count == 0:
         return {
-            'is_fresh': False,
-            'reason': 'Index is empty',
-            'last_index_time': None,
-            'changed_files': 0,
-            'total_files': 0
+            "is_fresh": False,
+            "reason": "Index is empty",
+            "last_index_time": None,
+            "changed_files": 0,
+            "total_files": 0,
         }
-    
+
     # Get last index time
     last_index_time = get_last_index_time(db_manager)
-    
+
     # Check if repository has changed
     has_changed, reason, changed_count = has_repository_changed(
-        repo_path, max_bytes, db_manager)
-    
+        repo_path, max_bytes, db_manager
+    )
+
     # Count current files
     current_files = scan_repo(repo_path, max_bytes)
-    
+
     return {
-        'is_fresh': not has_changed,
-        'reason': reason,
-        'last_index_time': last_index_time,
-        'changed_files': changed_count,
-        'total_files': len(current_files)
+        "is_fresh": not has_changed,
+        "reason": reason,
+        "last_index_time": last_index_time,
+        "changed_files": changed_count,
+        "total_files": len(current_files),
     }
 
 
-def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_workers=None, force_all=False):
+def reindex_all(
+    repo_path: Path,
+    max_bytes: int,
+    db_manager,
+    embedder,
+    max_workers=None,
+    force_all=False,
+):
     """
     Intelligently reindex a repository by only processing changed files.
 
@@ -897,43 +971,45 @@ def reindex_all(repo_path: Path, max_bytes: int, db_manager, embedder, max_worke
         Tuple of (total_files_found, files_processed, time_taken)
     """
     start_time = time.time()
-    
+
     # Scan the repository for indexable files
     print("🔍 Scanning repository for code files...")
     files = scan_repo(repo_path, max_bytes)
-    
+
     if not files:
         # Even if no files, we should clean up orphaned entries
         removed_count = remove_orphaned_files(db_manager, [])
         return 0, 0, 0
-    
+
     # Remove orphaned files from database (files that no longer exist in repo)
     removed_count = remove_orphaned_files(db_manager, files)
-    
+
     # Smart re-indexing: only process changed files
     files_to_process = files
     if not force_all:
         print("🧠 Checking for changed files...")
         existing_hashes = get_existing_file_hashes(db_manager)
         files_to_process = filter_changed_files(files, existing_hashes)
-        
+
         if not files_to_process and removed_count == 0:
             print("✨ No changes detected - index is up to date!")
             return len(files), 0, time.time() - start_time
-        
+
         if files_to_process:
-            print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
-    
+            print(
+                f"📝 Found {len(files_to_process)} changed files out of {len(files)} total"
+            )
+
     # Generate embeddings and store them in the database
     if files_to_process:
         embed_and_store(db_manager, embedder, files_to_process, max_workers)
-    
+
     # Build the search index from all stored embeddings
     build_full_index(db_manager)
-    
+
     # Print the tree structure of indexed files
     print_indexed_files_tree(files, repo_path)
-    
+
     elapsed = time.time() - start_time
     return len(files), len(files_to_process), elapsed
 
@@ -976,14 +1052,12 @@ Examples:
   • Watch mode keeps index fresh as you code
 
 🔗 More help: https://github.com/glamp/turboprop
-        """
+        """,
     )
 
     # Add version argument
     parser.add_argument(
-        '--version', '-v',
-        action='version',
-        version=f'turboprop {get_version()}'
+        "--version", "-v", action="version", version=f"turboprop {get_version()}"
     )
 
     sub = parser.add_subparsers(
@@ -991,7 +1065,7 @@ Examples:
         required=True,
         title="commands",
         description="Available operations",
-        help="Run 'turboprop <command> --help' for detailed usage"
+        help="Run 'turboprop <command> --help' for detailed usage",
     )
 
     # 'index' command: Build initial index from repository
@@ -1016,19 +1090,16 @@ Examples:
   turboprop index . --max-mb 2.0      # Allow larger files
 
 Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, etc.
-        """
+        """,
     )
-    p_i.add_argument(
-        "repo",
-        help="Path to the Git repository to index"
-    )
+    p_i.add_argument("repo", help="Path to the Git repository to index")
     p_i.add_argument(
         "--max-mb",
         type=float,
         default=1.0,
         metavar="SIZE",
         help="Maximum file size in MB to include (default: 1.0). "
-             "Larger files are skipped to avoid memory issues."
+        "Larger files are skipped to avoid memory issues.",
     )
     p_i.add_argument(
         "--workers",
@@ -1036,13 +1107,13 @@ Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, et
         default=None,
         metavar="NUM",
         help="Number of parallel workers for embedding generation (default: CPU count). "
-             "More workers = faster processing but higher memory usage."
+        "More workers = faster processing but higher memory usage.",
     )
     p_i.add_argument(
         "--force-all",
         action="store_true",
         help="Force reprocessing of all files, even if unchanged. "
-             "Useful for model updates or index corruption recovery."
+        "Useful for model updates or index corruption recovery.",
     )
 
     # 'search' command: Query the existing index
@@ -1060,30 +1131,29 @@ middleware" to discover relevant code across your entire repository.
         epilog="""
 Query Examples:
   "JWT authentication"              → Find auth-related code
-  "parse JSON response"             → Discover JSON parsing logic  
+  "parse JSON response"             → Discover JSON parsing logic
   "error handling middleware"       → Locate error handling patterns
   "database connection setup"       → Find DB initialization code
   "function to calculate tax"       → Search for specific functions
   "React component for forms"       → Find form-related components
 
 💡 Tip: Use descriptive phrases rather than single keywords for best results.
-        """
+        """,
     )
     p_s.add_argument(
-        "query",
-        help="Natural language search query (e.g., 'function to parse JSON')"
+        "query", help="Natural language search query (e.g., 'function to parse JSON')"
     )
     p_s.add_argument(
         "--repo",
         default=".",
-        help="Path to the Git repository to search (default: current directory)"
+        help="Path to the Git repository to search (default: current directory)",
     )
     p_s.add_argument(
         "--k",
         type=int,
         default=5,
         metavar="NUM",
-        help="Number of results to return (default: 5, max recommended: 20)"
+        help="Number of results to return (default: 5, max recommended: 20)",
     )
 
     # 'watch' command: Monitor repository for changes
@@ -1103,24 +1173,21 @@ Perfect for keeping your search index fresh during active development.
         epilog="""
 Usage Patterns:
   • Development mode: Run in background while coding
-  • CI/CD integration: Auto-update index on deployments  
+  • CI/CD integration: Auto-update index on deployments
   • Team environments: Keep shared index synchronized
 
 Press Ctrl+C to stop watching.
 
 💡 Pro Tip: Higher debounce values reduce CPU usage during heavy file activity.
-        """
+        """,
     )
-    p_w.add_argument(
-        "repo",
-        help="Path to the Git repository to watch"
-    )
+    p_w.add_argument("repo", help="Path to the Git repository to watch")
     p_w.add_argument(
         "--max-mb",
         type=float,
         default=1.0,
         metavar="SIZE",
-        help="Maximum file size in MB to process (default: 1.0)"
+        help="Maximum file size in MB to process (default: 1.0)",
     )
     p_w.add_argument(
         "--debounce-sec",
@@ -1128,7 +1195,7 @@ Press Ctrl+C to stop watching.
         default=5.0,
         metavar="SECONDS",
         help="Seconds to wait before processing changes (default: 5.0). "
-             "Higher values reduce CPU usage during rapid file changes."
+        "Higher values reduce CPU usage during rapid file changes.",
     )
 
     # 'mcp' command: Start MCP server
@@ -1153,50 +1220,50 @@ Examples:
   turboprop mcp --repository . --no-auto-index     # Don't auto-index on startup
 
 💡 Pro Tip: Use with Claude Code or other MCP clients for AI-powered code exploration.
-        """
+        """,
     )
     p_m.add_argument(
         "--repository",
         default=".",
-        help="Path to the repository to index and monitor (default: current directory)"
+        help="Path to the repository to index and monitor (default: current directory)",
     )
     p_m.add_argument(
         "--max-mb",
         type=float,
         default=1.0,
         metavar="SIZE",
-        help="Maximum file size in MB to process (default: 1.0)"
+        help="Maximum file size in MB to process (default: 1.0)",
     )
     p_m.add_argument(
         "--debounce-sec",
         type=float,
         default=5.0,
         metavar="SECONDS",
-        help="Seconds to wait before processing file changes (default: 5.0)"
+        help="Seconds to wait before processing file changes (default: 5.0)",
     )
     p_m.add_argument(
         "--auto-index",
         action="store_true",
         default=True,
-        help="Automatically index the repository on startup (default: True)"
+        help="Automatically index the repository on startup (default: True)",
     )
     p_m.add_argument(
         "--no-auto-index",
         action="store_false",
         dest="auto_index",
-        help="Don't automatically index the repository on startup"
+        help="Don't automatically index the repository on startup",
     )
     p_m.add_argument(
         "--auto-watch",
         action="store_true",
         default=True,
-        help="Automatically watch for file changes (default: True)"
+        help="Automatically watch for file changes (default: True)",
     )
     p_m.add_argument(
         "--no-auto-watch",
         action="store_false",
         dest="auto_watch",
-        help="Don't automatically watch for file changes"
+        help="Don't automatically watch for file changes",
     )
 
     # Parse command line arguments
@@ -1208,7 +1275,7 @@ Examples:
 
     # Initialize the ML model (shared across all commands)
     print("⚡ Initializing AI model...")
-    
+
     try:
         embedder = EmbeddingGenerator(EMBED_MODEL)
         print("✅ Embedding generator initialized successfully")
@@ -1226,7 +1293,7 @@ Examples:
         else:
             auto_workers = min(4, multiprocessing.cpu_count())
             print(f"👥 Using {auto_workers} parallel workers (auto-detected)")
-        
+
         if args.force_all:
             print("🔄 Force mode: reprocessing all files")
 
@@ -1240,51 +1307,48 @@ Examples:
             freshness = check_index_freshness(repo_path, max_bytes, db_manager)
             print(f"📊 {freshness['reason']}")
             print(f"📁 Repository files: {freshness['total_files']}")
-            
-            if freshness['is_fresh']:
+
+            if freshness["is_fresh"]:
                 print("✨ Index is up-to-date!")
-                if freshness['last_index_time']:
+                if freshness["last_index_time"]:
                     print(f"📅 Last indexed: {freshness['last_index_time']}")
                 print("💡 Use --force-all to reindex anyway")
                 return
-            elif freshness['changed_files'] > 0:
+            elif freshness["changed_files"] > 0:
                 print(f"🔄 Found {freshness['changed_files']} changed files")
         else:
             print("\n🔄 Force reindexing all files...")
 
         # Use new smart reindex function
         total_files, processed_files, elapsed = reindex_all(
-            repo_path, 
-            max_bytes, 
-            db_manager, 
-            embedder,
-            args.workers,
-            args.force_all
+            repo_path, max_bytes, db_manager, embedder, args.workers, args.force_all
         )
 
         if total_files == 0:
-            print("❌ No code files found. Make sure you're in a Git repository with code files.")
+            print(
+                "❌ No code files found. Make sure you're in a Git repository with code files."
+            )
             return
 
-        print(f"🎉 Indexing complete!")
+        print("🎉 Indexing complete!")
         print(f"📊 Files found: {total_files}")
         print(f"📊 Files processed: {processed_files}")
         print(f"⏱️  Time elapsed: {elapsed:.2f} seconds")
-        
+
         if processed_files > 0:
             print(f"⚡ Processing rate: {processed_files/elapsed:.1f} files/second")
-        
+
         embedding_count = build_full_index(db_manager)
         print(f"💾 Database saved to: {repo_path / '.turboprop' / 'code_index.duckdb'}")
         print(f"🔍 Total embeddings in index: {embedding_count}")
-        print("\n💡 Try searching: turboprop search \"your query here\"")
-        
+        print('\n💡 Try searching: turboprop search "your query here"')
+
         # Clean up database connections
         db_manager.cleanup()
 
     elif args.cmd == "search":
         # Search the existing index
-        print(f"\n🔎 Searching for: \"{args.query}\"")
+        print(f'\n🔎 Searching for: "{args.query}"')
         print(f"📊 Returning top {args.k} results...")
 
         repo_path = Path(args.repo).resolve()
@@ -1314,7 +1378,7 @@ Examples:
             similarity_pct = (1 - dist) * 100
             print(f"┌─ {i}. {path}")
             print(f"│  📈 Similarity: {similarity_pct:.1f}%")
-            print(f"│")
+            print("│")
             # Clean up the snippet display
             clean_snippet = snippet.strip()[:200]
             if len(snippet) > 200:
@@ -1339,42 +1403,44 @@ Examples:
 
     elif args.cmd == "mcp":
         # Start MCP server
-        print(f"\n🔗 Starting MCP server...")
+        print("\n🔗 Starting MCP server...")
         print("📞 Invoking MCP server module...")
-        
+
         # Import and run the MCP server with the provided arguments
         try:
-            from mcp_server import main as mcp_main
             import sys
-            
+
+            from mcp_server import main as mcp_main
+
             # Build arguments for MCP server
             mcp_args = []
             if args.repository:
                 mcp_args.extend(["--repository", args.repository])
-            
-            mcp_args.extend([
-                "--max-mb", str(args.max_mb),
-                "--debounce-sec", str(args.debounce_sec)
-            ])
-            
+
+            mcp_args.extend(
+                ["--max-mb", str(args.max_mb), "--debounce-sec", str(args.debounce_sec)]
+            )
+
             if not args.auto_index:
                 mcp_args.append("--no-auto-index")
             if not args.auto_watch:
                 mcp_args.append("--no-auto-watch")
-            
+
             # Override sys.argv for MCP server
             original_argv = sys.argv[:]
             sys.argv = ["turboprop-mcp"] + mcp_args
-            
+
             try:
                 mcp_main()
             finally:
                 # Restore original argv
                 sys.argv = original_argv
-                
+
         except ImportError:
             print("❌ MCP server module not available.")
-            print("💡 Make sure you've installed the MCP dependencies: pip install turboprop[mcp]")
+            print(
+                "💡 Make sure you've installed the MCP dependencies: pip install turboprop[mcp]"
+            )
             return
         except Exception as e:
             print(f"❌ MCP server failed to start: {e}")

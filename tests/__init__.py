@@ -8,7 +8,7 @@ This package contains unit tests and integration tests for:
 
 Run tests with:
     pytest tests/
-    
+
 Or run with coverage:
     pytest --cov=. tests/
 """

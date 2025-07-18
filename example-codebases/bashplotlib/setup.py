@@ -15,19 +15,18 @@ setup(
     packages=find_packages(),
     description="plotting in the terminal",
     long_description=long_description,
-    entry_points = {
-        'console_scripts': [
-            'hist=bashplotlib.histogram:main',
-            'scatter=bashplotlib.scatterplot:main',
+    entry_points={
+        "console_scripts": [
+            "hist=bashplotlib.histogram:main",
+            "scatter=bashplotlib.scatterplot:main",
         ]
     },
-    keywords=['plotting', 'console', 'shell'],
+    keywords=["plotting", "console", "shell"],
     classifiers=[
-        'Environment :: Console',
-        'Intended Audience :: End Users/Desktop',
-        'License :: OSI Approved :: BSD License',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
+        "Environment :: Console",
+        "Intended Audience :: End Users/Desktop",
+        "License :: OSI Approved :: BSD License",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
     ],
 )
-

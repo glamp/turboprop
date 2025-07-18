@@ -6,19 +6,20 @@ Plotting terminal based scatterplots
 """
 
 from __future__ import print_function
+
 import csv
-import sys
 import optparse
-from .utils.helpers import *
+import sys
+
 from .utils.commandhelp import scatter
+from .utils.helpers import *
 
 
 def get_scale(series, is_y=False, steps=20):
     min_val = min(series)
     max_val = max(series)
     scaled_series = []
-    for x in drange(min_val, max_val, (max_val - min_val) / steps,
-                    include_stop=True):
+    for x in drange(min_val, max_val, (max_val - min_val) / steps, include_stop=True):
         if x > 0 and scaled_series and max(scaled_series) < 0:
             scaled_series.append(0.0)
         scaled_series.append(x)
@@ -36,10 +37,10 @@ def _plot_scatter(xs, ys, size, pch, colour, title, cs):
 
     print("-" * (2 * len(get_scale(xs, False, size)) + 2))
     for y in get_scale(ys, True, size):
-        print("|", end=' ')
+        print("|", end=" ")
         for x in get_scale(xs, False, size):
             point = " "
-            for (i, (xp, yp)) in enumerate(zip(xs, ys)):
+            for i, (xp, yp) in enumerate(zip(xs, ys)):
                 if xp <= x and yp >= y and (xp, yp) not in plotted:
                     point = pch
                     plotted.add((xp, yp))
@@ -48,6 +49,7 @@ def _plot_scatter(xs, ys, size, pch, colour, title, cs):
             printcolour(point, True, colour)
         print(" |")
     print("-" * (2 * len(get_scale(xs, False, size)) + 2))
+
 
 def plot_scatter(f, xs, ys, size, pch, colour, title):
     """
@@ -66,9 +68,9 @@ def plot_scatter(f, xs, ys, size, pch, colour, title):
     if f:
         if isinstance(f, str):
             with open(f) as fh:
-                data = [tuple(line.strip().split(',')) for line in fh]
+                data = [tuple(line.strip().split(",")) for line in fh]
         else:
-            data = [tuple(line.strip().split(',')) for line in f]
+            data = [tuple(line.strip().split(",")) for line in f]
         xs = [float(i[0]) for i in data]
         ys = [float(i[1]) for i in data]
         if len(data[0]) > 2:
@@ -82,21 +84,28 @@ def plot_scatter(f, xs, ys, size, pch, colour, title):
             ys = [float(str(row).strip()) for row in fh]
 
     _plot_scatter(xs, ys, size, pch, colour, title, cs)
-    
 
 
 def main():
+    parser = optparse.OptionParser(usage=scatter["usage"])
 
-    parser = optparse.OptionParser(usage=scatter['usage'])
-
-    parser.add_option('-f', '--file', help='a csv w/ x and y coordinates', default=None, dest='f')
-    parser.add_option('-t', '--title', help='title for the chart', default="", dest='t')
-    parser.add_option('-x', help='x coordinates', default=None, dest='x')
-    parser.add_option('-y', help='y coordinates', default=None, dest='y')
-    parser.add_option('-s', '--size', help='y coordinates', default=20, dest='size', type='int')
-    parser.add_option('-p', '--pch', help='shape of point', default="x", dest='pch')
-    parser.add_option('-c', '--colour', help='colour of the plot (%s)' %
-                      colour_help, default='default', dest='colour')
+    parser.add_option(
+        "-f", "--file", help="a csv w/ x and y coordinates", default=None, dest="f"
+    )
+    parser.add_option("-t", "--title", help="title for the chart", default="", dest="t")
+    parser.add_option("-x", help="x coordinates", default=None, dest="x")
+    parser.add_option("-y", help="y coordinates", default=None, dest="y")
+    parser.add_option(
+        "-s", "--size", help="y coordinates", default=20, dest="size", type="int"
+    )
+    parser.add_option("-p", "--pch", help="shape of point", default="x", dest="pch")
+    parser.add_option(
+        "-c",
+        "--colour",
+        help="colour of the plot (%s)" % colour_help,
+        default="default",
+        dest="colour",
+    )
 
     opts, args = parser.parse_args()
 

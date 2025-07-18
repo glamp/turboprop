@@ -106,3 +106,7 @@ uv.lock
 # Turboprop database files
 .turboprop/
 .wal
+
+# Scratch directories and temporary files
+.swissarmyhammer/
+CODE_REVIEW.md

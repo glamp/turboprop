@@ -5,16 +5,16 @@
 Plotting terminal based histograms
 """
 
-from __future__ import print_function
-from __future__ import division
+from __future__ import division, print_function
 
-import os
-import sys
 import math
 import optparse
+import os
+import sys
 from os.path import dirname
-from .utils.helpers import *
+
 from .utils.commandhelp import hist
+from .utils.helpers import *
 
 
 def calc_bins(n, min_val, max_val, h=None, binwidth=None):
@@ -52,7 +52,7 @@ def run_demo():
     Run a demonstration
     """
     module_dir = dirname(dirname(os.path.realpath(__file__)))
-    demo_file = os.path.join(module_dir, 'examples/data/exp.txt')
+    demo_file = os.path.join(module_dir, "examples/data/exp.txt")
 
     if not os.path.isfile(demo_file):
         sys.stderr.write("demo input file not found!\n")
@@ -71,14 +71,14 @@ def run_demo():
     print("histogram with colours")
     print("plot_hist('%s', colour='blue')" % demo_file)
     print("hist -f %s -c blue" % demo_file)
-    plot_hist(demo_file, colour='blue')
+    plot_hist(demo_file, colour="blue")
     print("*" * 80)
 
     # changing the shape of the point
     print("changing the shape of the bars")
     print("plot_hist('%s', pch='.')" % demo_file)
     print("hist -f %s -p ." % demo_file)
-    plot_hist(demo_file, pch='.')
+    plot_hist(demo_file, pch=".")
     print("*" * 80)
 
     # changing the size of the plot
@@ -88,7 +88,18 @@ def run_demo():
     plot_hist(demo_file, height=35.0, bincount=40)
 
 
-def plot_hist(f, height=20.0, bincount=None, binwidth=None, pch="o", colour="default", title="", xlab=None, showSummary=False, regular=False):
+def plot_hist(
+    f,
+    height=20.0,
+    bincount=None,
+    binwidth=None,
+    pch="o",
+    colour="default",
+    title="",
+    xlab=None,
+    showSummary=False,
+    regular=False,
+):
     """
     Make a histogram
 
@@ -124,9 +135,9 @@ def plot_hist(f, height=20.0, bincount=None, binwidth=None, pch="o", colour="def
     mean /= n
 
     for number in read_numbers(f):
-        sd += (mean - number)**2
+        sd += (mean - number) ** 2
 
-    sd /= (n - 1)
+    sd /= n - 1
     sd **= 0.5
 
     bins = list(calc_bins(n, min_val, max_val, bincount, binwidth))
@@ -171,14 +182,14 @@ def plot_hist(f, height=20.0, bincount=None, binwidth=None, pch="o", colour="def
             used_labs.add(ylab)
         ylab = " " * (nlen - len(ylab)) + ylab + "|"
 
-        print(ylab, end=' ')
+        print(ylab, end=" ")
 
         for i in range(len(hist)):
             if int(y) <= hist[i]:
                 printcolour(pch, True, colour)
             else:
                 printcolour(" ", True, colour)
-        print('')
+        print("")
     xs = hist.keys()
 
     print(" " * (nlen + 1) + "-" * len(xs))
@@ -193,10 +204,10 @@ def plot_hist(f, height=20.0, bincount=None, binwidth=None, pch="o", colour="def
                 if x % 2 != 0:
                     pass
                 elif i < len(num):
-                    print(num[i], end=' ')
+                    print(num[i], end=" ")
                 else:
-                    print(" ", end=' ')
-            print('')
+                    print(" ", end=" ")
+            print("")
 
     center = max(map(len, map(str, [n, min_val, mean, max_val])))
     center += 15
@@ -216,29 +227,75 @@ def plot_hist(f, height=20.0, bincount=None, binwidth=None, pch="o", colour="def
 
 
 def main():
-
-    parser = optparse.OptionParser(usage=hist['usage'])
+    parser = optparse.OptionParser(usage=hist["usage"])
 
     parser.add_option(
-        '-f', '--file', help='a file containing a column of numbers', default=None, dest='f')
-    parser.add_option('-t', '--title', help='title for the chart', default="", dest='t')
+        "-f",
+        "--file",
+        help="a file containing a column of numbers",
+        default=None,
+        dest="f",
+    )
+    parser.add_option("-t", "--title", help="title for the chart", default="", dest="t")
     parser.add_option(
-        '-b', '--bins', help='number of bins in the histogram', type='int', default=None, dest='b')
-    parser.add_option('-w', '--binwidth', help='width of bins in the histogram',
-                      type='float', default=None, dest='binwidth')
-    parser.add_option('-s', '--height', help='height of the histogram (in lines)',
-                      type='int', default=None, dest='h')
-    parser.add_option('-p', '--pch', help='shape of each bar', default='o', dest='p')
-    parser.add_option('-x', '--xlab', help='label bins on x-axis',
-                      default=None, action="store_true", dest='x')
-    parser.add_option('-c', '--colour', help='colour of the plot (%s)' %
-                      colour_help, default='default', dest='colour')
-    parser.add_option('-d', '--demo', help='run demos', action='store_true', dest='demo')
-    parser.add_option('-n', '--nosummary', help='hide summary',
-                      action='store_false', dest='showSummary', default=True)
-    parser.add_option('-r', '--regular',
-                      help='use regular y-scale (0 - maximum y value), instead of truncated y-scale (minimum y-value - maximum y-value)',
-                      default=False, action="store_true", dest='regular')
+        "-b",
+        "--bins",
+        help="number of bins in the histogram",
+        type="int",
+        default=None,
+        dest="b",
+    )
+    parser.add_option(
+        "-w",
+        "--binwidth",
+        help="width of bins in the histogram",
+        type="float",
+        default=None,
+        dest="binwidth",
+    )
+    parser.add_option(
+        "-s",
+        "--height",
+        help="height of the histogram (in lines)",
+        type="int",
+        default=None,
+        dest="h",
+    )
+    parser.add_option("-p", "--pch", help="shape of each bar", default="o", dest="p")
+    parser.add_option(
+        "-x",
+        "--xlab",
+        help="label bins on x-axis",
+        default=None,
+        action="store_true",
+        dest="x",
+    )
+    parser.add_option(
+        "-c",
+        "--colour",
+        help="colour of the plot (%s)" % colour_help,
+        default="default",
+        dest="colour",
+    )
+    parser.add_option(
+        "-d", "--demo", help="run demos", action="store_true", dest="demo"
+    )
+    parser.add_option(
+        "-n",
+        "--nosummary",
+        help="hide summary",
+        action="store_false",
+        dest="showSummary",
+        default=True,
+    )
+    parser.add_option(
+        "-r",
+        "--regular",
+        help="use regular y-scale (0 - maximum y value), instead of truncated y-scale (minimum y-value - maximum y-value)",
+        default=False,
+        action="store_true",
+        dest="regular",
+    )
 
     opts, args = parser.parse_args()
 
@@ -251,8 +308,18 @@ def main():
     if opts.demo:
         run_demo()
     elif opts.f:
-        plot_hist(opts.f, opts.h, opts.b, opts.binwidth, opts.p, opts.colour,
-                  opts.t, opts.x, opts.showSummary, opts.regular)
+        plot_hist(
+            opts.f,
+            opts.h,
+            opts.b,
+            opts.binwidth,
+            opts.p,
+            opts.colour,
+            opts.t,
+            opts.x,
+            opts.showSummary,
+            opts.regular,
+        )
     else:
         print("nothing to plot!")
 

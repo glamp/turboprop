@@ -7,23 +7,23 @@ Various helpful function for bashplotlib
 
 import sys
 
-isiterable = lambda x: hasattr(x, '__iter__') or hasattr(x, '__getitem__')
+isiterable = lambda x: hasattr(x, "__iter__") or hasattr(x, "__getitem__")
 
 bcolours = {
-    "white":   '\033[97m',
-    "aqua":    '\033[96m',
-    "pink":    '\033[95m',
-    "blue":    '\033[94m',
-    "yellow":  '\033[93m',
-    "green":   '\033[92m',
-    "red":     '\033[91m',
-    "grey":    '\033[90m',
-    "black":   '\033[30m',
-    "default": '\033[39m',
-    "ENDC":    '\033[39m',
+    "white": "\033[97m",
+    "aqua": "\033[96m",
+    "pink": "\033[95m",
+    "blue": "\033[94m",
+    "yellow": "\033[93m",
+    "green": "\033[92m",
+    "red": "\033[91m",
+    "grey": "\033[90m",
+    "black": "\033[30m",
+    "default": "\033[39m",
+    "ENDC": "\033[39m",
 }
 
-colour_help = ', '.join([colour for colour in bcolours if colour != "ENDC"])
+colour_help = ", ".join([colour for colour in bcolours if colour != "ENDC"])
 
 
 def get_colour(colour, default="default"):
@@ -37,7 +37,7 @@ def printcolour(text, sameline=False, colour="default"):
     """
     Print color text using escape codes
     """
-    sep = '' if sameline else '\n'
+    sep = "" if sameline else "\n"
 
     # If no colour set, do not print color ESC characters
     if get_colour(colour) == get_colour("ENDC"):
@@ -66,7 +66,7 @@ def drange(start, stop, step=1.0, include_stop=False):
             r = round(r, 10)
 
 
-def abbreviate(labels, rfill=' '):
+def abbreviate(labels, rfill=" "):
     """
     Abbreviate labels without introducing ambiguities.
     """
@@ -82,7 +82,7 @@ def box_text(text, width, offset=0):
     """
     Return text inside an ascii textbox
     """
-    box = " " * offset + "-" * (width+2) + "\n"
+    box = " " * offset + "-" * (width + 2) + "\n"
     box += " " * offset + "|" + text.center(width) + "|" + "\n"
-    box += " " * offset + "-" * (width+2)
+    box += " " * offset + "-" * (width + 2)
     return box

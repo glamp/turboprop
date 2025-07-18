@@ -7,7 +7,7 @@ making it accessible over HTTP for integration with other tools and services.
 The server exposes the core code_index operations through web endpoints.
 
 Key features:
-- RESTful API for indexing and searching code repositories  
+- RESTful API for indexing and searching code repositories
 - Automatic background watching of the current directory
 - JSON request/response format for easy integration
 - FastAPI with automatic OpenAPI documentation
@@ -18,12 +18,13 @@ Endpoints:
 
 This server is particularly useful for:
 - Integration with IDEs and editors
-- Building web-based code search interfaces  
+- Building web-based code search interfaces
 - Providing code search as a microservice
 - MCP (Model Context Protocol) server implementations
 """
 
 # Standard library imports
+import contextlib
 import threading
 from pathlib import Path
 
@@ -33,14 +34,47 @@ from pydantic import BaseModel
 
 # Import our core indexing functionality
 # Note: reindex_all is referenced but may need to be implemented
-from code_index import init_db, search_index, reindex_all, watch_mode, TABLE_NAME, EMBED_MODEL, DIMENSIONS
+from code_index import (DIMENSIONS, EMBED_MODEL, TABLE_NAME, init_db,
+                        reindex_all, search_index, watch_mode)
+from config import config
 from embedding_helper import EmbeddingGenerator
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handle application startup and shutdown events using lifespan context manager.
+
+    This replaces the deprecated @app.on_event decorators with the modern
+    lifespan approach recommended by FastAPI.
+    """
+    # Startup: Start background file watching
+    print("[server] Starting background file watcher for current directory")
+    watcher_thread = threading.Thread(
+        # watch current dir with configurable settings
+        target=lambda: watch_mode(
+            config.server.WATCH_DIRECTORY,
+            config.server.WATCH_MAX_FILE_SIZE_MB,
+            config.server.WATCH_DEBOUNCE_SECONDS,
+        ),
+        daemon=True,  # Allow clean server shutdown without waiting for this thread
+    )
+    watcher_thread.start()
+
+    yield  # Server is running
+
+    # Shutdown: Clean up database connections
+    if db_manager:
+        db_manager.cleanup()
+        print("[server] Database connections cleaned up")
+
 
 # Initialize FastAPI application with metadata
 app = FastAPI(
     title="Code Index MCP",
     description="Semantic code search and indexing API",
-    version="0.1.9"
+    version="0.1.9",
+    lifespan=lifespan,
 )
 
 # Initialize shared resources that persist across requests
@@ -66,6 +100,7 @@ class IndexRequest(BaseModel):
                Files larger than this will be skipped to avoid memory issues
                and excessive processing time. Default is 1.0 MB.
     """
+
     repo: str
     max_mb: float = 1.0
 
@@ -84,6 +119,7 @@ class SearchResponse(BaseModel):
         distance: Cosine distance score (0.0 = identical, 1.0 = completely different)
                  Lower values indicate higher similarity to the search query
     """
+
     path: str
     snippet: str
     distance: float
@@ -114,7 +150,7 @@ def http_index(req: IndexRequest):
     Example:
         POST /index
         {
-            "repo": "/path/to/my/project", 
+            "repo": "/path/to/my/project",
             "max_mb": 2.0
         }
 
@@ -130,16 +166,20 @@ def http_index(req: IndexRequest):
 
         # Trigger full reindexing of the specified repository
         total_files, processed_files, elapsed = reindex_all(
-            Path(req.repo), max_bytes, db_manager, embedder)
+            Path(req.repo), max_bytes, db_manager, embedder
+        )
 
         # Count total files in database to report back to user
-        count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+        count_result = db_manager.execute_with_retry(
+            f"SELECT count(*) FROM {TABLE_NAME}"
+        )
         count = count_result[0][0] if count_result and count_result[0] else 0
 
         return {"status": "indexed", "files": count}
-    
+
     except Exception as e:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
 
 
@@ -185,13 +225,11 @@ def http_search(query: str, k: int = 5):
 
         # Convert results to the standardized response format
         # The list comprehension transforms tuples to structured objects
-        return [
-            SearchResponse(path=p, snippet=s, distance=d)
-            for p, s, d in results
-        ]
-    
+        return [SearchResponse(path=p, snippet=s, distance=d) for p, s, d in results]
+
     except Exception as e:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
@@ -244,7 +282,7 @@ def http_status():
         try:
             # This is a simple timestamp - in production you might want to store actual timestamps
             last_updated = "Recent"  # Simplified for now
-        except:
+        except Exception:
             last_updated = "Unknown"
 
     return {
@@ -253,50 +291,5 @@ def http_status():
         "search_index_ready": index_ready,
         "last_updated": last_updated,
         "embedding_dimensions": DIMENSIONS,
-        "model_name": EMBED_MODEL
+        "model_name": EMBED_MODEL,
     }
-
-
-@app.on_event("startup")
-def _startup_watch():
-    """
-    Start background file watching when the server starts up.
-
-    This startup event handler automatically begins monitoring the current
-    directory (".") for file changes when the FastAPI server starts. This
-    provides real-time index updates without requiring manual intervention.
-
-    The background watcher:
-    - Runs in a separate daemon thread to avoid blocking the main server
-    - Monitors the current directory recursively for any code file changes  
-    - Uses debounced updates (5 second delay) to avoid excessive processing
-    - Automatically handles file additions, modifications, and deletions
-    - Keeps the search index synchronized with the actual code state
-
-    Configuration:
-    - Watch directory: "." (current directory where server is started)
-    - Max file size: 1.0 MB (files larger than this are ignored)
-    - Debounce delay: 5.0 seconds (wait time before processing changes)
-    - Thread type: Daemon (dies when main server process exits)
-
-    Note: The daemon thread setting ensures the watcher doesn't prevent
-    the server from shutting down cleanly when terminated.
-    """
-    # Create a daemon thread that won't block server shutdown
-    watcher_thread = threading.Thread(
-        # watch current dir, 1MB max, 5s debounce
-        target=lambda: watch_mode(".", 1.0, 5.0),
-        daemon=True  # Allow clean server shutdown without waiting for this thread
-    )
-    watcher_thread.start()
-    print("[server] Started background file watcher for current directory")
-
-
-@app.on_event("shutdown")
-def _shutdown_cleanup():
-    """
-    Clean up database connections when the server shuts down.
-    """
-    if db_manager:
-        db_manager.cleanup()
-        print("[server] Database connections cleaned up")

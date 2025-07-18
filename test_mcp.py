@@ -3,26 +3,28 @@
 Test script for the Turboprop MCP server.
 """
 
-import sys
 import json
-import subprocess
-import time
-import signal
 import os
+import signal
+import subprocess
+import sys
+import time
+
 
 def test_mcp_server():
     """Test the MCP server by running it and sending test requests."""
-    
+
     print("Testing Turboprop MCP server...")
-    
+
     # Test 1: Basic import
     try:
         from mcp_server import mcp
+
         print("✓ MCP server module imports successfully")
     except Exception as e:
         print(f"✗ Failed to import MCP server: {e}")
         return False
-    
+
     # Test 2: Check if tools are registered
     try:
         # Test that our tools are available
@@ -30,18 +32,20 @@ def test_mcp_server():
     except Exception as e:
         print(f"✗ Failed to create MCP server: {e}")
         return False
-    
+
     # Test 3: Test index status tool
     try:
         from mcp_server import get_index_status
+
         result = get_index_status()
         print(f"✓ Index status tool works: {result[:50]}...")
     except Exception as e:
         print(f"✗ Index status tool failed: {e}")
         return False
-    
+
     print("\nAll tests passed! MCP server is ready.")
     return True
+
 
 if __name__ == "__main__":
     success = test_mcp_server()
