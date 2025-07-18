@@ -19,9 +19,11 @@ if is_apple_silicon:
     os.environ["PYTORCH_DISABLE_MPS"] = "1"
     os.environ["PYTORCH_DEVICE"] = "cpu"
 
-import numpy as np
-import torch
-from sentence_transformers import SentenceTransformer
+# Imports must be placed after environment variables are set for Apple Silicon MPS compatibility
+# This ensures PyTorch uses CPU backend instead of problematic MPS backend
+import numpy as np  # noqa: E402
+import torch  # noqa: E402
+from sentence_transformers import SentenceTransformer  # noqa: E402
 
 # Force PyTorch to use CPU backend on Apple Silicon
 if is_apple_silicon:

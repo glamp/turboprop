@@ -12,14 +12,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from code_index import (
-    TABLE_NAME,
-    DebouncedHandler,
-    init_db,
-    print_indexed_files_tree,
-    reindex_all,
-    remove_orphaned_files,
-)
+from code_index import (TABLE_NAME, DebouncedHandler, init_db,
+                        print_indexed_files_tree, reindex_all,
+                        remove_orphaned_files)
 
 
 class TestPrintIndexedFilesTree:

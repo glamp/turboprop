@@ -6,7 +6,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from mcp_server import DIMENSIONS, EMBED_MODEL, get_embedder
+# Import must be placed after sys.path.insert for module discovery
+from mcp_server import DIMENSIONS, EMBED_MODEL, get_embedder  # noqa: E402
 
 
 def test_embedder():

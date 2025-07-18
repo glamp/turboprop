@@ -14,14 +14,8 @@ from pathlib import Path
 import pytest
 
 # Import the modules to test
-from code_index import (
-    CODE_EXTENSIONS,
-    DIMENSIONS,
-    TABLE_NAME,
-    compute_id,
-    init_db,
-    scan_repo,
-)
+from code_index import (CODE_EXTENSIONS, DIMENSIONS, TABLE_NAME, compute_id,
+                        init_db, scan_repo)
 
 
 class TestComputeId:

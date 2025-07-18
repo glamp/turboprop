@@ -27,21 +27,23 @@ if is_apple_silicon:
     os.environ["PYTORCH_DISABLE_MPS"] = "1"
     os.environ["PYTORCH_DEVICE"] = "cpu"
 
-import argparse
-import hashlib
-import multiprocessing
-import subprocess
-import sys
-import threading
-import time
-from pathlib import Path
+# Imports must be placed after environment variables are set for Apple Silicon MPS compatibility
+# This ensures PyTorch uses CPU backend instead of problematic MPS backend
+import argparse  # noqa: E402
+import hashlib  # noqa: E402
+import multiprocessing  # noqa: E402
+import subprocess  # noqa: E402
+import sys  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-from tqdm import tqdm
-from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer
+from tqdm import tqdm  # noqa: E402
+from watchdog.events import FileSystemEventHandler  # noqa: E402
+from watchdog.observers import Observer  # noqa: E402
 
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
+from database_manager import DatabaseManager  # noqa: E402
+from embedding_helper import EmbeddingGenerator  # noqa: E402
 
 # Global database manager instance
 _db_manager = None

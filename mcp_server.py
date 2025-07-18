@@ -24,19 +24,9 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 # Import our existing code indexing functionality
-from code_index import (
-    DIMENSIONS,
-    EMBED_MODEL,
-    TABLE_NAME,
-    build_full_index,
-    check_index_freshness,
-    get_version,
-    init_db,
-    reindex_all,
-    scan_repo,
-    search_index,
-    watch_mode,
-)
+from code_index import (DIMENSIONS, EMBED_MODEL, TABLE_NAME, build_full_index,
+                        check_index_freshness, get_version, init_db,
+                        reindex_all, scan_repo, search_index, watch_mode)
 from config import config
 from embedding_helper import EmbeddingGenerator
 
@@ -151,7 +141,10 @@ def index_repository(
         print(f"📄 Found {len(files)} code files to process", file=sys.stderr)
 
         if not files:
-            return f"No code files found in repository '{repository_path}'. Make sure it's a Git repository with code files."
+            return (
+                f"No code files found in repository '{repository_path}'. "
+                "Make sure it's a Git repository with code files."
+            )
 
         # Use the improved reindexing function that handles orphaned files
         print(
@@ -230,7 +223,10 @@ def search_code(query: str, max_results: int = None) -> str:
         results = search_index(con, embedder, query, max_results)
 
         if not results:
-            return f"No results found for query: '{query}'. Try different search terms or make sure the repository is indexed."
+            return (
+                f"No results found for query: '{query}'. "
+                "Try different search terms or make sure the repository is indexed."
+            )
 
         # Format results
         formatted_results = []
@@ -618,7 +614,10 @@ def search_by_type(file_type: str, query: str = "") -> str:
         query: Search query
     """
     if not query:
-        return f"Please provide both file type and search query. Example: /mcp__turboprop__search_by_type python {file_type}"
+        return (
+            f"Please provide both file type and search query. "
+            f"Example: /mcp__turboprop__search_by_type python {file_type}"
+        )
 
     # Combine file type and query for more targeted search
     combined_query = f"{file_type} {query}"
@@ -670,7 +669,8 @@ def start_file_watcher():
 
     if not repo_path.exists() or not repo_path.is_dir():
         print(
-            f"Warning: Cannot watch repository '{_config['repository_path']}' - path does not exist or is not a directory",
+            f"Warning: Cannot watch repository '{_config['repository_path']}' - "
+            "path does not exist or is not a directory",
             file=sys.stderr,
         )
         return
@@ -695,7 +695,8 @@ def start_file_watcher():
     _watcher_thread = threading.Thread(target=start_watcher, daemon=True)
     _watcher_thread.start()
     print(
-        f"File watcher started for '{repo_path}' (max: {_config['max_file_size_mb']}MB, debounce: {_config['debounce_seconds']}s)",
+        f"File watcher started for '{repo_path}' "
+        f"(max: {_config['max_file_size_mb']}MB, debounce: {_config['debounce_seconds']}s)",
         file=sys.stderr,
     )
 
@@ -888,7 +889,8 @@ def main():
                     file_count = int(file_count_match.group(1))
                     if freshness["changed_files"] < file_count:
                         print(
-                            f"⚡ Smart indexing: processed {freshness['changed_files']} changed files out of {file_count} total",
+                            f"⚡ Smart indexing: processed {freshness['changed_files']} "
+                            f"changed files out of {file_count} total",
                             file=sys.stderr,
                         )
                     time_per_file = total_time / max(1, freshness["changed_files"])
