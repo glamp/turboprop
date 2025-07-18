@@ -161,9 +161,7 @@ def init_db(repo_path: Path = None):
             # Check if columns exist before attempting to add them
             try:
                 # Check if last_modified column exists
-                result = _db_manager.execute_with_retry(
-                    f"PRAGMA table_info({TABLE_NAME})"
-                )
+                result = _db_manager.execute_with_retry(f"PRAGMA table_info({TABLE_NAME})")
                 existing_columns = [row[1] for row in result]
 
                 if "last_modified" not in existing_columns:
