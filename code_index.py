@@ -173,7 +173,8 @@ def init_db(repo_path: Path = None):
                 if "last_modified" not in existing_columns:
                     _db_manager.execute_with_retry(
                         f"""
-                        ALTER TABLE {TABLE_NAME} ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ALTER TABLE {TABLE_NAME}
+                        ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     """
                     )
 
@@ -184,7 +185,8 @@ def init_db(repo_path: Path = None):
                     """
                     )
             except Exception:
-                # If PRAGMA table_info doesn't work with DuckDB, fall back to the original approach
+                # If PRAGMA table_info doesn't work with DuckDB,
+                # fall back to the original approach
                 # but suppress the error logging for expected failures
                 pass
 
@@ -350,7 +352,7 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
     # Report processing results
     if failed_files:
         print(
-            f"⚠️  Failed to process {len(failed_files)} files out of {len(files)} total",
+            f"⚠️  Failed to process {len(failed_files)} files " f"out of {len(files)} total",
             file=sys.stderr,
         )
 
@@ -420,7 +422,8 @@ def search_index(db_manager, embedder, query: str, k: int):
                 path,
                 substr(content, 1, 300) as snippet,
                 1 - (list_dot_product(embedding, $1) /
-                    (sqrt(list_dot_product(embedding, embedding)) * sqrt(list_dot_product($1, $1)))) as distance
+                    (sqrt(list_dot_product(embedding, embedding)) *
+                     sqrt(list_dot_product($1, $1)))) as distance
             FROM {TABLE_NAME}
             WHERE embedding IS NOT NULL
             ORDER BY distance ASC
@@ -445,7 +448,8 @@ def embed_and_store_single(db_manager, embedder, path: Path):
         path: Path to the single file to process
 
     Returns:
-        Tuple of (unique_id, embedding) if successful, None if file couldn't be processed
+        Tuple of (unique_id, embedding) if successful,
+        None if file couldn't be processed
     """
     try:
         # Read the file content
@@ -1011,7 +1015,7 @@ def reindex_all(
             return len(files), 0, time.time() - start_time
 
         if files_to_process:
-            print(f"📝 Found {len(files_to_process)} changed files out of {len(files)} total")
+            print(f"📝 Found {len(files_to_process)} changed files " f"out of {len(files)} total")
 
     # Generate embeddings and store them in the database
     if files_to_process:
@@ -1103,7 +1107,8 @@ Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, et
         type=int,
         default=None,
         metavar="NUM",
-        help="Number of parallel workers for embedding generation (default: CPU count). "
+        help="Number of parallel workers for embedding generation "
+        "(default: CPU count). "
         "More workers = faster processing but higher memory usage.",
     )
     p_i.add_argument(
@@ -1209,7 +1214,7 @@ Perfect for AI-assisted development workflows.
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  turboprop mcp --repository .                     # Start MCP server for current directory
+  turboprop mcp --repository .                     # Start MCP server for current dir
   turboprop mcp --repository /path/to/repo         # Index specific repository
   turboprop mcp --repository . --max-mb 2.0        # Allow larger files
   turboprop mcp --repository . --no-auto-index     # Don't auto-index on startup
@@ -1317,7 +1322,7 @@ def handle_index_command(args, embedder):
     )
 
     if total_files == 0:
-        print("❌ No code files found. Make sure you're in a Git repository with code files.")
+        print("❌ No code files found. Make sure you're in a Git repository " "with code files.")
         return
 
     print("🎉 Indexing complete!")
@@ -1429,7 +1434,7 @@ def handle_mcp_command(args):
 
     except ImportError:
         print("❌ MCP server module not available.")
-        print("💡 Make sure you've installed the MCP dependencies: pip install turboprop[mcp]")
+        print("💡 Make sure you've installed the MCP dependencies: " "pip install turboprop[mcp]")
         return
     except Exception as e:
         print(f"❌ MCP server failed to start: {e}")
