@@ -24,9 +24,19 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 # Import our existing code indexing functionality
-from code_index import (DIMENSIONS, EMBED_MODEL, TABLE_NAME, build_full_index,
-                        check_index_freshness, get_version, init_db,
-                        reindex_all, scan_repo, search_index, watch_mode)
+from code_index import (
+    DIMENSIONS,
+    EMBED_MODEL,
+    TABLE_NAME,
+    build_full_index,
+    check_index_freshness,
+    get_version,
+    init_db,
+    reindex_all,
+    scan_repo,
+    search_index,
+    watch_mode,
+)
 from config import config
 from embedding_helper import EmbeddingGenerator
 

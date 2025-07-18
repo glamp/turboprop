@@ -814,6 +814,58 @@ def get_last_index_time(db_manager):
         return None
 
 
+def get_current_files_safely(repo_path: Path, max_bytes: int):
+    """Get current files from repository with error handling."""
+    current_files = scan_repo(repo_path, max_bytes)
+    if not current_files:
+        return None, "No files found in repository"
+    return current_files, None
+
+
+def get_existing_files_from_db(db_manager):
+    """Get existing files from database with error handling."""
+    try:
+        result = db_manager.execute_with_retry(
+            f"SELECT path, file_mtime FROM {TABLE_NAME}"
+        )
+        return {row[0]: row[1] for row in result}, None
+    except Exception:
+        return None, "Database error - need to rebuild index"
+
+
+def check_file_count_changed(current_files, existing_files):
+    """Check if file counts have changed."""
+    if len(current_files) != len(existing_files):
+        file_diff = len(current_files) - len(existing_files)
+        return True, f"File count changed ({file_diff:+d} files)", abs(file_diff)
+    return False, None, 0
+
+
+def find_changed_files(current_files, existing_files):
+    """Find files that have been modified or added."""
+    changed_files = []
+    for file_path in current_files:
+        try:
+            file_mtime = file_path.stat().st_mtime
+            str_path = str(file_path)
+
+            # File is new if not in database
+            if str_path not in existing_files:
+                changed_files.append(str_path)
+                continue
+
+            # Check if file has been modified
+            db_mtime = existing_files[str_path]
+            if db_mtime is None or file_mtime > db_mtime.timestamp():
+                changed_files.append(str_path)
+
+        except OSError:
+            # File might have been deleted, count as changed
+            changed_files.append(str(file_path))
+
+    return changed_files
+
+
 def has_repository_changed(repo_path: Path, max_bytes: int, db_manager):
     """
     Check if any files in the repository have changed since the last indexing.
@@ -833,47 +885,22 @@ def has_repository_changed(repo_path: Path, max_bytes: int, db_manager):
     """
     try:
         # Get current files in repository
-        current_files = scan_repo(repo_path, max_bytes)
-
-        if not current_files:
-            return False, "No files found in repository", 0
+        current_files, error = get_current_files_safely(repo_path, max_bytes)
+        if error:
+            return False, error, 0
 
         # Get existing file info from database
-        existing_files = {}
-        try:
-            result = db_manager.execute_with_retry(
-                f"SELECT path, file_mtime FROM {TABLE_NAME}"
-            )
-            existing_files = {row[0]: row[1] for row in result}
-        except Exception:
-            return True, "Database error - need to rebuild index", len(current_files)
+        existing_files, error = get_existing_files_from_db(db_manager)
+        if error:
+            return True, error, len(current_files)
 
         # Check if file counts differ
-        if len(current_files) != len(existing_files):
-            file_diff = len(current_files) - len(existing_files)
-            return True, f"File count changed ({file_diff:+d} files)", abs(file_diff)
+        count_changed, reason, count = check_file_count_changed(current_files, existing_files)
+        if count_changed:
+            return True, reason, count
 
         # Check modification times
-        changed_files = []
-        for file_path in current_files:
-            try:
-                file_mtime = file_path.stat().st_mtime
-                str_path = str(file_path)
-
-                # File is new if not in database
-                if str_path not in existing_files:
-                    changed_files.append(str_path)
-                    continue
-
-                # Check if file has been modified
-                db_mtime = existing_files[str_path]
-                if db_mtime is None or file_mtime > db_mtime.timestamp():
-                    changed_files.append(str_path)
-
-            except OSError:
-                # File might have been deleted, count as changed
-                changed_files.append(str(file_path))
-
+        changed_files = find_changed_files(current_files, existing_files)
         if changed_files:
             return True, "Files modified or added", len(changed_files)
 
@@ -1019,21 +1046,8 @@ def reindex_all(
     return len(files), len(files_to_process), elapsed
 
 
-def main():
-    """
-    Main entry point for the code indexing CLI application.
-
-    This function sets up the command-line argument parser and dispatches
-    to the appropriate functionality based on user input. The CLI supports
-    three main commands:
-
-    1. index: Scan a repository and build a searchable index
-    2. search: Query the index for semantically similar code
-    3. watch: Monitor a repository for changes and update index incrementally
-
-    Each command has its own set of arguments and options for customization.
-    """
-    # Set up the main argument parser with enhanced help
+def setup_argument_parser():
+    """Set up the command-line argument parser with all subcommands."""
     parser = argparse.ArgumentParser(
         prog="turboprop",
         description="""
@@ -1271,7 +1285,190 @@ Examples:
         help="Don't automatically watch for file changes",
     )
 
-    # Parse command line arguments
+    return parser
+
+
+def initialize_embedder():
+    """Initialize the embedding generator with error handling."""
+    print("⚡ Initializing AI model...")
+    try:
+        embedder = EmbeddingGenerator(EMBED_MODEL)
+        print("✅ Embedding generator initialized successfully")
+        return embedder
+    except Exception as e:
+        print(f"❌ Failed to initialize embedding generator: {e}")
+        raise e
+
+
+def handle_index_command(args, embedder):
+    """Handle the index command logic."""
+    print(f"\n🔍 Indexing repository: {args.repo}")
+    print(f"📁 Max file size: {args.max_mb} MB")
+    if args.workers:
+        print(f"👥 Using {args.workers} parallel workers")
+    else:
+        auto_workers = min(4, multiprocessing.cpu_count())
+        print(f"👥 Using {auto_workers} parallel workers (auto-detected)")
+
+    if args.force_all:
+        print("🔄 Force mode: reprocessing all files")
+
+    repo_path = Path(args.repo).resolve()
+    db_manager = init_db(repo_path)
+    max_bytes = int(args.max_mb * 1024**2)
+
+    # Check index freshness and provide user feedback
+    if not args.force_all:
+        print("\n🔍 Checking index freshness...")
+        freshness = check_index_freshness(repo_path, max_bytes, db_manager)
+        print(f"📊 {freshness['reason']}")
+        print(f"📁 Repository files: {freshness['total_files']}")
+
+        if freshness["is_fresh"]:
+            print("✨ Index is up-to-date!")
+            if freshness["last_index_time"]:
+                print(f"📅 Last indexed: {freshness['last_index_time']}")
+            print("💡 Use --force-all to reindex anyway")
+            return
+        elif freshness["changed_files"] > 0:
+            print(f"🔄 Found {freshness['changed_files']} changed files")
+    else:
+        print("\n🔄 Force reindexing all files...")
+
+    # Use new smart reindex function
+    total_files, processed_files, elapsed = reindex_all(
+        repo_path, max_bytes, db_manager, embedder, args.workers, args.force_all
+    )
+
+    if total_files == 0:
+        print(
+            "❌ No code files found. Make sure you're in a Git repository with code files."
+        )
+        return
+
+    print("🎉 Indexing complete!")
+    print(f"📊 Files found: {total_files}")
+    print(f"📊 Files processed: {processed_files}")
+    print(f"⏱️  Time elapsed: {elapsed:.2f} seconds")
+
+    if processed_files > 0:
+        print(f"⚡ Processing rate: {processed_files/elapsed:.1f} files/second")
+
+    embedding_count = build_full_index(db_manager)
+    print(f"💾 Database saved to: {repo_path / '.turboprop' / 'code_index.duckdb'}")
+    print(f"🔍 Total embeddings in index: {embedding_count}")
+    print('\n💡 Try searching: turboprop search "your query here"')
+
+    # Clean up database connections
+    db_manager.cleanup()
+
+
+def handle_search_command(args, embedder):
+    """Handle the search command logic."""
+    print(f'\n🔎 Searching for: "{args.query}"')
+    print(f"📊 Returning top {args.k} results...")
+
+    repo_path = Path(args.repo).resolve()
+    db_manager = init_db(repo_path)
+
+    try:
+        results = search_index(db_manager, embedder, args.query, args.k)
+    except Exception as e:
+        print(f"❌ Search failed: {e}")
+        print("💡 Make sure you've built an index first: turboprop index <repo>")
+        return
+    finally:
+        # Clean up database connections
+        db_manager.cleanup()
+
+    if not results:
+        print("❌ No results found.")
+        print("💡 Try:")
+        print("   • Building an index first: turboprop index <repo>")
+        print("   • Using different search terms")
+        print("   • Making sure your query describes code concepts")
+        return
+
+    # Display search results with enhanced formatting
+    print(f"\n🎯 Found {len(results)} relevant results:\n")
+    for i, (path, snippet, dist) in enumerate(results, 1):
+        similarity_pct = (1 - dist) * 100
+        print(f"┌─ {i}. {path}")
+        print(f"│  📈 Similarity: {similarity_pct:.1f}%")
+        print("│")
+        # Clean up the snippet display
+        clean_snippet = snippet.strip()[:200]
+        if len(snippet) > 200:
+            clean_snippet += "..."
+        print(f"│  {clean_snippet}")
+        print("└" + "─" * 60)
+        print()
+
+
+def handle_watch_command(args):
+    """Handle the watch command logic."""
+    print(f"\n👀 Starting watch mode for: {args.repo}")
+    print(f"📁 Max file size: {args.max_mb} MB")
+    print(f"⏱️  Debounce delay: {args.debounce_sec}s")
+    print("🔄 Monitoring for changes... (Press Ctrl+C to stop)")
+
+    try:
+        watch_mode(args.repo, args.max_mb, args.debounce_sec)
+    except KeyboardInterrupt:
+        print("\n\n⏹️  Watch mode stopped by user")
+    except Exception as e:
+        print(f"\n❌ Watch mode failed: {e}")
+
+
+def handle_mcp_command(args):
+    """Handle the MCP command logic."""
+    print("\n🔗 Starting MCP server...")
+    print("📞 Invoking MCP server module...")
+
+    # Import and run the MCP server with the provided arguments
+    try:
+        import sys
+
+        from mcp_server import main as mcp_main
+
+        # Build arguments for MCP server
+        mcp_args = []
+        if args.repository:
+            mcp_args.extend(["--repository", args.repository])
+
+        mcp_args.extend(
+            ["--max-mb", str(args.max_mb), "--debounce-sec", str(args.debounce_sec)]
+        )
+
+        if not args.auto_index:
+            mcp_args.append("--no-auto-index")
+        if not args.auto_watch:
+            mcp_args.append("--no-auto-watch")
+
+        # Override sys.argv for MCP server
+        original_argv = sys.argv[:]
+        sys.argv = ["turboprop-mcp"] + mcp_args
+
+        try:
+            mcp_main()
+        finally:
+            # Restore original argv
+            sys.argv = original_argv
+
+    except ImportError:
+        print("❌ MCP server module not available.")
+        print(
+            "💡 Make sure you've installed the MCP dependencies: pip install turboprop[mcp]"
+        )
+        return
+    except Exception as e:
+        print(f"❌ MCP server failed to start: {e}")
+        return
+
+
+def main():
+    """Main entry point for the code indexing CLI application."""
+    parser = setup_argument_parser()
     args = parser.parse_args()
 
     # Add some visual flair for better UX
@@ -1279,177 +1476,20 @@ Examples:
     print("=" * 40)
 
     # Initialize the ML model (shared across all commands)
-    print("⚡ Initializing AI model...")
-
-    try:
-        embedder = EmbeddingGenerator(EMBED_MODEL)
-        print("✅ Embedding generator initialized successfully")
-    except Exception as e:
-        print(f"❌ Failed to initialize embedding generator: {e}")
-        raise e
+    embedder = initialize_embedder()
 
     # Dispatch to appropriate command handler
     if args.cmd == "index":
-        # Build full index from repository
-        print(f"\n🔍 Indexing repository: {args.repo}")
-        print(f"📁 Max file size: {args.max_mb} MB")
-        if args.workers:
-            print(f"👥 Using {args.workers} parallel workers")
-        else:
-            auto_workers = min(4, multiprocessing.cpu_count())
-            print(f"👥 Using {auto_workers} parallel workers (auto-detected)")
-
-        if args.force_all:
-            print("🔄 Force mode: reprocessing all files")
-
-        repo_path = Path(args.repo).resolve()
-        db_manager = init_db(repo_path)
-        max_bytes = int(args.max_mb * 1024**2)
-
-        # Check index freshness and provide user feedback
-        if not args.force_all:
-            print("\n🔍 Checking index freshness...")
-            freshness = check_index_freshness(repo_path, max_bytes, db_manager)
-            print(f"📊 {freshness['reason']}")
-            print(f"📁 Repository files: {freshness['total_files']}")
-
-            if freshness["is_fresh"]:
-                print("✨ Index is up-to-date!")
-                if freshness["last_index_time"]:
-                    print(f"📅 Last indexed: {freshness['last_index_time']}")
-                print("💡 Use --force-all to reindex anyway")
-                return
-            elif freshness["changed_files"] > 0:
-                print(f"🔄 Found {freshness['changed_files']} changed files")
-        else:
-            print("\n🔄 Force reindexing all files...")
-
-        # Use new smart reindex function
-        total_files, processed_files, elapsed = reindex_all(
-            repo_path, max_bytes, db_manager, embedder, args.workers, args.force_all
-        )
-
-        if total_files == 0:
-            print(
-                "❌ No code files found. Make sure you're in a Git repository with code files."
-            )
-            return
-
-        print("🎉 Indexing complete!")
-        print(f"📊 Files found: {total_files}")
-        print(f"📊 Files processed: {processed_files}")
-        print(f"⏱️  Time elapsed: {elapsed:.2f} seconds")
-
-        if processed_files > 0:
-            print(f"⚡ Processing rate: {processed_files/elapsed:.1f} files/second")
-
-        embedding_count = build_full_index(db_manager)
-        print(f"💾 Database saved to: {repo_path / '.turboprop' / 'code_index.duckdb'}")
-        print(f"🔍 Total embeddings in index: {embedding_count}")
-        print('\n💡 Try searching: turboprop search "your query here"')
-
-        # Clean up database connections
-        db_manager.cleanup()
+        handle_index_command(args, embedder)
 
     elif args.cmd == "search":
-        # Search the existing index
-        print(f'\n🔎 Searching for: "{args.query}"')
-        print(f"📊 Returning top {args.k} results...")
-
-        repo_path = Path(args.repo).resolve()
-        db_manager = init_db(repo_path)
-
-        try:
-            results = search_index(db_manager, embedder, args.query, args.k)
-        except Exception as e:
-            print(f"❌ Search failed: {e}")
-            print("💡 Make sure you've built an index first: turboprop index <repo>")
-            return
-        finally:
-            # Clean up database connections
-            db_manager.cleanup()
-
-        if not results:
-            print("❌ No results found.")
-            print("💡 Try:")
-            print("   • Building an index first: turboprop index <repo>")
-            print("   • Using different search terms")
-            print("   • Making sure your query describes code concepts")
-            return
-
-        # Display search results with enhanced formatting
-        print(f"\n🎯 Found {len(results)} relevant results:\n")
-        for i, (path, snippet, dist) in enumerate(results, 1):
-            similarity_pct = (1 - dist) * 100
-            print(f"┌─ {i}. {path}")
-            print(f"│  📈 Similarity: {similarity_pct:.1f}%")
-            print("│")
-            # Clean up the snippet display
-            clean_snippet = snippet.strip()[:200]
-            if len(snippet) > 200:
-                clean_snippet += "..."
-            print(f"│  {clean_snippet}")
-            print("└" + "─" * 60)
-            print()
+        handle_search_command(args, embedder)
 
     elif args.cmd == "watch":
-        # Start continuous monitoring mode
-        print(f"\n👀 Starting watch mode for: {args.repo}")
-        print(f"📁 Max file size: {args.max_mb} MB")
-        print(f"⏱️  Debounce delay: {args.debounce_sec}s")
-        print("🔄 Monitoring for changes... (Press Ctrl+C to stop)")
-
-        try:
-            watch_mode(args.repo, args.max_mb, args.debounce_sec)
-        except KeyboardInterrupt:
-            print("\n\n⏹️  Watch mode stopped by user")
-        except Exception as e:
-            print(f"\n❌ Watch mode failed: {e}")
+        handle_watch_command(args)
 
     elif args.cmd == "mcp":
-        # Start MCP server
-        print("\n🔗 Starting MCP server...")
-        print("📞 Invoking MCP server module...")
-
-        # Import and run the MCP server with the provided arguments
-        try:
-            import sys
-
-            from mcp_server import main as mcp_main
-
-            # Build arguments for MCP server
-            mcp_args = []
-            if args.repository:
-                mcp_args.extend(["--repository", args.repository])
-
-            mcp_args.extend(
-                ["--max-mb", str(args.max_mb), "--debounce-sec", str(args.debounce_sec)]
-            )
-
-            if not args.auto_index:
-                mcp_args.append("--no-auto-index")
-            if not args.auto_watch:
-                mcp_args.append("--no-auto-watch")
-
-            # Override sys.argv for MCP server
-            original_argv = sys.argv[:]
-            sys.argv = ["turboprop-mcp"] + mcp_args
-
-            try:
-                mcp_main()
-            finally:
-                # Restore original argv
-                sys.argv = original_argv
-
-        except ImportError:
-            print("❌ MCP server module not available.")
-            print(
-                "💡 Make sure you've installed the MCP dependencies: pip install turboprop[mcp]"
-            )
-            return
-        except Exception as e:
-            print(f"❌ MCP server failed to start: {e}")
-            return
+        handle_mcp_command(args)
 
     if args.cmd != "mcp":
         print("\n✨ Done!")
