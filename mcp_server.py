@@ -89,7 +89,11 @@ def get_embedder():
 
 
 @mcp.tool()
-def index_repository(repository_path: str = None, max_file_size_mb: float = None, force_all: bool = False) -> str:
+def index_repository(
+    repository_path: str = None,
+    max_file_size_mb: float = None,
+    force_all: bool = False,
+) -> str:
     """
     🚀 TURBOPROP: Index a code repository for semantic search
 
@@ -122,7 +126,10 @@ def index_repository(repository_path: str = None, max_file_size_mb: float = None
             repository_path = _config["repository_path"]
 
         if repository_path is None:
-            return "Error: No repository path specified. Either provide a path or configure one at startup."
+            return (
+                "Error: No repository path specified. Either provide a path or "
+                "configure one at startup."
+            )
 
         repo_path = Path(repository_path).resolve()
 
@@ -167,7 +174,8 @@ def index_repository(repository_path: str = None, max_file_size_mb: float = None
         embedding_count = build_full_index(con)
 
         print(
-            f"✅ Indexing complete! Processed {len(files)} files with {embedding_count} embeddings.",
+            f"✅ Indexing complete! Processed {len(files)} files with "
+            f"{embedding_count} embeddings.",
             file=sys.stderr,
         )
         print(
@@ -225,7 +233,10 @@ def search_code(query: str, max_results: int = None) -> str:
         # Check if index exists
         file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
         if file_count == 0:
-            return "No index found. Please index a repository first using the index_repository tool."
+            return (
+                "No index found. Please index a repository first using the "
+                "index_repository tool."
+            )
 
         # Perform semantic search
         results = search_index(con, embedder, query, max_results)
@@ -244,7 +255,10 @@ def search_code(query: str, max_results: int = None) -> str:
             similarity_pct = (1 - distance) * 100
             formatted_results.append(f"{i}. {path}")
             formatted_results.append(f"   Similarity: {similarity_pct:.1f}%")
-            formatted_results.append(f"   Preview: {snippet.strip()[:config.file_processing.PREVIEW_LENGTH]}...")
+            formatted_results.append(
+                f"   Preview: {snippet.strip()[:config.file_processing.PREVIEW_LENGTH]}"
+                "..."
+            )
             formatted_results.append("")
 
         return "\n".join(formatted_results)
@@ -254,7 +268,9 @@ def search_code(query: str, max_results: int = None) -> str:
 
 
 @mcp.tool()
-def check_index_freshness_tool(repository_path: str = None, max_file_size_mb: float = None) -> str:
+def check_index_freshness_tool(
+    repository_path: str = None, max_file_size_mb: float = None
+) -> str:
     """
     🔍 TURBOPROP: Check if your index is fresh and up-to-date
 
@@ -287,7 +303,10 @@ def check_index_freshness_tool(repository_path: str = None, max_file_size_mb: fl
             repository_path = _config["repository_path"]
 
         if repository_path is None:
-            return "Error: No repository path specified. Either provide a path or configure one at startup."
+            return (
+                "Error: No repository path specified. Either provide a path or "
+                "configure one at startup."
+            )
 
         repo_path = Path(repository_path).resolve()
 
@@ -330,10 +349,14 @@ def check_index_freshness_tool(repository_path: str = None, max_file_size_mb: fl
         else:
             if freshness["changed_files"] > 0:
                 report.append(
-                    f"💡 Recommendation: Run index_repository() to update {freshness['changed_files']} changed files"
+                    f"💡 Recommendation: Run index_repository() to update "
+                    f"{freshness['changed_files']} changed files"
                 )
             else:
-                report.append("💡 Recommendation: Run index_repository() to build the initial index")
+                report.append(
+                    "💡 Recommendation: Run index_repository() to build the "
+                    "initial index"
+                )
 
         return "\n".join(report)
 
@@ -374,7 +397,9 @@ def get_index_status() -> str:
         # Get database size
         db_size_mb = 0
         if _config["repository_path"]:
-            db_path = Path(_config["repository_path"]) / ".turboprop" / "code_index.duckdb"
+            db_path = (
+                Path(_config["repository_path"]) / ".turboprop" / "code_index.duckdb"
+            )
         else:
             db_path = Path.cwd() / ".turboprop" / "code_index.duckdb"
 
@@ -385,7 +410,11 @@ def get_index_status() -> str:
         index_ready = file_count > 0
 
         # Check watcher status
-        watcher_status = "Running" if _watcher_thread and _watcher_thread.is_alive() else "Not running"
+        watcher_status = (
+            "Running"
+            if _watcher_thread and _watcher_thread.is_alive()
+            else "Not running"
+        )
 
         status_info = [
             "Index Status:",
@@ -399,7 +428,9 @@ def get_index_status() -> str:
         ]
 
         if file_count == 0:
-            status_info.append("\nTo get started, use the index_repository tool to index a code repository.")
+            status_info.append(
+                "\nTo get started, use the index_repository tool to index a code repository."
+            )
 
         return "\n".join(status_info)
 
@@ -408,7 +439,9 @@ def get_index_status() -> str:
 
 
 @mcp.tool()
-def watch_repository(repository_path: str, max_file_size_mb: float = 1.0, debounce_seconds: float = 5.0) -> str:
+def watch_repository(
+    repository_path: str, max_file_size_mb: float = 1.0, debounce_seconds: float = 5.0
+) -> str:
     """
     👀 TURBOPROP: Watch repository for changes (LIVE INDEX UPDATES!)
 
@@ -678,7 +711,9 @@ def start_file_watcher():
     def start_watcher():
         try:
             print(f"Starting file watcher for repository: {repo_path}", file=sys.stderr)
-            watch_mode(str(repo_path), _config["max_file_size_mb"], _config["debounce_seconds"])
+            watch_mode(
+                str(repo_path), _config["max_file_size_mb"], _config["debounce_seconds"]
+            )
         except KeyboardInterrupt:
             pass  # Normal shutdown
         except Exception as e:
@@ -709,9 +744,13 @@ Examples:
     )
 
     # Add version argument
-    parser.add_argument("--version", "-v", action="version", version=f"turboprop-mcp {get_version()}")
+    parser.add_argument(
+        "--version", "-v", action="version", version=f"turboprop-mcp {get_version()}"
+    )
 
-    parser.add_argument("repository", nargs="?", help="Path to the repository to index and watch")
+    parser.add_argument(
+        "repository", nargs="?", help="Path to the repository to index and watch"
+    )
 
     parser.add_argument(
         "--repository",
@@ -805,11 +844,17 @@ def main():
         print(f"📁 Repository: {_config['repository_path']}", file=sys.stderr)
         print(f"📊 Max file size: {_config['max_file_size_mb']} MB", file=sys.stderr)
         print(f"⏱️  Debounce delay: {_config['debounce_seconds']}s", file=sys.stderr)
-        print(f"🔍 Auto-index: {'Yes' if _config['auto_index'] else 'No'}", file=sys.stderr)
-        print(f"👀 Auto-watch: {'Yes' if _config['auto_watch'] else 'No'}", file=sys.stderr)
+        print(
+            f"🔍 Auto-index: {'Yes' if _config['auto_index'] else 'No'}", file=sys.stderr
+        )
+        print(
+            f"👀 Auto-watch: {'Yes' if _config['auto_watch'] else 'No'}", file=sys.stderr
+        )
         print(file=sys.stderr)
     else:
-        print("📁 No repository configured - use tools to specify paths", file=sys.stderr)
+        print(
+            "📁 No repository configured - use tools to specify paths", file=sys.stderr
+        )
         print(file=sys.stderr)
 
     # Smart auto-indexing with freshness checks
@@ -851,7 +896,9 @@ def main():
                         file=sys.stderr,
                     )
                 else:
-                    print(f"🔍 {freshness['reason']}, building index...", file=sys.stderr)
+                    print(
+                        f"🔍 {freshness['reason']}, building index...", file=sys.stderr
+                    )
 
                 start_time = time.time()
                 result = index_repository(force_all=_config["force_reindex"])
@@ -862,7 +909,9 @@ def main():
                 # Extract file count from result message
                 import re
 
-                file_count_match = re.search(r"Successfully indexed (\d+) files", result)
+                file_count_match = re.search(
+                    r"Successfully indexed (\d+) files", result
+                )
                 if file_count_match:
                     file_count = int(file_count_match.group(1))
                     if freshness["changed_files"] < file_count:
@@ -903,7 +952,9 @@ def main():
     print("=" * 40, file=sys.stderr)
     print(file=sys.stderr)
     print("🔥 AVAILABLE TOOLS (use 'tp:' prefix):", file=sys.stderr)
-    print("  • tp:search_code - Find code by meaning (semantic search)", file=sys.stderr)
+    print(
+        "  • tp:search_code - Find code by meaning (semantic search)", file=sys.stderr
+    )
     print("  • tp:index_repository - Build searchable code index", file=sys.stderr)
     print("  • tp:get_index_status - Check index health & stats", file=sys.stderr)
     print("  • tp:watch_repository - Live index updates", file=sys.stderr)
@@ -913,7 +964,9 @@ def main():
     print("  • /mcp__turboprop__search <query> - Fast semantic search", file=sys.stderr)
     print("  • /mcp__turboprop__status - Show index status", file=sys.stderr)
     print("  • /mcp__turboprop__files [limit] - List indexed files", file=sys.stderr)
-    print("  • /mcp__turboprop__help_commands - Show all slash commands", file=sys.stderr)
+    print(
+        "  • /mcp__turboprop__help_commands - Show all slash commands", file=sys.stderr
+    )
     print(file=sys.stderr)
     print(
         "💡 START HERE: '/mcp__turboprop__search \"your query\"' or '/mcp__turboprop__status'",

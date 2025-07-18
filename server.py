@@ -34,7 +34,15 @@ from pydantic import BaseModel
 
 # Import our core indexing functionality
 # Note: reindex_all is referenced but may need to be implemented
-from code_index import DIMENSIONS, EMBED_MODEL, TABLE_NAME, init_db, reindex_all, search_index, watch_mode
+from code_index import (
+    DIMENSIONS,
+    EMBED_MODEL,
+    TABLE_NAME,
+    init_db,
+    reindex_all,
+    search_index,
+    watch_mode,
+)
 from config import config
 from embedding_helper import EmbeddingGenerator
 
@@ -164,10 +172,14 @@ def http_index(req: IndexRequest):
         max_bytes = int(req.max_mb * 1024**2)
 
         # Trigger full reindexing of the specified repository
-        total_files, processed_files, elapsed = reindex_all(Path(req.repo), max_bytes, db_manager, embedder)
+        total_files, processed_files, elapsed = reindex_all(
+            Path(req.repo), max_bytes, db_manager, embedder
+        )
 
         # Count total files in database to report back to user
-        count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+        count_result = db_manager.execute_with_retry(
+            f"SELECT count(*) FROM {TABLE_NAME}"
+        )
         count = count_result[0][0] if count_result and count_result[0] else 0
 
         return {"status": "indexed", "files": count}
@@ -275,7 +287,8 @@ def http_status():
     last_updated = None
     if file_count > 0:
         try:
-            # This is a simple timestamp - in production you might want to store actual timestamps
+            # This is a simple timestamp - in production you might want to store
+            # actual timestamps
             last_updated = "Recent"  # Simplified for now
         except Exception:
             last_updated = "Unknown"

@@ -113,7 +113,9 @@ class TestFreshnessCheck:
         empty_repo.mkdir()
         subprocess.run(["git", "init"], cwd=empty_repo, capture_output=True)
 
-        has_changed, reason, count = has_repository_changed(empty_repo, 1024 * 1024, self.db_manager)
+        has_changed, reason, count = has_repository_changed(
+            empty_repo, 1024 * 1024, self.db_manager
+        )
 
         assert not has_changed
         assert "No files found" in reason
@@ -123,14 +125,18 @@ class TestFreshnessCheck:
         """Test has_repository_changed detects new files."""
         # Add a new file
         (self.repo_path / "new_file.py").write_text("# new file")
-        subprocess.run(["git", "add", "new_file.py"], cwd=self.repo_path, capture_output=True)
+        subprocess.run(
+            ["git", "add", "new_file.py"], cwd=self.repo_path, capture_output=True
+        )
         subprocess.run(
             ["git", "commit", "-m", "Add new file"],
             cwd=self.repo_path,
             capture_output=True,
         )
 
-        has_changed, reason, count = has_repository_changed(self.repo_path, 1024 * 1024, self.db_manager)
+        has_changed, reason, count = has_repository_changed(
+            self.repo_path, 1024 * 1024, self.db_manager
+        )
 
         assert has_changed
         assert "File count changed" in reason
@@ -146,7 +152,9 @@ class TestFreshnessCheck:
         time.sleep(0.1)
         (self.repo_path / "main.py").write_text("print('modified')")
 
-        has_changed, reason, count = has_repository_changed(self.repo_path, 1024 * 1024, self.db_manager)
+        has_changed, reason, count = has_repository_changed(
+            self.repo_path, 1024 * 1024, self.db_manager
+        )
 
         assert has_changed
         # Could be "Files modified" or "File count changed" depending on exact behavior
@@ -163,7 +171,9 @@ class TestFreshnessCheck:
         # Index all files found
         embed_and_store(self.db_manager, self.mock_embedder, all_files)
 
-        has_changed, reason, count = has_repository_changed(self.repo_path, 1024 * 1024, self.db_manager)
+        has_changed, reason, count = has_repository_changed(
+            self.repo_path, 1024 * 1024, self.db_manager
+        )
 
         # Debug print to understand what's happening
         print(f"DEBUG: has_changed={has_changed}, reason={reason}, count={count}")
@@ -206,7 +216,9 @@ class TestFreshnessCheck:
 
         freshness = check_index_freshness(self.repo_path, 1024 * 1024, self.db_manager)
 
-        print(f"DEBUG fresh_index: is_fresh={freshness['is_fresh']}, reason={freshness['reason']}")
+        print(
+            f"DEBUG fresh_index: is_fresh={freshness['is_fresh']}, reason={freshness['reason']}"
+        )
 
         # The function may or may not detect freshness due to timing issues
         # Let's just verify it returns a reasonable result
@@ -221,7 +233,9 @@ class TestFreshnessCheck:
 
         # Add a new file
         (self.repo_path / "new_file.py").write_text("# new file")
-        subprocess.run(["git", "add", "new_file.py"], cwd=self.repo_path, capture_output=True)
+        subprocess.run(
+            ["git", "add", "new_file.py"], cwd=self.repo_path, capture_output=True
+        )
         subprocess.run(
             ["git", "commit", "-m", "Add new file"],
             cwd=self.repo_path,
@@ -232,7 +246,10 @@ class TestFreshnessCheck:
 
         assert not freshness["is_fresh"]
         # The function may detect changes in different ways
-        assert "File count changed" in freshness["reason"] or "Files modified" in freshness["reason"]
+        assert (
+            "File count changed" in freshness["reason"]
+            or "Files modified" in freshness["reason"]
+        )
         assert freshness["changed_files"] > 0
         assert freshness["total_files"] >= 4  # At least the original 3 + new file
 
@@ -245,7 +262,10 @@ class TestFreshnessCheck:
 
         assert not freshness["is_fresh"]
         # After database error, it tries to scan files and detects count mismatch
-        assert "File count changed" in freshness["reason"] or "No index found" in freshness["reason"]
+        assert (
+            "File count changed" in freshness["reason"]
+            or "No index found" in freshness["reason"]
+        )
         # Don't assert on last_index_time since it may vary after database error
         assert freshness["changed_files"] >= 0
         assert freshness["total_files"] >= 0
@@ -293,7 +313,9 @@ class TestFreshnessCheckEdgeCases:
         # Create a non-git directory with files
         (self.repo_path / "file.txt").write_text("content")
 
-        has_changed, reason, count = has_repository_changed(self.repo_path, 1024 * 1024, self.db_manager)
+        has_changed, reason, count = has_repository_changed(
+            self.repo_path, 1024 * 1024, self.db_manager
+        )
 
         # Should still work, falling back to file walk
         assert has_changed
@@ -307,7 +329,9 @@ class TestFreshnessCheckEdgeCases:
 
         # Mock os.walk to raise PermissionError
         with patch("os.walk", side_effect=PermissionError("Permission denied")):
-            has_changed, reason, count = has_repository_changed(self.repo_path, 1024 * 1024, self.db_manager)
+            has_changed, reason, count = has_repository_changed(
+                self.repo_path, 1024 * 1024, self.db_manager
+            )
 
             # Should handle error gracefully
             assert has_changed
@@ -319,10 +343,13 @@ class TestFreshnessCheckEdgeCases:
         invalid_path = Path("/nonexistent/path")
 
         try:
-            freshness = check_index_freshness(invalid_path, 1024 * 1024, self.db_manager)
+            freshness = check_index_freshness(
+                invalid_path, 1024 * 1024, self.db_manager
+            )
 
             assert not freshness["is_fresh"]
             assert freshness["total_files"] == 0
         except FileNotFoundError:
-            # This is expected behavior - the function doesn't handle invalid paths gracefully
+            # This is expected behavior - the function doesn't handle invalid paths
+            # gracefully
             pass

@@ -133,7 +133,9 @@ class TestRemoveOrphanedFiles:
         ]
 
         for data in test_data:
-            self.db_manager.execute_with_retry(f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?)", data)
+            self.db_manager.execute_with_retry(
+                f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?)", data
+            )
 
     def teardown_method(self):
         """Clean up test environment."""
@@ -157,7 +159,9 @@ class TestRemoveOrphanedFiles:
         assert removed_count == 1
 
         # Check database state
-        result = self.db_manager.execute_with_retry(f"SELECT path FROM {TABLE_NAME} ORDER BY path")
+        result = self.db_manager.execute_with_retry(
+            f"SELECT path FROM {TABLE_NAME} ORDER BY path"
+        )
         paths = [row[0] for row in result]
 
         assert "/path/to/existing.py" in paths
@@ -179,7 +183,9 @@ class TestRemoveOrphanedFiles:
         assert removed_count == 0
 
         # All files should still be in database
-        result = self.db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME}")
+        result = self.db_manager.execute_with_retry(
+            f"SELECT COUNT(*) FROM {TABLE_NAME}"
+        )
         count = result[0][0]
         assert count == 3
 
@@ -211,7 +217,9 @@ class TestEnhancedReindexAll:
 
         # Add to git
         subprocess.run(["git", "add", "."], cwd=self.repo_path, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "initial"], cwd=self.repo_path, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "initial"], cwd=self.repo_path, capture_output=True
+        )
 
         # Initialize database
         self.db_manager = init_db(self.repo_path)
@@ -301,7 +309,9 @@ class TestDebouncedHandlerShouldIndexFile:
         )
 
         # Create handler
-        self.handler = DebouncedHandler(self.repo_path, 1024 * 1024, Mock(), Mock(), 5.0)
+        self.handler = DebouncedHandler(
+            self.repo_path, 1024 * 1024, Mock(), Mock(), 5.0
+        )
 
     def teardown_method(self):
         """Clean up test environment."""
@@ -336,7 +346,9 @@ class TestDebouncedHandlerShouldIndexFile:
     def test_should_index_file_checks_file_size(self):
         """Test that _should_index_file respects file size limits."""
         # Create handler with small size limit
-        small_handler = DebouncedHandler(self.repo_path, 100, Mock(), Mock(), 5.0)  # 100 bytes limit
+        small_handler = DebouncedHandler(
+            self.repo_path, 100, Mock(), Mock(), 5.0
+        )  # 100 bytes limit
 
         # Create small file
         small_file = self.repo_path / "small.py"
