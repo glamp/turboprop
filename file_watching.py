@@ -252,7 +252,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
         max_mb: Maximum file size in MB to process
         debounce_sec: Debounce delay in seconds for batching changes
     """
-    from database_manager import init_db
+    from code_index import init_db
     from embedding_helper import EmbeddingGenerator
 
     repo_path_obj = Path(repo_path).resolve()

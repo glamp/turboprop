@@ -27,7 +27,7 @@ class DatabaseManager:
         db_path: Path,
         max_retries: Optional[int] = None,
         retry_delay: Optional[float] = None,
-    ):
+    ) -> None:
         self.db_path = db_path
         self.max_retries = max_retries or config.database.MAX_RETRIES
         self.retry_delay = retry_delay or config.database.RETRY_DELAY
