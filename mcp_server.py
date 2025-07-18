@@ -398,12 +398,12 @@ def get_index_status() -> str:
             f"  Search ready: {'Yes' if index_ready else 'No'}",
             f"  Database path: {db_path}",
             f"  Embedding model: {EMBED_MODEL} ({DIMENSIONS} dimensions)",
-            f"  Configured repository: {_config['repository_path'] or 'Not configured'}",
+            f"  Configured repository: " f"{_config['repository_path'] or 'Not configured'}",
             f"  File watcher: {watcher_status}",
         ]
 
         if file_count == 0:
-            status_info.append("\nTo get started, use the index_repository tool to index a code repository.")
+            status_info.append("\nTo get started, use the index_repository tool to index a code " "repository.")
 
         return "\n".join(status_info)
 
@@ -456,7 +456,7 @@ def watch_repository(repository_path: str, max_file_size_mb: float = 1.0, deboun
 
         # Stop existing watcher if running
         if _watcher_thread and _watcher_thread.is_alive():
-            return "Watcher is already running for a repository. Only one watcher can run at a time."
+            return "Watcher is already running for a repository. Only one watcher " "can run at a time."
 
         # Start new watcher in background thread
         def start_watcher():
@@ -472,7 +472,8 @@ def watch_repository(repository_path: str, max_file_size_mb: float = 1.0, deboun
 
         return (
             f"Started watching repository '{repository_path}' for changes. "
-            f"Files up to {max_file_size_mb} MB will be processed with {debounce_seconds}s debounce delay."
+            f"Files up to {max_file_size_mb} MB will be processed with "
+            f"{debounce_seconds}s debounce delay."
         )
 
     except Exception as e:
@@ -521,7 +522,7 @@ def list_indexed_files(limit: int = 20) -> str:
         ).fetchall()
 
         if not results:
-            return "No files are currently indexed. Use the index_repository tool to index a repository."
+            return "No files are currently indexed. Use the index_repository tool " "to index a repository."
 
         formatted_results = [f"Indexed files (showing up to {limit}):"]
 
@@ -550,7 +551,7 @@ def search(query: str = "") -> str:
         query: What to search for in the code
     """
     if not query:
-        return "Please provide a search query. Example: /mcp__turboprop__search JWT authentication"
+        return "Please provide a search query. Example: /mcp__turboprop__search " "JWT authentication"
 
     result = search_code(query, 3)
     return f"Quick search results for '{query}':\n\n{result}"
@@ -564,7 +565,7 @@ def index_current() -> str:
     Usage: /mcp__turboprop__index_current
     """
     if not _config["repository_path"]:
-        return "No repository configured. Please specify a repository path when starting the MCP server."
+        return "No repository configured. Please specify a repository path when " "starting the MCP server."
 
     result = index_repository()
     return f"Indexing results:\n\n{result}"
@@ -692,7 +693,8 @@ def start_file_watcher():
     _watcher_thread.start()
     print(
         f"File watcher started for '{repo_path}' "
-        f"(max: {_config['max_file_size_mb']}MB, debounce: {_config['debounce_seconds']}s)",
+        f"(max: {_config['max_file_size_mb']}MB, "
+        f"debounce: {_config['debounce_seconds']}s)",
         file=sys.stderr,
     )
 
@@ -720,7 +722,7 @@ Examples:
     parser.add_argument(
         "--repository",
         dest="repository_flag",
-        help="Path to the repository to index and watch (alternative to positional argument)",
+        help=("Path to the repository to index and watch (alternative to " "positional argument)"),
     )
 
     parser.add_argument(
@@ -851,7 +853,7 @@ def main():
                 # Index needs updating
                 if freshness["changed_files"] > 0:
                     print(
-                        f"🔄 Found {freshness['changed_files']} changed files, updating index...",
+                        f"🔄 Found {freshness['changed_files']} changed files, " f"updating index...",
                         file=sys.stderr,
                     )
                 else:
@@ -877,7 +879,7 @@ def main():
                         )
                     time_per_file = total_time / max(1, freshness["changed_files"])
                     print(
-                        f"🚀 Indexing completed in {total_time:.2f}s at {time_per_file:.3f}s per file",
+                        f"🚀 Indexing completed in {total_time:.2f}s at " f"{time_per_file:.3f}s per file",
                         file=sys.stderr,
                     )
                 else:
@@ -920,7 +922,7 @@ def main():
     print("  • /mcp__turboprop__help_commands - Show all slash commands", file=sys.stderr)
     print(file=sys.stderr)
     print(
-        "💡 START HERE: '/mcp__turboprop__search \"your query\"' or '/mcp__turboprop__status'",
+        "💡 START HERE: '/mcp__turboprop__search \"your query\"' or " "'/mcp__turboprop__status'",
         file=sys.stderr,
     )
     print("=" * 40, file=sys.stderr)
