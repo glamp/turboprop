@@ -18,16 +18,9 @@ The system supports three main operations:
 """
 
 # Force CPU usage for PyTorch before any imports to avoid MPS issues on Apple Silicon
-import os
-import platform
+from apple_silicon_compat import setup_apple_silicon_compatibility
 
-is_apple_silicon = platform.processor() == "arm" or platform.machine() == "arm64"
-
-if is_apple_silicon:
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-    os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
-    os.environ["PYTORCH_DISABLE_MPS"] = "1"
-    os.environ["PYTORCH_DEVICE"] = "cpu"
+setup_apple_silicon_compatibility()
 
 # Imports must be placed after environment variables are set for Apple Silicon MPS
 # compatibility
@@ -35,6 +28,7 @@ if is_apple_silicon:
 import argparse  # noqa: E402
 import hashlib  # noqa: E402
 import multiprocessing  # noqa: E402
+import os  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
@@ -47,10 +41,14 @@ from watchdog.observers import Observer  # noqa: E402
 
 from database_manager import DatabaseManager  # noqa: E402
 from embedding_helper import EmbeddingGenerator  # noqa: E402
+from logging_config import get_logger  # noqa: E402
 
 # Global database manager instance
 _db_manager = None
 _db_manager_lock = threading.Lock()
+
+# Logger instance
+logger = get_logger(__name__)
 
 
 def get_version():
@@ -340,7 +338,7 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
                 rows.append((uid, str(path), text, emb.tolist(), file_mtime))
 
             except Exception as e:
-                print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
+                logger.error(f"Failed to process {path}: {e}")
                 failed_files.append(path)
 
             pbar.update(1)
@@ -616,14 +614,14 @@ class DebouncedHandler(FileSystemEventHandler):
                     if res:
                         uid, emb = res
                         # With DuckDB, no separate index update needed
-                        print(f"[debounce] updated {p}")
+                        logger.debug(f"[debounce] updated {p}")
                 except OSError:
                     # Ignore files we can't access (permissions, etc.)
                     pass
         elif ev_type == "deleted":
             # Remove deleted file from database
             self.db_manager.execute_with_retry(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
-            print(f"[debounce] {p} deleted from database")
+            logger.debug(f"[debounce] {p} deleted from database")
 
 
 def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
@@ -654,14 +652,14 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
 
     try:
         embedder = EmbeddingGenerator(EMBED_MODEL)
-        print("✅ Embedding generator initialized for watch mode", file=sys.stderr)
+        logger.info("Embedding generator initialized for watch mode")
     except Exception as e:
-        print(f"❌ Failed to initialize embedding generator: {e}", file=sys.stderr)
+        logger.error(f"Failed to initialize embedding generator: {e}")
         raise e
 
     # Verify database has embeddings
     embedding_count = build_full_index(db_manager)
-    print(f"[watch] found {embedding_count} embeddings in database")
+    logger.info(f"[watch] found {embedding_count} embeddings in database")
 
     # Set up the debounced file handler
     handler = DebouncedHandler(repo, max_bytes, db_manager, embedder, debounce_sec)
@@ -1274,10 +1272,10 @@ def initialize_embedder():
     print("⚡ Initializing AI model...")
     try:
         embedder = EmbeddingGenerator(EMBED_MODEL)
-        print("✅ Embedding generator initialized successfully")
+        logger.info("Embedding generator initialized successfully")
         return embedder
     except Exception as e:
-        print(f"❌ Failed to initialize embedding generator: {e}")
+        logger.error(f"Failed to initialize embedding generator: {e}")
         raise e
 
 
@@ -1353,7 +1351,7 @@ def handle_search_command(args, embedder):
     try:
         results = search_index(db_manager, embedder, args.query, args.k)
     except Exception as e:
-        print(f"❌ Search failed: {e}")
+        logger.error(f"Search failed: {e}")
         print("💡 Make sure you've built an index first: turboprop index <repo>")
         return
     finally:

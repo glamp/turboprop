@@ -8,34 +8,27 @@ SentenceTransformers
 with proper handling of Apple Silicon MPS tensor issues.
 """
 
-import os
-import platform
 import sys
 import time
 
-# Force CPU usage for PyTorch on Apple Silicon
-is_apple_silicon = platform.processor() == "arm" or platform.machine() == "arm64"
+from apple_silicon_compat import is_apple_silicon_device, setup_apple_silicon_compatibility
 
-if is_apple_silicon:
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-    os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
-    os.environ["PYTORCH_DISABLE_MPS"] = "1"
-    os.environ["PYTORCH_DEVICE"] = "cpu"
+# Force CPU usage for PyTorch on Apple Silicon
+setup_apple_silicon_compatibility()
 
 # Imports must be placed after environment variables are set for Apple Silicon MPS
 # compatibility
 # This ensures PyTorch uses CPU backend instead of problematic MPS backend
 import numpy as np  # noqa: E402
-import torch  # noqa: E402
+
+# torch import removed - not directly used in this module
 from sentence_transformers import SentenceTransformer  # noqa: E402
 
+# Force PyTorch to use CPU backend on Apple Silicon
+from apple_silicon_compat import configure_torch_backend
 from config import config  # noqa: E402
 
-# Force PyTorch to use CPU backend on Apple Silicon
-if is_apple_silicon:
-    torch.backends.mps.is_available = lambda: False
-    torch.backends.mps.is_built = lambda: False
-    torch.set_default_device("cpu")
+configure_torch_backend()
 
 
 class EmbeddingGenerator:
@@ -51,7 +44,7 @@ class EmbeddingGenerator:
         """Initialize the SentenceTransformer model with CPU device"""
         try:
             # Use configured device, but force CPU on Apple Silicon
-            device = "cpu" if is_apple_silicon else config.embedding.DEVICE
+            device = "cpu" if is_apple_silicon_device() else config.embedding.DEVICE
             self.model = SentenceTransformer(self.model_name, device=device)
             # Ensure model is on the correct device
             self.model = self.model.to(device)
@@ -132,26 +125,27 @@ class EmbeddingGenerator:
             print(f"❌ Failed to encode large batch: {e}", file=sys.stderr)
             raise
 
-    def encode_batch_with_retry(self, texts, batch_size=None, max_retries=3, show_progress=False):
+    def encode_batch_with_retry(self, texts, batch_size=None, max_retries=None, show_progress=False):
         """Generate embeddings with retry logic for better reliability"""
         if self.model is None:
             raise ValueError("Model not initialized")
 
         effective_batch_size = batch_size or config.embedding.BATCH_SIZE
+        effective_max_retries = max_retries or config.embedding.MAX_RETRIES
 
-        for attempt in range(max_retries):
+        for attempt in range(effective_max_retries):
             try:
                 return self.encode_batch(texts, effective_batch_size, show_progress)
             except Exception as e:
-                if attempt == max_retries - 1:
-                    print(f"❌ Failed to encode batch after {max_retries} attempts: {e}", file=sys.stderr)
+                if attempt == effective_max_retries - 1:
+                    print(f"❌ Failed to encode batch after {effective_max_retries} attempts: {e}", file=sys.stderr)
                     raise
                 else:
                     print(f"⚠️ Batch encoding attempt {attempt + 1} failed, retrying: {e}", file=sys.stderr)
-                    time.sleep(1.0 * (2**attempt))  # Exponential backoff
+                    time.sleep(config.embedding.RETRY_BASE_DELAY * (2**attempt))  # Exponential backoff
 
         # This should never be reached, but just in case
-        raise RuntimeError(f"Failed to encode batch after {max_retries} attempts")
+        raise RuntimeError(f"Failed to encode batch after {effective_max_retries} attempts")
 
 
 def test_embedding_generator():

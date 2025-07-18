@@ -259,6 +259,14 @@ class EmbeddingConfig:
         os.getenv("TURBOPROP_EMBEDDING_BATCH_SIZE", "32"), "TURBOPROP_EMBEDDING_BATCH_SIZE", 32
     )
 
+    # Retry settings
+    MAX_RETRIES: int = validate_positive_int(
+        os.getenv("TURBOPROP_EMBEDDING_MAX_RETRIES", "3"), "TURBOPROP_EMBEDDING_MAX_RETRIES", 3
+    )
+    RETRY_BASE_DELAY: float = validate_positive_float(
+        os.getenv("TURBOPROP_EMBEDDING_RETRY_BASE_DELAY", "1.0"), "TURBOPROP_EMBEDDING_RETRY_BASE_DELAY", 1.0
+    )
+
 
 class ServerConfig:
     """Server and API configuration."""
@@ -391,6 +399,9 @@ Embedding:
   Model: {cls.embedding.EMBED_MODEL}
   Dimensions: {cls.embedding.DIMENSIONS}
   Device: {cls.embedding.DEVICE}
+  Batch Size: {cls.embedding.BATCH_SIZE}
+  Max Retries: {cls.embedding.MAX_RETRIES}
+  Retry Base Delay: {cls.embedding.RETRY_BASE_DELAY}s
 
 Server:
   Host: {cls.server.HOST}
