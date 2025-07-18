@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-embedding_helper.py: A simple, reliable module for generating embeddings that works on Apple Silicon
+embedding_helper.py: A simple, reliable module for generating embeddings that works
+on Apple Silicon
 
-This module provides a simple interface for generating embeddings using SentenceTransformers
+This module provides a simple interface for generating embeddings using
+SentenceTransformers
 with proper handling of Apple Silicon MPS tensor issues.
 """
 
@@ -19,7 +21,8 @@ if is_apple_silicon:
     os.environ["PYTORCH_DISABLE_MPS"] = "1"
     os.environ["PYTORCH_DEVICE"] = "cpu"
 
-# Imports must be placed after environment variables are set for Apple Silicon MPS compatibility
+# Imports must be placed after environment variables are set for Apple Silicon MPS
+# compatibility
 # This ensures PyTorch uses CPU backend instead of problematic MPS backend
 import numpy as np  # noqa: E402
 import torch  # noqa: E402

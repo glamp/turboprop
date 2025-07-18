@@ -18,7 +18,8 @@ logger = get_logger(__name__)
 
 class DatabaseManager:
     """
-    Thread-safe database connection manager with file locking and proper lifecycle management.
+    Thread-safe database connection manager with file locking and proper lifecycle
+    management.
     """
 
     def __init__(
@@ -49,7 +50,8 @@ class DatabaseManager:
         sys.exit(0)
 
     def _acquire_file_lock(self) -> None:
-        """Acquire file-based lock to prevent multiple processes from accessing the same database."""
+        """Acquire file-based lock to prevent multiple processes from accessing the
+        same database."""
         try:
             self._lock_file_path.parent.mkdir(parents=True, exist_ok=True)
             self._file_lock = open(self._lock_file_path, "w")
@@ -130,19 +132,15 @@ class DatabaseManager:
                     else:
                         return conn.execute(query).fetchall()
             except duckdb.Error as e:
-                if (
-                    "database is locked" in str(e).lower()
-                    and attempt < self.max_retries - 1
-                ):
+                if "database is locked" in str(e).lower() and attempt < self.max_retries - 1:
                     logger.warning(
-                        f"Database locked on attempt {attempt + 1}, retrying in {self.retry_delay * (2**attempt):.1f}s"
+                        f"Database locked on attempt {attempt + 1}, retrying in "
+                        f"{self.retry_delay * (2**attempt):.1f}s"
                     )
                     time.sleep(self.retry_delay * (2**attempt))  # Exponential backoff
                     continue
                 logger.error(f"Database error after {attempt + 1} attempts: {e}")
-                raise DatabaseLockError(
-                    f"Database is locked after {attempt + 1} attempts"
-                ) from e
+                raise DatabaseLockError(f"Database is locked after {attempt + 1} attempts") from e
             except Exception as e:
                 logger.error(f"Unexpected error during database operation: {e}")
                 raise DatabaseError(f"Database operation failed: {e}") from e

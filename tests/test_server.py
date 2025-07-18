@@ -45,9 +45,7 @@ class TestServerBasicFunctionality:
 
         # Add to git
         subprocess.run(["git", "add", "."], cwd=self.repo_path, capture_output=True)
-        subprocess.run(
-            ["git", "commit", "-m", "initial"], cwd=self.repo_path, capture_output=True
-        )
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=self.repo_path, capture_output=True)
 
         # Create test client
         self.client = TestClient(app)
@@ -89,9 +87,7 @@ class TestServerBasicFunctionality:
 
     def test_index_endpoint_accepts_valid_request(self):
         """Test that /index endpoint accepts valid requests."""
-        response = self.client.post(
-            "/index", json={"repo": str(self.repo_path), "max_mb": 1.0}
-        )
+        response = self.client.post("/index", json={"repo": str(self.repo_path), "max_mb": 1.0})
 
         # Should return 200 and valid response structure
         assert response.status_code == 200
@@ -105,9 +101,7 @@ class TestServerBasicFunctionality:
 
     def test_index_endpoint_handles_invalid_path(self):
         """Test that /index endpoint handles invalid repository paths."""
-        response = self.client.post(
-            "/index", json={"repo": "/nonexistent/path", "max_mb": 1.0}
-        )
+        response = self.client.post("/index", json={"repo": "/nonexistent/path", "max_mb": 1.0})
 
         # Should return 500 for invalid path (server error)
         assert response.status_code == 500
