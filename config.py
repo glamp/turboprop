@@ -3,47 +3,173 @@ Configuration module for Turboprop semantic code search system.
 
 This module centralizes all configuration constants and default values
 to make the system more maintainable and configurable.
+
+Example usage:
+    from config import config
+
+    # Access configuration values
+    print(f"Database path: {config.database.get_db_path()}")
+
+    # Get configuration summary
+    print(config.get_summary())
+
+    # Validate configuration
+    try:
+        config.validate()
+        print("Configuration is valid")
+    except ValueError as e:
+        print(f"Configuration error: {e}")
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Optional
+
+
+class ConfigValidationError(ValueError):
+    """Exception raised when configuration validation fails."""
+
+    pass
+
+
+def validate_positive_int(value: str, var_name: str, default: int) -> int:
+    """Validate and convert string to positive integer."""
+    try:
+        result = int(value)
+        if result <= 0:
+            raise ConfigValidationError(f"{var_name} must be positive, got {result}")
+        return result
+    except ValueError:
+        raise ConfigValidationError(f"{var_name} must be a valid integer, got '{value}'")
+
+
+def validate_positive_float(value: str, var_name: str, default: float) -> float:
+    """Validate and convert string to positive float."""
+    try:
+        result = float(value)
+        if result <= 0:
+            raise ConfigValidationError(f"{var_name} must be positive, got {result}")
+        return result
+    except ValueError:
+        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+
+
+def validate_non_negative_float(value: str, var_name: str, default: float) -> float:
+    """Validate and convert string to non-negative float."""
+    try:
+        result = float(value)
+        if result < 0:
+            raise ConfigValidationError(f"{var_name} must be non-negative, got {result}")
+        return result
+    except ValueError:
+        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+
+
+def validate_memory_limit(value: str, var_name: str) -> str:
+    """Validate memory limit string format (e.g., '1GB', '512MB')."""
+    pattern = r"^(\d+(?:\.\d+)?)\s*(GB|MB|KB|B)$"
+    if not re.match(pattern, value.upper()):
+        raise ConfigValidationError(f"{var_name} must be in format like '1GB', '512MB', '1024KB', got '{value}'")
+    return value
+
+
+def validate_boolean(value: str, var_name: str) -> bool:
+    """Validate and convert string to boolean."""
+    lower_value = value.lower()
+    if lower_value in ("true", "1", "yes", "on"):
+        return True
+    elif lower_value in ("false", "0", "no", "off"):
+        return False
+    else:
+        raise ConfigValidationError(
+            f"{var_name} must be 'true', 'false', '1', '0', 'yes', 'no', 'on', or 'off', got '{value}'"
+        )
+
+
+def validate_log_level(value: str, var_name: str) -> str:
+    """Validate log level."""
+    valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    if value.upper() not in valid_levels:
+        raise ConfigValidationError(f"{var_name} must be one of {valid_levels}, got '{value}'")
+    return value.upper()
+
+
+def validate_device(value: str, var_name: str) -> str:
+    """Validate device string."""
+    valid_devices = ["cpu", "cuda", "mps"]
+    if value.lower() not in valid_devices:
+        raise ConfigValidationError(f"{var_name} must be one of {valid_devices}, got '{value}'")
+    return value.lower()
+
+
+def validate_range_float(value: str, var_name: str, min_val: float, max_val: float) -> float:
+    """Validate float is within specified range."""
+    try:
+        result = float(value)
+        if result < min_val or result > max_val:
+            raise ConfigValidationError(f"{var_name} must be between {min_val} and {max_val}, got {result}")
+        return result
+    except ValueError:
+        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
 
 
 class DatabaseConfig:
     """Database-related configuration constants."""
 
     # DuckDB performance settings
-    MEMORY_LIMIT: str = os.getenv("TURBOPROP_DB_MEMORY_LIMIT", "1GB")
-    THREADS: int = int(os.getenv("TURBOPROP_DB_THREADS", "4"))
+    MEMORY_LIMIT: str = validate_memory_limit(
+        os.getenv("TURBOPROP_DB_MEMORY_LIMIT", "1GB"), "TURBOPROP_DB_MEMORY_LIMIT"
+    )
+    THREADS: int = validate_positive_int(os.getenv("TURBOPROP_DB_THREADS", "4"), "TURBOPROP_DB_THREADS", 4)
 
     # Database connection and retry settings
-    MAX_RETRIES: int = int(os.getenv("TURBOPROP_DB_MAX_RETRIES", "3"))
-    RETRY_DELAY: float = float(os.getenv("TURBOPROP_DB_RETRY_DELAY", "0.1"))
+    MAX_RETRIES: int = validate_positive_int(os.getenv("TURBOPROP_DB_MAX_RETRIES", "3"), "TURBOPROP_DB_MAX_RETRIES", 3)
+    RETRY_DELAY: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_RETRY_DELAY", "0.1"), "TURBOPROP_DB_RETRY_DELAY", 0.1
+    )
 
     # Connection pool and timeout settings
-    MAX_CONNECTIONS_PER_THREAD: int = int(os.getenv("TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", "1"))
-    CONNECTION_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_CONNECTION_TIMEOUT", "30.0"))
-    STATEMENT_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_STATEMENT_TIMEOUT", "60.0"))
+    MAX_CONNECTIONS_PER_THREAD: int = validate_positive_int(
+        os.getenv("TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", "1"), "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", 1
+    )
+    CONNECTION_TIMEOUT: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_CONNECTION_TIMEOUT", "30.0"), "TURBOPROP_DB_CONNECTION_TIMEOUT", 30.0
+    )
+    STATEMENT_TIMEOUT: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_STATEMENT_TIMEOUT", "60.0"), "TURBOPROP_DB_STATEMENT_TIMEOUT", 60.0
+    )
 
     # File lock settings
-    LOCK_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_LOCK_TIMEOUT", "10.0"))
-    LOCK_RETRY_INTERVAL: float = float(os.getenv("TURBOPROP_DB_LOCK_RETRY_INTERVAL", "0.1"))
+    LOCK_TIMEOUT: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_LOCK_TIMEOUT", "10.0"), "TURBOPROP_DB_LOCK_TIMEOUT", 10.0
+    )
+    LOCK_RETRY_INTERVAL: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_LOCK_RETRY_INTERVAL", "0.1"), "TURBOPROP_DB_LOCK_RETRY_INTERVAL", 0.1
+    )
 
     # Database file configuration
     DEFAULT_DB_NAME: str = "code_index.duckdb"
     DEFAULT_DB_DIR: str = ".turboprop"
 
     # Database optimization settings
-    CHECKPOINT_INTERVAL: int = int(os.getenv("TURBOPROP_DB_CHECKPOINT_INTERVAL", "1000"))
-    AUTO_VACUUM: bool = os.getenv("TURBOPROP_DB_AUTO_VACUUM", "true").lower() == "true"
+    CHECKPOINT_INTERVAL: int = validate_positive_int(
+        os.getenv("TURBOPROP_DB_CHECKPOINT_INTERVAL", "1000"), "TURBOPROP_DB_CHECKPOINT_INTERVAL", 1000
+    )
+    AUTO_VACUUM: bool = validate_boolean(os.getenv("TURBOPROP_DB_AUTO_VACUUM", "true"), "TURBOPROP_DB_AUTO_VACUUM")
     TEMP_DIRECTORY: Optional[str] = os.getenv("TURBOPROP_DB_TEMP_DIRECTORY")
 
     # Connection management settings
-    CONNECTION_MAX_AGE: float = float(os.getenv("TURBOPROP_DB_CONNECTION_MAX_AGE", "3600.0"))  # 1 hour
-    CONNECTION_IDLE_TIMEOUT: float = float(os.getenv("TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", "300.0"))  # 5 minutes
-    CONNECTION_HEALTH_CHECK_INTERVAL: float = float(
-        os.getenv("TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", "60.0")
+    CONNECTION_MAX_AGE: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_CONNECTION_MAX_AGE", "3600.0"), "TURBOPROP_DB_CONNECTION_MAX_AGE", 3600.0
+    )  # 1 hour
+    CONNECTION_IDLE_TIMEOUT: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", "300.0"), "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", 300.0
+    )  # 5 minutes
+    CONNECTION_HEALTH_CHECK_INTERVAL: float = validate_positive_float(
+        os.getenv("TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", "60.0"),
+        "TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL",
+        60.0,
     )  # 1 minute
 
     @classmethod
@@ -58,40 +184,64 @@ class FileProcessingConfig:
     """File processing and indexing configuration."""
 
     # File size limits (in MB)
-    MAX_FILE_SIZE_MB: float = float(os.getenv("TURBOPROP_MAX_FILE_SIZE_MB", "1.0"))
+    MAX_FILE_SIZE_MB: float = validate_positive_float(
+        os.getenv("TURBOPROP_MAX_FILE_SIZE_MB", "1.0"), "TURBOPROP_MAX_FILE_SIZE_MB", 1.0
+    )
 
     # File watching and debouncing
-    DEBOUNCE_SECONDS: float = float(os.getenv("TURBOPROP_DEBOUNCE_SECONDS", "5.0"))
+    DEBOUNCE_SECONDS: float = validate_positive_float(
+        os.getenv("TURBOPROP_DEBOUNCE_SECONDS", "5.0"), "TURBOPROP_DEBOUNCE_SECONDS", 5.0
+    )
 
     # Preview and snippet settings
-    PREVIEW_LENGTH: int = int(os.getenv("TURBOPROP_PREVIEW_LENGTH", "200"))
-    SNIPPET_LENGTH: int = int(os.getenv("TURBOPROP_SNIPPET_LENGTH", "300"))
+    PREVIEW_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_PREVIEW_LENGTH", "200"), "TURBOPROP_PREVIEW_LENGTH", 200
+    )
+    SNIPPET_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_SNIPPET_LENGTH", "300"), "TURBOPROP_SNIPPET_LENGTH", 300
+    )
 
     # Batch processing settings
-    BATCH_SIZE: int = int(os.getenv("TURBOPROP_BATCH_SIZE", "100"))
+    BATCH_SIZE: int = validate_positive_int(os.getenv("TURBOPROP_BATCH_SIZE", "100"), "TURBOPROP_BATCH_SIZE", 100)
 
     # File watching cleanup and health check intervals
-    CLEANUP_INTERVAL: int = int(os.getenv("TURBOPROP_CLEANUP_INTERVAL", "300"))  # 5 minutes
-    HEALTH_CHECK_INTERVAL: int = int(os.getenv("TURBOPROP_HEALTH_CHECK_INTERVAL", "3600"))  # 1 hour
+    CLEANUP_INTERVAL: int = validate_positive_int(
+        os.getenv("TURBOPROP_CLEANUP_INTERVAL", "300"), "TURBOPROP_CLEANUP_INTERVAL", 300
+    )  # 5 minutes
+    HEALTH_CHECK_INTERVAL: int = validate_positive_int(
+        os.getenv("TURBOPROP_HEALTH_CHECK_INTERVAL", "3600"), "TURBOPROP_HEALTH_CHECK_INTERVAL", 3600
+    )  # 1 hour
 
     # Parallel processing settings
-    MAX_WORKERS: int = int(os.getenv("TURBOPROP_MAX_WORKERS", "4"))
-    MIN_FILES_FOR_PARALLEL: int = int(os.getenv("TURBOPROP_MIN_FILES_FOR_PARALLEL", "10"))
-    PARALLEL_CHUNK_SIZE: int = int(os.getenv("TURBOPROP_PARALLEL_CHUNK_SIZE", "50"))
+    MAX_WORKERS: int = validate_positive_int(os.getenv("TURBOPROP_MAX_WORKERS", "4"), "TURBOPROP_MAX_WORKERS", 4)
+    MIN_FILES_FOR_PARALLEL: int = validate_positive_int(
+        os.getenv("TURBOPROP_MIN_FILES_FOR_PARALLEL", "10"), "TURBOPROP_MIN_FILES_FOR_PARALLEL", 10
+    )
+    PARALLEL_CHUNK_SIZE: int = validate_positive_int(
+        os.getenv("TURBOPROP_PARALLEL_CHUNK_SIZE", "50"), "TURBOPROP_PARALLEL_CHUNK_SIZE", 50
+    )
 
 
 class SearchConfig:
     """Search-related configuration constants."""
 
     # Search result limits
-    DEFAULT_MAX_RESULTS: int = int(os.getenv("TURBOPROP_DEFAULT_MAX_RESULTS", "5"))
-    MAX_RESULTS_LIMIT: int = int(os.getenv("TURBOPROP_MAX_RESULTS_LIMIT", "20"))
+    DEFAULT_MAX_RESULTS: int = validate_positive_int(
+        os.getenv("TURBOPROP_DEFAULT_MAX_RESULTS", "5"), "TURBOPROP_DEFAULT_MAX_RESULTS", 5
+    )
+    MAX_RESULTS_LIMIT: int = validate_positive_int(
+        os.getenv("TURBOPROP_MAX_RESULTS_LIMIT", "20"), "TURBOPROP_MAX_RESULTS_LIMIT", 20
+    )
 
     # Similarity and distance thresholds
-    MIN_SIMILARITY_THRESHOLD: float = float(os.getenv("TURBOPROP_MIN_SIMILARITY", "0.1"))
+    MIN_SIMILARITY_THRESHOLD: float = validate_range_float(
+        os.getenv("TURBOPROP_MIN_SIMILARITY", "0.1"), "TURBOPROP_MIN_SIMILARITY", 0.0, 1.0
+    )
 
     # Display formatting
-    SEPARATOR_LENGTH: int = int(os.getenv("TURBOPROP_SEPARATOR_LENGTH", "50"))
+    SEPARATOR_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_SEPARATOR_LENGTH", "50"), "TURBOPROP_SEPARATOR_LENGTH", 50
+    )
 
 
 class EmbeddingConfig:
@@ -99,11 +249,15 @@ class EmbeddingConfig:
 
     # Model settings (from code_index.py)
     EMBED_MODEL: str = os.getenv("TURBOPROP_EMBED_MODEL", "all-MiniLM-L6-v2")
-    DIMENSIONS: int = int(os.getenv("TURBOPROP_EMBEDDING_DIMENSIONS", "384"))
+    DIMENSIONS: int = validate_positive_int(
+        os.getenv("TURBOPROP_EMBEDDING_DIMENSIONS", "384"), "TURBOPROP_EMBEDDING_DIMENSIONS", 384
+    )
 
     # Processing settings
-    DEVICE: str = os.getenv("TURBOPROP_DEVICE", "cpu")  # or "cuda", "mps"
-    BATCH_SIZE: int = int(os.getenv("TURBOPROP_EMBEDDING_BATCH_SIZE", "32"))
+    DEVICE: str = validate_device(os.getenv("TURBOPROP_DEVICE", "cpu"), "TURBOPROP_DEVICE")  # or "cuda", "mps"
+    BATCH_SIZE: int = validate_positive_int(
+        os.getenv("TURBOPROP_EMBEDDING_BATCH_SIZE", "32"), "TURBOPROP_EMBEDDING_BATCH_SIZE", 32
+    )
 
 
 class ServerConfig:
@@ -111,43 +265,63 @@ class ServerConfig:
 
     # FastAPI server settings
     HOST: str = os.getenv("TURBOPROP_HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("TURBOPROP_PORT", "8000"))
+    PORT: int = validate_positive_int(os.getenv("TURBOPROP_PORT", "8000"), "TURBOPROP_PORT", 8000)
 
     # Watcher settings for server mode
     WATCH_DIRECTORY: str = os.getenv("TURBOPROP_WATCH_DIR", ".")
-    WATCH_MAX_FILE_SIZE_MB: float = float(os.getenv("TURBOPROP_WATCH_MAX_FILE_SIZE_MB", "1.0"))
-    WATCH_DEBOUNCE_SECONDS: float = float(os.getenv("TURBOPROP_WATCH_DEBOUNCE_SECONDS", "5.0"))
+    WATCH_MAX_FILE_SIZE_MB: float = validate_positive_float(
+        os.getenv("TURBOPROP_WATCH_MAX_FILE_SIZE_MB", "1.0"), "TURBOPROP_WATCH_MAX_FILE_SIZE_MB", 1.0
+    )
+    WATCH_DEBOUNCE_SECONDS: float = validate_positive_float(
+        os.getenv("TURBOPROP_WATCH_DEBOUNCE_SECONDS", "5.0"), "TURBOPROP_WATCH_DEBOUNCE_SECONDS", 5.0
+    )
 
     # API rate limiting and timeouts
-    REQUEST_TIMEOUT: float = float(os.getenv("TURBOPROP_REQUEST_TIMEOUT", "30.0"))
-    MAX_CONCURRENT_REQUESTS: int = int(os.getenv("TURBOPROP_MAX_CONCURRENT_REQUESTS", "10"))
+    REQUEST_TIMEOUT: float = validate_positive_float(
+        os.getenv("TURBOPROP_REQUEST_TIMEOUT", "30.0"), "TURBOPROP_REQUEST_TIMEOUT", 30.0
+    )
+    MAX_CONCURRENT_REQUESTS: int = validate_positive_int(
+        os.getenv("TURBOPROP_MAX_CONCURRENT_REQUESTS", "10"), "TURBOPROP_MAX_CONCURRENT_REQUESTS", 10
+    )
 
 
 class LoggingConfig:
     """Logging configuration."""
 
     # Log levels
-    LOG_LEVEL: str = os.getenv("TURBOPROP_LOG_LEVEL", "INFO")
+    LOG_LEVEL: str = validate_log_level(os.getenv("TURBOPROP_LOG_LEVEL", "INFO"), "TURBOPROP_LOG_LEVEL")
 
     # Log formatting
     LOG_FORMAT: str = os.getenv("TURBOPROP_LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # File logging
     LOG_FILE: Optional[str] = os.getenv("TURBOPROP_LOG_FILE")
-    LOG_MAX_SIZE: int = int(os.getenv("TURBOPROP_LOG_MAX_SIZE", "10485760"))  # 10MB
-    LOG_BACKUP_COUNT: int = int(os.getenv("TURBOPROP_LOG_BACKUP_COUNT", "5"))
+    LOG_MAX_SIZE: int = validate_positive_int(
+        os.getenv("TURBOPROP_LOG_MAX_SIZE", "10485760"), "TURBOPROP_LOG_MAX_SIZE", 10485760
+    )  # 10MB
+    LOG_BACKUP_COUNT: int = validate_positive_int(
+        os.getenv("TURBOPROP_LOG_BACKUP_COUNT", "5"), "TURBOPROP_LOG_BACKUP_COUNT", 5
+    )
 
 
 class MCPConfig:
     """MCP (Model Context Protocol) server configuration."""
 
     # Default settings for MCP operations
-    DEFAULT_MAX_FILE_SIZE_MB: float = float(os.getenv("TURBOPROP_MCP_MAX_FILE_SIZE_MB", "1.0"))
-    DEFAULT_DEBOUNCE_SECONDS: float = float(os.getenv("TURBOPROP_MCP_DEBOUNCE_SECONDS", "5.0"))
+    DEFAULT_MAX_FILE_SIZE_MB: float = validate_positive_float(
+        os.getenv("TURBOPROP_MCP_MAX_FILE_SIZE_MB", "1.0"), "TURBOPROP_MCP_MAX_FILE_SIZE_MB", 1.0
+    )
+    DEFAULT_DEBOUNCE_SECONDS: float = validate_positive_float(
+        os.getenv("TURBOPROP_MCP_DEBOUNCE_SECONDS", "5.0"), "TURBOPROP_MCP_DEBOUNCE_SECONDS", 5.0
+    )
 
     # MCP server limits
-    MAX_FILES_LIST: int = int(os.getenv("TURBOPROP_MCP_MAX_FILES_LIST", "100"))
-    MAX_SEARCH_RESULTS: int = int(os.getenv("TURBOPROP_MCP_MAX_SEARCH_RESULTS", "20"))
+    MAX_FILES_LIST: int = validate_positive_int(
+        os.getenv("TURBOPROP_MCP_MAX_FILES_LIST", "100"), "TURBOPROP_MCP_MAX_FILES_LIST", 100
+    )
+    MAX_SEARCH_RESULTS: int = validate_positive_int(
+        os.getenv("TURBOPROP_MCP_MAX_SEARCH_RESULTS", "20"), "TURBOPROP_MCP_MAX_SEARCH_RESULTS", 20
+    )
 
 
 # Convenience class for accessing all configurations
@@ -163,11 +337,35 @@ class Config:
     mcp = MCPConfig()
 
     @classmethod
+    def validate(cls) -> bool:
+        """Validate all configuration values."""
+        try:
+            # Validation happens during class initialization
+            # All values are validated when the environment variables are read
+            # If we get here, validation passed
+            return True
+        except ConfigValidationError:
+            # Re-raise the validation error
+            raise
+
+    @classmethod
+    def get_validation_status(cls) -> str:
+        """Get validation status for all configuration values."""
+        try:
+            cls.validate()
+            return "✅ All configuration values are valid"
+        except ConfigValidationError as e:
+            return f"❌ Configuration validation failed: {e}"
+
+    @classmethod
     def get_summary(cls) -> str:
         """Get a summary of current configuration settings."""
+        validation_status = cls.get_validation_status()
         return f"""
 Turboprop Configuration Summary:
 ==============================
+
+Validation Status: {validation_status}
 
 Database:
   Memory Limit: {cls.database.MEMORY_LIMIT}

@@ -36,6 +36,60 @@ class DatabaseSchemaError(DatabaseError):
     pass
 
 
+class DatabaseTimeoutError(DatabaseError):
+    """Raised when database operations timeout."""
+
+    pass
+
+
+class DatabaseConnectionTimeoutError(DatabaseTimeoutError):
+    """Raised when database connection establishment times out."""
+
+    pass
+
+
+class DatabaseStatementTimeoutError(DatabaseTimeoutError):
+    """Raised when database statement execution times out."""
+
+    pass
+
+
+class DatabaseHealthCheckError(DatabaseError):
+    """Raised when database connection health checks fail."""
+
+    pass
+
+
+class DatabaseTransactionError(DatabaseError):
+    """Raised when database transaction operations fail."""
+
+    pass
+
+
+class DatabasePermissionError(DatabaseError):
+    """Raised when database permission/access errors occur."""
+
+    pass
+
+
+class DatabaseCorruptionError(DatabaseError):
+    """Raised when database corruption is detected."""
+
+    pass
+
+
+class DatabaseDiskSpaceError(DatabaseError):
+    """Raised when database operations fail due to insufficient disk space."""
+
+    pass
+
+
+class DatabasePoolExhaustionError(DatabaseError):
+    """Raised when database connection pool is exhausted."""
+
+    pass
+
+
 class EmbeddingError(TurbopropError):
     """Raised when embedding generation fails."""
 

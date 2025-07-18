@@ -10,7 +10,15 @@ from typing import Any, Dict, Optional, TextIO
 import duckdb
 
 from config import config
-from exceptions import DatabaseError, DatabaseLockError
+from exceptions import (
+    DatabaseConnectionTimeoutError,
+    DatabaseCorruptionError,
+    DatabaseDiskSpaceError,
+    DatabaseError,
+    DatabaseLockError,
+    DatabasePermissionError,
+    DatabaseTimeoutError,
+)
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -80,13 +88,18 @@ class DatabaseManager:
                         raise
 
             if not lock_acquired:
-                raise RuntimeError(f"Could not acquire database lock within {self.lock_timeout} seconds")
+                raise DatabaseTimeoutError(f"Could not acquire database lock within {self.lock_timeout} seconds")
 
         except (IOError, OSError) as e:
             if self._file_lock:
                 self._file_lock.close()
                 self._file_lock = None
-            raise RuntimeError(f"Could not acquire database lock: {e}")
+            if "permission denied" in str(e).lower():
+                raise DatabasePermissionError(f"Permission denied when acquiring database lock: {e}")
+            elif "no space left" in str(e).lower():
+                raise DatabaseDiskSpaceError(f"Insufficient disk space when acquiring database lock: {e}")
+            else:
+                raise DatabaseLockError(f"Could not acquire database lock: {e}")
 
     def _release_file_lock(self) -> None:
         """Release file-based lock."""
@@ -102,32 +115,47 @@ class DatabaseManager:
 
     def _create_connection(self) -> duckdb.DuckDBPyConnection:
         """Create a new database connection with proper configuration."""
-        # Ensure database directory exists
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # Ensure database directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create connection - DuckDB uses different configuration than SQLite
-        conn = duckdb.connect(str(self.db_path))
+            # Create connection - DuckDB uses different configuration than SQLite
+            conn = duckdb.connect(str(self.db_path))
 
-        # Configure for better performance and concurrency
-        # DuckDB automatically handles WAL-like behavior and concurrency
-        conn.execute(f"SET memory_limit = '{config.database.MEMORY_LIMIT}'")
-        conn.execute(f"SET threads = {config.database.THREADS}")
+            # Configure for better performance and concurrency
+            # DuckDB automatically handles WAL-like behavior and concurrency
+            conn.execute(f"SET memory_limit = '{config.database.MEMORY_LIMIT}'")
+            conn.execute(f"SET threads = {config.database.THREADS}")
 
-        # Configure timeout settings
-        if hasattr(conn, "execute") and config.database.STATEMENT_TIMEOUT > 0:
-            # Note: DuckDB doesn't have a direct statement timeout, but we can use this for logging
-            pass
+            # Configure timeout settings
+            if hasattr(conn, "execute") and config.database.STATEMENT_TIMEOUT > 0:
+                # Note: DuckDB doesn't have a direct statement timeout, but we can use this for logging
+                pass
 
-        # Configure temporary directory if specified
-        if config.database.TEMP_DIRECTORY:
-            conn.execute(f"SET temp_directory = '{config.database.TEMP_DIRECTORY}'")
+            # Configure temporary directory if specified
+            if config.database.TEMP_DIRECTORY:
+                conn.execute(f"SET temp_directory = '{config.database.TEMP_DIRECTORY}'")
 
-        # Configure auto-vacuum if enabled
-        if config.database.AUTO_VACUUM:
-            # DuckDB handles this automatically, but we can add related optimizations
-            pass
+            # Configure auto-vacuum if enabled
+            if config.database.AUTO_VACUUM:
+                # DuckDB handles this automatically, but we can add related optimizations
+                pass
 
-        return conn
+            return conn
+        except PermissionError as e:
+            raise DatabasePermissionError(f"Permission denied when creating database connection: {e}")
+        except OSError as e:
+            if "no space left" in str(e).lower():
+                raise DatabaseDiskSpaceError(f"Insufficient disk space when creating database connection: {e}")
+            else:
+                raise DatabaseConnectionTimeoutError(f"Failed to create database connection: {e}")
+        except duckdb.Error as e:
+            if "corrupt" in str(e).lower():
+                raise DatabaseCorruptionError(f"Database corruption detected: {e}")
+            else:
+                raise DatabaseError(f"Database error when creating connection: {e}")
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error when creating database connection: {e}")
 
     def _get_thread_connection(self) -> duckdb.DuckDBPyConnection:
         """Get or create a connection for the current thread with lifecycle management."""
