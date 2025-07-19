@@ -1,21 +1,24 @@
 # Turboprop 🚀
 
-Lightning-fast semantic code search with AI embeddings. Transform your codebase into a searchable knowledge base using natural language queries.
+**Lightning-fast semantic code search with AI embeddings**
 
-## ✨ Key Features
+Transform your codebase into a searchable knowledge base using natural language queries. Perfect for AI-assisted development with Claude Code and other AI coding assistants.
 
-- 🔍 **Semantic Search**: Find code by meaning, not just keywords ("JWT authentication" finds auth logic)
-- 🐆 **Lightning Fast**: DuckDB vector operations for sub-second search across large codebases
-- 🔄 **Live Updates**: Watch mode with intelligent debouncing - your index stays fresh as you code
-- 🤖 **MCP Ready**: Perfect integration with Claude and other AI coding assistants
-- 📁 **Git-Aware**: Respects .gitignore and only indexes what matters
-- 💻 **Simple CLI**: Clean command-line interface with helpful guidance
+## ✨ What Makes Turboprop Special
 
-## 🚀 Quick Start
+🔍 **Semantic Search** - Find code by meaning, not just keywords ("JWT authentication" finds auth logic across languages)  
+🐆 **Lightning Fast** - DuckDB vector operations deliver sub-second search across massive codebases  
+🔄 **Live Updates** - Watch mode with intelligent debouncing keeps your index fresh as you code  
+🤖 **Claude Code Ready** - Perfect MCP integration with custom slash commands and tools  
+🔒 **Safe Concurrent Access** - Advanced file locking prevents corruption during multi-process operations  
+📁 **Git-Aware** - Respects .gitignore and only indexes what matters  
+💻 **Beautiful CLI** - Rich terminal interface with progress indicators and helpful guidance
 
-### MCP Configuration (Claude Integration) - Front and Center!
+## 🚀 Quick Start with Claude Code
 
-Add this to your Claude Code `.mcp` configuration file:
+### MCP Installation
+
+Add this to your Claude Code MCP configuration:
 
 ```json
 {
@@ -29,376 +32,229 @@ Add this to your Claude Code `.mcp` configuration file:
 }
 ```
 
-Then restart Claude Desktop and start asking questions about your code:
+### Sample Claude Code Prompts
 
-- "Find JWT authentication code"
-- "Show me error handling patterns"
-- "Where is the database connection setup?"
+Once installed, try these prompts with Claude Code:
 
-### Installation & Basic Usage
+**Search for specific patterns:**
+- "Use the turboprop tools to find JWT authentication code in this repository"
+- "Search the codebase for error handling middleware patterns"  
+- "Find React components that handle form validation"
+- "Look for database connection setup code"
+
+**Index management:**
+- "Index this repository with turboprop and then search for API route handlers"
+- "Check the turboprop index status and tell me what files are indexed"
+- "Reindex this codebase and search for logging implementations"
+
+**Development workflow:**
+- "Use turboprop to find code similar to what I'm working on and explain the patterns"
+- "Search for examples of how authentication is implemented in this project"
+- "Find all places where JSON parsing happens and show me the different approaches"
+
+### Available MCP Tools
+
+Claude Code can use these tools automatically:
+
+- **`index_repository`** - Build searchable index from your codebase
+- **`search_code`** - Perform semantic search with natural language  
+- **`get_index_status`** - Check index health and file counts
+- **`watch_repository`** - Monitor for changes (auto-enabled by default)
+- **`list_indexed_files`** - Show what files are in the index
+
+### Custom Slash Commands
+
+Turboprop includes custom slash commands for Claude Code. Add these to your `.claude/` directory:
+
+**`/search [query]`** - Quick semantic search
+```
+/search JWT authentication
+/search error handling patterns  
+/search React form components
+```
+
+**`/index [path]`** - Index a repository  
+```
+/index .
+/index /path/to/project
+```
+
+**`/status`** - Check index status
+```
+/status
+```
+
+## ⚙️ Standalone CLI Usage
+
+### Installation
 
 ```bash
 # Install globally
 pip install turboprop
 
-# Index your codebase
-turboprop index .
-
-# Search with natural language
-turboprop search "JWT authentication"
-
-# Watch for changes (keeps index updated)
-turboprop watch .
+# Or with uv (recommended)
+uvx turboprop
 ```
 
-## ⚙️ CLI Usage
+### Core Commands
 
-### `index` - Build Search Index
-
+**Index your codebase:**
 ```bash
-turboprop index <repository_path> [options]
-
-Options:
-  --max-mb FLOAT       Maximum file size in MB to index (default: 1.0)
-  --workers INTEGER    Number of parallel workers (default: CPU count)
-  --force-all         Force reprocessing of all files
-
-Examples:
-  turboprop index .                    # Index current directory
-  turboprop index ~/my-project         # Index specific project
-  turboprop index . --max-mb 2.0      # Allow larger files
+turboprop index .                    # Index current directory  
+turboprop index ~/my-project         # Index specific project
+turboprop index . --max-mb 2.0      # Allow larger files
+turboprop index . --force-all        # Force reprocessing
 ```
 
-### `search` - Semantic Code Search
-
+**Search with natural language:**
 ```bash
-turboprop search "<query>" [options]
-
-Options:
-  --repo PATH         Repository path (default: current directory)
-  --k INTEGER         Number of results to return (default: 5)
-
-Query Examples:
-  turboprop search "JWT authentication"              # Find auth-related code
-  turboprop search "parse JSON response"             # Discover JSON parsing logic
-  turboprop search "error handling middleware"       # Locate error handling patterns
-  turboprop search "database connection setup"       # Find DB initialization code
-  turboprop search "React component for forms"       # Find form-related components
+turboprop search "JWT authentication"              # Find auth code
+turboprop search "parse JSON response"             # JSON parsing logic  
+turboprop search "error handling middleware"       # Error patterns
+turboprop search "React component for forms"       # Form components
 ```
 
-### `watch` - Live Index Updates
-
+**Watch for live updates:**
 ```bash
-turboprop watch <repository_path> [options]
-
-Options:
-  --max-mb FLOAT        Maximum file size in MB (default: 1.0)
-  --debounce-sec FLOAT  Seconds to wait before processing changes (default: 5.0)
-
-Example:
-  turboprop watch . --debounce-sec 3.0  # Faster updates
+turboprop watch .                    # Monitor current directory
+turboprop watch . --debounce-sec 3.0 # Faster updates
 ```
 
-### `mcp` - Start MCP Server
-
+**Start MCP server:**
 ```bash
-turboprop mcp [options]
-
-Options:
-  --repository PATH     Repository to index and monitor (default: current directory)
-  --max-mb FLOAT       Maximum file size in MB (default: 1.0)
-  --debounce-sec FLOAT Seconds to wait before processing changes (default: 5.0)
-  --auto-index         Automatically index on startup (default: True)
-  --no-auto-index      Don't automatically index on startup
-  --auto-watch         Automatically watch for changes (default: True)
-  --no-auto-watch      Don't automatically watch for changes
-
-Examples:
-  turboprop mcp --repository .                     # Start MCP server for current directory
-  turboprop mcp --repository /path/to/repo         # Index specific repository
-  turboprop mcp --repository . --max-mb 2.0        # Allow larger files
-  turboprop mcp --repository . --no-auto-index     # Don't auto-index on startup
+turboprop mcp --repository . --auto-index    # Full auto mode
+turboprop mcp --repository . --no-auto-watch # Manual updates only
 ```
 
-### Features Available in Claude
+## 🔧 Advanced Features
 
-When using the MCP server with Claude:
+### Concurrent Access Protection
 
-- **🔍 Semantic Code Search**: Ask Claude to find code using natural language
-- **📁 Repository Indexing**: Automatically index and watch your codebase
-- **🔄 Real-time Updates**: Index stays fresh as you code
-- **💬 Natural Queries**: "Find JWT authentication code", "Show error handling patterns"
+Turboprop uses advanced file locking to prevent database corruption:
 
-## 💡 Pro Tips & Search Examples
+- **Process-safe indexing** - Multiple processes can safely access the same repository
+- **Atomic operations** - Index updates are completed fully or rolled back  
+- **Deadlock prevention** - Smart lock ordering prevents system hangs
+- **Graceful recovery** - Automatic cleanup of stale locks on restart
 
-### Query Examples
+### Performance Optimization
 
-- `"JWT authentication"` → Find auth-related code
-- `"parse JSON response"` → Discover JSON parsing logic
-- `"error handling middleware"` → Locate error handling patterns
-- `"database connection setup"` → Find DB initialization code
-- `"React component for forms"` → Find form-related components
+**Smart file filtering:**
+- Respects `.gitignore` automatically
+- Configurable file size limits (`--max-mb`)
+- Skips binary and generated files
 
-### Performance Tips
+**Efficient indexing:**
+- Parallel processing with worker pools
+- Incremental updates (only changed files)
+- Memory-efficient batch processing
 
-- **File size limit**: Adjust `--max-mb` based on your repository size and available memory
-- **Debounce timing**: Lower `--debounce-sec` for faster updates, higher for less CPU usage
-- **Search results**: Increase `--k` to see more results, decrease for faster queries
+**Fast search:**
+- Native DuckDB vector operations  
+- 384-dimension embeddings for accuracy
+- Cosine similarity ranking
 
-## 📄 License
+### Configuration Options
 
-MIT License - feel free to use this in your projects!
-
----
-
-**Ready to supercharge your code exploration? Get started in 60 seconds!** 🚀✨
-
-## 🧠 Optimized for Claude Code
-
-Add `.claude/code-index.commands.md` for slash commands.
-
----
-
-That’s it—**fucking easy as pie**. 🍰🚀
-
-## 💻 Enhanced CLI Experience
-
-Turboprop now features a beautiful, user-friendly CLI with:
-
-### Rich Help System
-
+**File size limits:**
 ```bash
-uv run python code_index.py --help     # Main help with examples
-uv run python code_index.py index --help    # Detailed command help
-uv run python code_index.py search --help   # Search-specific guidance
+--max-mb 1.0    # Default: 1MB max file size
+--max-mb 5.0    # Allow larger files
+--max-mb 0.1    # Strict limit for huge repos
 ```
 
-### Visual Feedback
-
-- 🚀 Branded startup messages
-- ⚡ Progress indicators with emojis
-- 📊 Rich search result formatting
-- 💡 Helpful tips and suggestions
-- ❌ Clear error messages with solutions
-
-### Smart Error Handling
-
-- Missing index detection with guidance
-- File size limit recommendations
-- Search result explanations
-- Recovery suggestions
-
-## 🔗 MCP Integration (Claude & AI Assistants)
-
-### Quick Setup for Claude
-
-1. **Start the MCP server:**
-
-   ```bash
-   uv run uvicorn server:app --host localhost --port 8000
-   ```
-
-2. **Index your repository:**
-
-   ```bash
-   uv run python code_index.py index /path/to/your/repo
-   ```
-
-3. **Use in Claude with slash commands:**
-   - `/search JWT authentication` - Find auth-related code
-   - `/search React form validation` - Find form components
-   - `/status` - Check index health
-
-### Available MCP Tools
-
-- **`index_repository`** - Build searchable index from code repository
-- **`search_code`** - Search code using natural language queries
-- **`get_index_status`** - Check current state of the code index
-- **`watch_repository`** - Monitor repository for changes
-- **`list_indexed_files`** - Show files currently in the index
-
-### MCP Configuration
-
-The repository includes ready-to-use MCP configuration:
-
-- `.mcp/config.json` - Server configuration
-- `.claude/turboprop-commands.md` - Claude slash commands
-
-## ⚙️ Complete CLI Reference
-
-### `index` - Build Search Index
-
+**Watch mode timing:**
 ```bash
-uv run python code_index.py index <repository_path> [options]
-
-Options:
-  --max-mb FLOAT    Maximum file size in MB to index (default: 1.0)
-
-Examples:
-  uv run python code_index.py index .                    # Index current directory
-  uv run python code_index.py index ~/my-project         # Index specific project
-  uv run python code_index.py index . --max-mb 2.0      # Allow larger files
+--debounce-sec 5.0   # Default: 5 second debounce
+--debounce-sec 1.0   # Faster updates  
+--debounce-sec 10.0  # Less CPU usage
 ```
 
-### `search` - Semantic Code Search
-
+**Search results:**
 ```bash
-uv run python code_index.py search "<query>" [options]
-
-Options:
-  --k INTEGER      Number of results to return (default: 5)
-
-Query Examples:
-  "JWT authentication"              → Find auth-related code
-  "parse JSON response"             → Discover JSON parsing logic
-  "error handling middleware"       → Locate error handling patterns
-  "database connection setup"       → Find DB initialization code
-  "React component for forms"       → Find form-related components
+--k 5     # Default: 5 results
+--k 10    # More results
+--k 1     # Just the best match
 ```
 
-### `watch` - Live Index Updates
+## 💡 Search Query Tips
 
-```bash
-uv run python code_index.py watch <repository_path> [options]
+### Effective Query Patterns
 
-Options:
-  --max-mb FLOAT        Maximum file size in MB (default: 1.0)
-  --debounce-sec FLOAT  Seconds to wait before processing changes (default: 5.0)
+**Be descriptive and specific:**
+- ✅ "JWT token validation middleware"  
+- ❌ "auth"
 
-Example:
-  uv run python code_index.py watch . --debounce-sec 3.0  # Faster updates
+**Ask conceptual questions:**
+- ✅ "how to handle database connection errors"
+- ❌ "try catch db"
+
+**Combine multiple concepts:**
+- ✅ "React form validation with custom hooks"
+- ❌ "react forms"
+
+**Use domain-specific language:**
+- ✅ "OAuth2 authorization flow implementation"  
+- ❌ "login stuff"
+
+### Example Queries by Use Case
+
+**Authentication & Security:**
+- "JWT token validation and refresh logic"
+- "password hashing and salt generation"  
+- "OAuth2 provider integration code"
+- "session management middleware"
+
+**API & Data:**
+- "REST API error handling patterns"
+- "JSON schema validation logic"
+- "database query optimization"
+- "caching layer implementation"
+
+**Frontend & UI:**
+- "React component state management"
+- "form validation with error messages"  
+- "responsive design utility classes"
+- "event handler patterns"
+
+## 🏗️ Architecture & Technical Details
+
+### Database Schema
+```sql
+CREATE TABLE code_files (
+  id VARCHAR PRIMARY KEY,        -- SHA-256 hash of path + content
+  path VARCHAR,                  -- Absolute file path  
+  content TEXT,                  -- Full file content
+  embedding DOUBLE[384]          -- 384-dimension vector embeddings
+);
 ```
 
-## 🌐 HTTP API Server
+### ML Model
+- **Model**: SentenceTransformer "all-MiniLM-L6-v2"
+- **Dimensions**: 384 (balanced accuracy/speed)
+- **Similarity**: Cosine similarity via DuckDB vector operations
 
-### Start the Server
-
-```bash
-# Development mode with auto-reload (using uv)
-uv run uvicorn server:app --reload --host 0.0.0.0 --port 8000
-
-# Production mode
-uv run uvicorn server:app --host 0.0.0.0 --port 8000
-
-# OR with activated virtual environment
-uvicorn server:app --reload --host 0.0.0.0 --port 8000
-```
-
-### API Endpoints
-
-#### `POST /index` - Build Index
-
-```bash
-curl -X POST "http://localhost:8000/index" \
-  -H "Content-Type: application/json" \
-  -d '{"repo": "/path/to/repository", "max_mb": 1.0}'
-
-# Response: {"status": "indexed", "files": 1247}
-```
-
-#### `GET /search` - Search Code
-
-```bash
-curl "http://localhost:8000/search?query=JWT%20authentication&k=5"
-
-# Response:
-[
-  {
-    "path": "/src/auth/middleware.py",
-    "snippet": "def verify_jwt_token(token: str):\n    \"\"\"Verify JWT token and extract claims...",
-    "distance": 0.234
-  }
-]
-```
-
-#### `GET /status` - Index Status
-
-```bash
-curl "http://localhost:8000/status"
-
-# Response:
-{
-  "files_indexed": 1247,
-  "database_size_mb": 125.6,
-  "search_index_ready": true,
-  "last_updated": "Recent",
-  "embedding_dimensions": 384,
-  "model_name": "all-MiniLM-L6-v2"
-}
-```
-
-### Interactive API Documentation
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-## 💡 Pro Tips & Best Practices
-
-### Search Query Optimization
-
-- **Use descriptive phrases**: "authentication middleware" vs just "auth"
-- **Ask conceptual questions**: "how to handle errors" vs "try catch"
-- **Combine multiple concepts**: "JWT token validation middleware"
-- **Be domain-specific**: "React form validation" vs "form validation"
-
-### Performance Tuning
-
-- **File size limit**: Adjust `--max-mb` based on your repository size and available memory
-- **Debounce timing**: Lower `--debounce-sec` for faster updates, higher for less CPU usage
-- **Search results**: Increase `--k` to see more results, decrease for faster queries
-
-### File Management
-
-- **Index files**: `code_index.duckdb` (database) and `hnsw_code.idx` (search index)
-- **Location**: Created in the current working directory
-- **Cleanup**: Delete these files to reset the index completely
-- **Backup**: Copy these files to backup your index
-
-## 🏗️ Architecture Overview
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Git Repository │───▶│  File Scanner    │───▶│  Code Files     │
-│   (.gitignore    │    │  (scan_repo)     │    │  (.py, .js, etc)│
-│    aware)        │    └──────────────────┘    └─────────────────┘
-└─────────────────┘                                       │
-                                                          ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Search Results │◀───│  HNSW Index     │◀───│  Embeddings     │
-│   (ranked by    │    │  (fast vector   │    │  (ML model:     │
-│    similarity)  │    │   search)        │    │   all-MiniLM)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                 ▲                        │
-                                 │                        ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   User Query    │───▶│  Query Embedding │    │  DuckDB Storage │
-│   ("parse JSON") │    │  (same model)   │    │  (persistent)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                 ▲
-                                 │
-                   ┌──────────────────┐
-                   │   FastAPI Server │ ←── MCP Integration
-                   │   (HTTP API)     │     Claude, etc.
-                   └──────────────────┘
-```
+### File System
+- **Index location**: `.turboprop/code_index.duckdb` in each repository
+- **Git integration**: Uses `git ls-files` for file discovery
+- **Ignore handling**: Respects `.gitignore` automatically
 
 ## 🤝 Contributing
 
-We welcome contributions! Key areas for improvement:
+Key areas for contribution:
 
-- Additional programming language support
-- Performance optimizations for large repositories
-- IDE/editor integrations
-- Advanced search features (regex, file filters, etc.)
-- Better error handling and user feedback
-- Enhanced MCP tool capabilities
+- Language-specific improvements (better syntax highlighting, smart parsing)
+- Performance optimizations for enormous codebases  
+- IDE/editor plugin development
+- Advanced search features (regex filters, file type limits)
+- Better error recovery and user guidance
 
 ## 📄 License
 
-MIT License - feel free to use this in your projects!
+MIT License - use freely in your projects!
 
 ---
 
-**Ready to supercharge your code exploration? Get started in 60 seconds!** 🚀✨
+**Ready to supercharge your code exploration with Claude Code?** 🚀✨
 
-_Turboprop: Because finding code should be as smooth as flying._
+*Turboprop: Because finding code should be as smooth as flying.*
