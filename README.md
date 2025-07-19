@@ -22,7 +22,7 @@ Add this to your Claude Code `.mcp` configuration file:
   "mcpServers": {
     "turboprop": {
       "command": "uvx",
-      "args": ["turboprop", "mcp", "--repository", ".", "--auto-index"],
+      "args": ["turboprop@latest", "mcp", "--repository", ".", "--auto-index"],
       "env": {}
     }
   }
