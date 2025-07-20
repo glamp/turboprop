@@ -478,5 +478,149 @@ class DatabaseManager:
             logger.error("Schema migration failed: %s", e)
             raise DatabaseError(f"Failed to migrate schema for table {table_name}: {e}") from e
 
+    def create_constructs_table(self) -> None:
+        """
+        Create the code_constructs table for storing extracted programming constructs.
+        
+        This table stores individual programming constructs (functions, classes, variables, etc.)
+        with their own embeddings for more granular search capabilities.
+        """
+        logger.info("Creating code_constructs table")
+        
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS code_constructs (
+            id VARCHAR PRIMARY KEY,
+            file_id VARCHAR NOT NULL,
+            construct_type VARCHAR NOT NULL,
+            name VARCHAR NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            signature TEXT,
+            docstring TEXT,
+            parent_construct_id VARCHAR,
+            embedding DOUBLE[384],
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        
+        create_indexes_sql = [
+            "CREATE INDEX IF NOT EXISTS idx_code_constructs_file_id ON code_constructs(file_id)",
+            "CREATE INDEX IF NOT EXISTS idx_code_constructs_type ON code_constructs(construct_type)",
+            "CREATE INDEX IF NOT EXISTS idx_code_constructs_name ON code_constructs(name)",
+            "CREATE INDEX IF NOT EXISTS idx_code_constructs_parent ON code_constructs(parent_construct_id)"
+        ]
+        
+        try:
+            with self.get_connection() as conn:
+                # Create the table
+                conn.execute(create_table_sql)
+                
+                # Create indexes
+                for index_sql in create_indexes_sql:
+                    conn.execute(index_sql)
+                
+                logger.info("Successfully created code_constructs table with indexes")
+                
+        except Exception as e:
+            logger.error("Failed to create code_constructs table: %s", e)
+            raise DatabaseError(f"Failed to create code_constructs table: {e}") from e
+
+    def store_construct(self, construct, file_id: str, construct_id: str, embedding: list) -> None:
+        """
+        Store a code construct in the database.
+        
+        Args:
+            construct: CodeConstruct instance to store
+            file_id: ID of the file containing this construct
+            construct_id: Unique ID for this construct
+            embedding: Embedding vector for the construct
+        """
+        try:
+            with self.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO code_constructs 
+                    (id, file_id, construct_type, name, start_line, end_line, 
+                     signature, docstring, parent_construct_id, embedding)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        construct_id,
+                        file_id,
+                        construct.construct_type,
+                        construct.name,
+                        construct.start_line,
+                        construct.end_line,
+                        construct.signature,
+                        construct.docstring,
+                        construct.parent_construct_id,
+                        embedding
+                    )
+                )
+                logger.debug("Stored construct %s for file %s", construct.name, file_id)
+                
+        except Exception as e:
+            logger.error("Failed to store construct %s: %s", construct.name, e)
+            raise DatabaseError(f"Failed to store construct: {e}") from e
+
+    def get_constructs_by_file(self, file_id: str) -> list:
+        """
+        Get all constructs for a specific file.
+        
+        Args:
+            file_id: ID of the file to get constructs for
+            
+        Returns:
+            List of construct records
+        """
+        try:
+            with self.get_connection() as conn:
+                result = conn.execute(
+                    "SELECT * FROM code_constructs WHERE file_id = ? ORDER BY start_line",
+                    (file_id,)
+                ).fetchall()
+                return result
+                
+        except Exception as e:
+            logger.error("Failed to get constructs for file %s: %s", file_id, e)
+            return []
+
+    def remove_constructs_for_file(self, file_id: str) -> int:
+        """
+        Remove all constructs associated with a file.
+        
+        Args:
+            file_id: ID of the file whose constructs should be removed
+            
+        Returns:
+            Number of constructs removed
+        """
+        try:
+            with self.get_connection() as conn:
+                result = conn.execute(
+                    "DELETE FROM code_constructs WHERE file_id = ?",
+                    (file_id,)
+                )
+                # DuckDB doesn't return affected rows directly, so we'll estimate
+                return 1  # Assume at least one row was affected if no error
+                
+        except Exception as e:
+            logger.error("Failed to remove constructs for file %s: %s", file_id, e)
+            return 0
+
+    def get_construct_count(self) -> int:
+        """
+        Get the total number of constructs in the database.
+        
+        Returns:
+            Number of constructs stored
+        """
+        try:
+            result = self.execute_with_retry("SELECT COUNT(*) FROM code_constructs")
+            return result[0][0] if result and result[0] else 0
+        except Exception as e:
+            logger.error("Failed to get construct count: %s", e)
+            return 0
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cleanup()

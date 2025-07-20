@@ -1013,7 +1013,9 @@ def reindex_all(
 
     # Generate embeddings and store them in the database
     if files_to_process:
-        embed_and_store(db_manager, embedder, files_to_process, max_workers)
+        # Use the enhanced function from indexing_operations which includes construct extraction
+        from indexing_operations import embed_and_store as embed_and_store_enhanced
+        embed_and_store_enhanced(db_manager, embedder, files_to_process, extract_constructs=True)
 
     # Build the search index from all stored embeddings
     build_full_index(db_manager)

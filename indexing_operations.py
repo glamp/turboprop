@@ -23,14 +23,19 @@ from tqdm import tqdm
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from language_detection import LanguageDetector
+from code_construct_extractor import CodeConstructExtractor
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Constants
 TABLE_NAME = "code_files"
 DIMENSIONS = 384
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
-# Global language detector instance for efficient reuse
+# Global instances for efficient reuse
 _language_detector = None
+_construct_extractor = None
 
 
 def get_language_detector() -> LanguageDetector:
@@ -39,6 +44,14 @@ def get_language_detector() -> LanguageDetector:
     if _language_detector is None:
         _language_detector = LanguageDetector()
     return _language_detector
+
+
+def get_construct_extractor() -> CodeConstructExtractor:
+    """Get a cached CodeConstructExtractor instance for efficient reuse."""
+    global _construct_extractor
+    if _construct_extractor is None:
+        _construct_extractor = CodeConstructExtractor(get_language_detector())
+    return _construct_extractor
 
 
 def compute_id(text: str) -> str:
@@ -257,11 +270,78 @@ def _batch_insert_rows(db_manager: DatabaseManager, rows: List[Tuple]) -> None:
     print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
 
+def _extract_and_store_constructs(
+    db_manager: DatabaseManager,
+    embedder: EmbeddingGenerator,
+    file_path: Path,
+    file_content: str,
+    file_id: str
+) -> int:
+    """
+    Extract constructs from a file and store them in the database.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        embedder: EmbeddingGenerator for creating construct embeddings
+        file_path: Path to the file
+        file_content: Content of the file
+        file_id: ID of the file in the database
+        
+    Returns:
+        Number of constructs extracted and stored
+    """
+    try:
+        # Ensure the constructs table exists
+        db_manager.create_constructs_table()
+        
+        # Extract constructs
+        extractor = get_construct_extractor()
+        constructs = extractor.extract_constructs(file_content, str(file_path))
+        
+        if not constructs:
+            return 0
+        
+        # Remove existing constructs for this file
+        db_manager.remove_constructs_for_file(file_id)
+        
+        # Process each construct
+        stored_count = 0
+        for construct in constructs:
+            try:
+                # Generate embedding for the construct
+                embedding_text = construct.get_embedding_text()
+                construct_embedding = embedder.encode(embedding_text)
+                
+                # Generate construct ID
+                construct_id = construct.compute_construct_id(file_id)
+                
+                # Store the construct
+                db_manager.store_construct(
+                    construct, 
+                    file_id, 
+                    construct_id, 
+                    construct_embedding.tolist()
+                )
+                stored_count += 1
+                
+            except Exception as e:
+                logger.warning(f"Failed to store construct {construct.name} from {file_path}: {e}")
+                continue
+        
+        logger.debug(f"Extracted and stored {stored_count} constructs from {file_path}")
+        return stored_count
+        
+    except Exception as e:
+        logger.error(f"Failed to extract constructs from {file_path}: {e}")
+        return 0
+
+
 def embed_and_store(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
     files: List[Path],
     progress_callback: Optional[Callable] = None,
+    extract_constructs: bool = True,
 ) -> None:
     """
     Process a list of files by generating embeddings and storing them in the database.
@@ -272,19 +352,33 @@ def embed_and_store(
         embedder: EmbeddingGenerator instance for generating embeddings
         files: List of Path objects to process
         progress_callback: Function to call with progress updates (deprecated, use tqdm)
+        extract_constructs: Whether to also extract and store code constructs
     """
     if not files:
         return
 
     rows = []
     failed_count = 0
+    total_constructs = 0
 
     # Use sequential processing for reliability
-    with tqdm(total=len(files), desc="🔍 Generating embeddings", unit="files") as pbar:
+    with tqdm(total=len(files), desc="🔍 Processing files", unit="files") as pbar:
         for path in files:
             row_data = _process_single_file(embedder, path)
             if row_data:
                 rows.append(row_data)
+                
+                # Extract constructs if requested
+                if extract_constructs:
+                    try:
+                        file_content = path.read_text(encoding="utf-8")
+                        file_id = compute_id(str(path) + file_content)
+                        construct_count = _extract_and_store_constructs(
+                            db_manager, embedder, path, file_content, file_id
+                        )
+                        total_constructs += construct_count
+                    except Exception as e:
+                        logger.warning(f"Failed to extract constructs from {path}: {e}")
             else:
                 failed_count += 1
 
@@ -301,6 +395,10 @@ def embed_and_store(
     # Insert all rows in a single batch operation for better performance
     if rows:
         _batch_insert_rows(db_manager, rows)
+    
+    # Report construct extraction results
+    if extract_constructs and total_constructs > 0:
+        print(f"🔧 Extracted {total_constructs} code constructs from {len(files)} files", file=sys.stderr)
 
 
 def build_full_index(db_manager: DatabaseManager) -> int:
@@ -323,7 +421,7 @@ def build_full_index(db_manager: DatabaseManager) -> int:
 
 
 def embed_and_store_single(
-    db_manager: DatabaseManager, embedder: EmbeddingGenerator, path: Path
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, path: Path, extract_constructs: bool = True
 ) -> bool:
     """
     Process a single file by generating embeddings and storing them in the database.
@@ -332,6 +430,7 @@ def embed_and_store_single(
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance for generating embeddings
         path: Path object for the file to process
+        extract_constructs: Whether to also extract and store code constructs
 
     Returns:
         True if successful, False otherwise
@@ -356,6 +455,18 @@ def embed_and_store_single(
              metadata["file_type"], metadata["language"],
              metadata["size_bytes"], metadata["line_count"], metadata["category"]),
         )
+        
+        # Extract constructs if requested
+        if extract_constructs:
+            try:
+                construct_count = _extract_and_store_constructs(
+                    db_manager, embedder, path, text, uid
+                )
+                if construct_count > 0:
+                    logger.debug(f"Extracted {construct_count} constructs from {path}")
+            except Exception as e:
+                logger.warning(f"Failed to extract constructs from {path}: {e}")
+        
         return True
 
     except (OSError, UnicodeDecodeError, RuntimeError) as error:
@@ -366,6 +477,7 @@ def embed_and_store_single(
 def remove_orphaned_files(db_manager: DatabaseManager, current_files: List[Path]) -> int:
     """
     Remove files from the database that no longer exist in the repository.
+    Also removes associated constructs.
 
     Args:
         db_manager: DatabaseManager instance
@@ -375,7 +487,7 @@ def remove_orphaned_files(db_manager: DatabaseManager, current_files: List[Path]
         Number of orphaned files removed
     """
     # Get all files currently in the database
-    db_files = db_manager.execute_with_retry(f"SELECT path FROM {TABLE_NAME}")
+    db_files = db_manager.execute_with_retry(f"SELECT id, path FROM {TABLE_NAME}")
 
     if not db_files:
         return 0
@@ -385,19 +497,27 @@ def remove_orphaned_files(db_manager: DatabaseManager, current_files: List[Path]
 
     # Find orphaned files
     orphaned_files = []
-    for (db_path,) in db_files:
+    orphaned_file_ids = []
+    for file_id, db_path in db_files:
         if db_path not in current_file_paths:
             orphaned_files.append(db_path)
+            orphaned_file_ids.append(file_id)
 
-    # Remove orphaned files
+    # Remove orphaned files and their constructs
     if orphaned_files:
-        operations = [
-            (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)) 
-            for path in orphaned_files
-        ]
+        operations = []
+        
+        # Remove constructs first (foreign key constraint)
+        for file_id in orphaned_file_ids:
+            operations.append(("DELETE FROM code_constructs WHERE file_id = ?", (file_id,)))
+        
+        # Remove files
+        for path in orphaned_files:
+            operations.append((f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)))
+        
         db_manager.execute_transaction(operations)
         print(
-            f"🗑️  Removed {len(orphaned_files)} orphaned files from index",
+            f"🗑️  Removed {len(orphaned_files)} orphaned files and their constructs from index",
             file=sys.stderr,
         )
 
