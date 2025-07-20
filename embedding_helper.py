@@ -162,6 +162,29 @@ class EmbeddingGenerator:
         # This should never be reached, but just in case
         raise RuntimeError(f"Failed to encode batch after {effective_max_retries} attempts")
 
+    def generate_embeddings(self, texts, batch_size=None, show_progress=False):
+        """
+        Generate embeddings for a list of texts.
+        
+        This method provides API compatibility for components expecting a generate_embeddings method.
+        
+        Args:
+            texts: List of text strings to encode
+            batch_size: Optional batch size for processing
+            show_progress: Whether to show progress for large batches
+            
+        Returns:
+            List of numpy arrays, one embedding per input text
+        """
+        if isinstance(texts, str):
+            texts = [texts]
+        
+        # Use encode_batch to process the texts
+        embeddings = self.encode_batch(texts, batch_size=batch_size, show_progress=show_progress)
+        
+        # Convert to list of individual embeddings for API compatibility
+        return [embedding for embedding in embeddings]
+
 
 def test_embedding_generator():
     """Test the embedding generator with various inputs"""

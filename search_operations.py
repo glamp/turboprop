@@ -25,6 +25,7 @@ from mcp_response_types import (
     create_search_response_from_results
 )
 import response_config
+from construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
 
 # Constants
 TABLE_NAME = "code_files"
@@ -1056,3 +1057,335 @@ def find_similar_files(
         legacy_results.append(legacy_tuple)
 
     return legacy_results
+
+
+# Hybrid Search Functions - Combining File-level and Construct-level Search
+
+def search_hybrid(
+    db_manager: DatabaseManager,
+    embedder: EmbeddingGenerator,
+    query: str,
+    k: int = 10,
+    construct_weight: float = 0.7,
+    file_weight: float = 0.3,
+    construct_types: Optional[List[str]] = None
+) -> List[CodeSearchResult]:
+    """
+    Perform hybrid search combining file-level and construct-level results.
+    
+    This function searches both files and constructs, then intelligently merges
+    and ranks the results based on configurable weights. Construct matches are
+    typically weighted higher for precision.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        embedder: EmbeddingGenerator instance  
+        query: Natural language search query
+        k: Maximum number of results to return
+        construct_weight: Weight for construct-level matches (0.0 to 1.0)
+        file_weight: Weight for file-level matches (0.0 to 1.0)
+        construct_types: Optional filter for construct types
+        
+    Returns:
+        List of CodeSearchResult objects with merged and ranked results
+    """
+    try:
+        # Initialize construct search operations
+        construct_ops = ConstructSearchOperations(db_manager, embedder)
+        
+        # Search constructs with higher k to get more candidates
+        construct_k = min(k * 2, 20)  # Search more constructs for better selection
+        construct_results = construct_ops.search_constructs(
+            query=query,
+            k=construct_k,
+            construct_types=construct_types
+        )
+        
+        # Search files
+        file_results = search_index_enhanced(db_manager, embedder, query, k)
+        
+        # Convert construct results to CodeSearchResult for merging
+        construct_code_results = []
+        for construct_result in construct_results:
+            code_result = construct_result.to_code_search_result()
+            # Apply construct weight to similarity score
+            code_result.similarity_score *= construct_weight
+            construct_code_results.append(code_result)
+        
+        # Apply file weight to file results
+        for file_result in file_results:
+            file_result.similarity_score *= file_weight
+        
+        # Merge results and deduplicate by file path
+        merged_results = []
+        seen_files = set()
+        
+        # Prioritize construct results (they're usually more precise)
+        for result in construct_code_results:
+            file_key = result.file_path
+            if file_key not in seen_files:
+                merged_results.append(result)
+                seen_files.add(file_key)
+            elif construct_weight > file_weight:
+                # Replace file result with construct result if construct weight is higher
+                for i, existing_result in enumerate(merged_results):
+                    if existing_result.file_path == file_key:
+                        # Keep the higher scoring result
+                        if result.similarity_score > existing_result.similarity_score:
+                            merged_results[i] = result
+                        break
+        
+        # Add unique file results
+        for result in file_results:
+            file_key = result.file_path
+            if file_key not in seen_files:
+                merged_results.append(result)
+                seen_files.add(file_key)
+        
+        # Sort by weighted similarity score and limit results
+        merged_results.sort(key=lambda r: r.similarity_score, reverse=True)
+        final_results = merged_results[:k]
+        
+        # Enhance results with construct context where applicable
+        enhanced_results = []
+        for result in final_results:
+            enhanced_result = _add_construct_context(result, construct_results)
+            enhanced_results.append(enhanced_result)
+        
+        logger.info(f"Hybrid search found {len(enhanced_results)} merged results for query: {query}")
+        return enhanced_results
+        
+    except Exception as e:
+        logger.error(f"Error in hybrid search for query '{query}': {e}")
+        return []
+
+
+def search_with_construct_focus(
+    db_manager: DatabaseManager,
+    embedder: EmbeddingGenerator,
+    query: str,
+    k: int = 10,
+    construct_types: Optional[List[str]] = None
+) -> List[CodeSearchResult]:
+    """
+    Search with primary focus on constructs, falling back to file search if needed.
+    
+    This function prioritizes construct-level results but includes file-level
+    results to ensure comprehensive coverage.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        embedder: EmbeddingGenerator instance
+        query: Natural language search query
+        k: Maximum number of results to return
+        construct_types: Optional filter for construct types
+        
+    Returns:
+        List of CodeSearchResult objects prioritizing construct matches
+    """
+    return search_hybrid(
+        db_manager=db_manager,
+        embedder=embedder,
+        query=query,
+        k=k,
+        construct_weight=0.8,
+        file_weight=0.2,
+        construct_types=construct_types
+    )
+
+
+def _add_construct_context(
+    result: CodeSearchResult, 
+    construct_results: List[ConstructSearchResult]
+) -> CodeSearchResult:
+    """
+    Add construct context to a CodeSearchResult when applicable.
+    
+    Args:
+        result: CodeSearchResult to enhance
+        construct_results: List of construct results for context
+        
+    Returns:
+        Enhanced CodeSearchResult with construct context
+    """
+    # Find constructs from the same file
+    file_constructs = [
+        c for c in construct_results 
+        if c.file_path == result.file_path
+    ]
+    
+    if not file_constructs:
+        return result
+    
+    # Add construct information to file metadata
+    if not result.file_metadata:
+        result.file_metadata = {}
+    
+    # Add construct summary to metadata
+    construct_summary = {
+        'related_constructs': len(file_constructs),
+        'construct_types': list(set(c.construct_type for c in file_constructs)),
+        'top_constructs': [
+            {
+                'name': c.name,
+                'type': c.construct_type,
+                'line': c.start_line,
+                'signature': c.signature[:100] + "..." if len(c.signature) > 100 else c.signature
+            }
+            for c in sorted(file_constructs, key=lambda x: x.similarity_score, reverse=True)[:3]
+        ]
+    }
+    
+    result.file_metadata['construct_context'] = construct_summary
+    return result
+
+
+def format_hybrid_search_results(
+    results: List[CodeSearchResult], 
+    query: str, 
+    show_construct_context: bool = True
+) -> str:
+    """
+    Format hybrid search results with construct context.
+    
+    Args:
+        results: List of CodeSearchResult objects
+        query: Original search query
+        show_construct_context: Whether to show construct context information
+        
+    Returns:
+        Formatted string representation of hybrid search results
+    """
+    if not results:
+        return f"No hybrid search results found for query: '{query}'"
+    
+    formatted_lines = [f"🔍 Found {len(results)} hybrid results for: '{query}'\n"]
+    
+    for i, result in enumerate(results, 1):
+        # Result header with confidence and type information
+        confidence_emoji = {
+            'high': '🎯',
+            'medium': '✅', 
+            'low': '⚠️'
+        }.get(result.confidence_level, '❓')
+        
+        formatted_lines.append(
+            f"{confidence_emoji} [{i}] {result.file_path} "
+            f"(similarity: {result.similarity_score:.3f})"
+        )
+        
+        # Show main snippet
+        snippet = result.snippet
+        if snippet.start_line == snippet.end_line:
+            line_info = f"Line {snippet.start_line}"
+        else:
+            line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
+        
+        formatted_lines.append(f"   📄 {line_info}: {snippet.text.strip()[:150]}...")
+        
+        # Show construct context if available and requested
+        if (show_construct_context and result.file_metadata and 
+            'construct_context' in result.file_metadata):
+            
+            context = result.file_metadata['construct_context']
+            construct_count = context['related_constructs']
+            construct_types = ', '.join(context['construct_types'])
+            
+            formatted_lines.append(f"   🔧 {construct_count} constructs: {construct_types}")
+            
+            # Show top constructs
+            for construct in context['top_constructs']:
+                formatted_lines.append(
+                    f"      • {construct['type']}: {construct['name']} "
+                    f"(line {construct['line']})"
+                )
+        
+        formatted_lines.append("")  # Empty line between results
+    
+    return "\n".join(formatted_lines)
+
+
+def search_constructs_with_file_context(
+    db_manager: DatabaseManager,
+    embedder: EmbeddingGenerator,
+    query: str,
+    k: int = 10,
+    construct_types: Optional[List[str]] = None
+) -> Tuple[List[ConstructSearchResult], List[CodeSearchResult]]:
+    """
+    Search constructs and provide related file context.
+    
+    This function performs construct search and then finds the containing
+    files to provide full context for each match.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        embedder: EmbeddingGenerator instance
+        query: Natural language search query
+        k: Maximum number of construct results to return
+        construct_types: Optional filter for construct types
+        
+    Returns:
+        Tuple of (construct_results, file_context_results)
+    """
+    try:
+        # Initialize construct search operations
+        construct_ops = ConstructSearchOperations(db_manager, embedder)
+        
+        # Search constructs
+        construct_results = construct_ops.search_constructs(
+            query=query,
+            k=k,
+            construct_types=construct_types
+        )
+        
+        if not construct_results:
+            return [], []
+        
+        # Get unique file paths from construct results
+        unique_file_paths = list(set(c.file_path for c in construct_results))
+        
+        # Get file context for each unique file
+        file_context_results = []
+        for file_path in unique_file_paths:
+            try:
+                # Get file content and create CodeSearchResult
+                content = get_file_content(db_manager, file_path)
+                if content:
+                    # Create enhanced snippet focusing on the file's most relevant constructs
+                    file_constructs = [c for c in construct_results if c.file_path == file_path]
+                    best_construct = max(file_constructs, key=lambda c: c.similarity_score)
+                    
+                    snippet = CodeSnippet(
+                        text=content[best_construct.start_line:best_construct.end_line],
+                        start_line=best_construct.start_line,
+                        end_line=best_construct.end_line
+                    )
+                    
+                    file_metadata = {
+                        'language': _detect_file_language(file_path),
+                        'filename': Path(file_path).name,
+                        'directory': str(Path(file_path).parent),
+                        'construct_matches': len(file_constructs)
+                    }
+                    
+                    file_result = CodeSearchResult(
+                        file_path=file_path,
+                        snippet=snippet,
+                        similarity_score=best_construct.similarity_score,
+                        file_metadata=file_metadata,
+                        confidence_level=best_construct.confidence_level
+                    )
+                    
+                    file_context_results.append(file_result)
+                    
+            except Exception as e:
+                logger.warning(f"Error getting file context for {file_path}: {e}")
+                continue
+        
+        logger.info(f"Found {len(construct_results)} construct matches with {len(file_context_results)} file contexts")
+        return construct_results, file_context_results
+        
+    except Exception as e:
+        logger.error(f"Error in construct search with file context for query '{query}': {e}")
+        return [], []
