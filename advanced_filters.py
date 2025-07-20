@@ -3,7 +3,7 @@
 Advanced Filters
 
 This module provides sophisticated multi-dimensional filtering capabilities
-for parameter-aware tool search, including parameter count, type, and 
+for parameter-aware tool search, including parameter count, type, and
 complexity-based filtering.
 """
 

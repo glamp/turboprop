@@ -2,7 +2,7 @@
 """
 MCP Tool Search Engine
 
-This module provides the core semantic search engine for MCP tools, enabling 
+This module provides the core semantic search engine for MCP tools, enabling
 natural language queries to find tools by functionality, purpose, and capabilities.
 """
 
@@ -486,7 +486,7 @@ class MCPToolSearchEngine:
             search_conditions.append(f"(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)")
             score_conditions.append(
                 f"""
-                CASE 
+                CASE
                     WHEN LOWER(name) LIKE ? THEN 2.0
                     WHEN LOWER(description) LIKE ? THEN 1.0
                     ELSE 0.0
@@ -517,13 +517,13 @@ class MCPToolSearchEngine:
             with self.db_manager.get_connection() as conn:
                 search_sql = """
                     SELECT id, name, description, category, tool_type, metadata_json,
-                           CASE 
+                           CASE
                                WHEN LOWER(name) LIKE LOWER(?) THEN 1.0
                                WHEN LOWER(description) LIKE LOWER(?) THEN 0.8
                                ELSE 0.5
                            END as keyword_score
                     FROM mcp_tools
-                    WHERE LOWER(name) LIKE LOWER(?) 
+                    WHERE LOWER(name) LIKE LOWER(?)
                        OR LOWER(description) LIKE LOWER(?)
                     ORDER BY keyword_score DESC
                     LIMIT ?

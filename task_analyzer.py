@@ -17,11 +17,11 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 # Configuration constants with environment variable overrides
-MAX_TASK_DESCRIPTION_LENGTH = int(os.getenv('TURBOPROP_MAX_TASK_LENGTH', 2000))
-COMPLEX_TASK_PATTERN_THRESHOLD = int(os.getenv('TURBOPROP_COMPLEX_PATTERN_THRESHOLD', 3))
-COMPLEX_TASK_STEPS_THRESHOLD = int(os.getenv('TURBOPROP_COMPLEX_STEPS_THRESHOLD', 8))
-DEFAULT_SIMPLE_STEPS = int(os.getenv('TURBOPROP_DEFAULT_SIMPLE_STEPS', 6))
-BASE_CONFIDENCE_SCORE = float(os.getenv('TURBOPROP_BASE_CONFIDENCE', 0.7))
+MAX_TASK_DESCRIPTION_LENGTH = int(os.getenv("TURBOPROP_MAX_TASK_LENGTH", 2000))
+COMPLEX_TASK_PATTERN_THRESHOLD = int(os.getenv("TURBOPROP_COMPLEX_PATTERN_THRESHOLD", 3))
+COMPLEX_TASK_STEPS_THRESHOLD = int(os.getenv("TURBOPROP_COMPLEX_STEPS_THRESHOLD", 8))
+DEFAULT_SIMPLE_STEPS = int(os.getenv("TURBOPROP_DEFAULT_SIMPLE_STEPS", 6))
+BASE_CONFIDENCE_SCORE = float(os.getenv("TURBOPROP_BASE_CONFIDENCE", 0.7))
 
 
 class TaskComplexity(Enum):
@@ -266,7 +266,7 @@ class TaskAnalyzer:
             raise ValueError("Task description cannot be empty or only whitespace")
         if len(task_description) > MAX_TASK_DESCRIPTION_LENGTH:
             raise ValueError("Task description too long (max 2000 characters)")
-            
+
         logger.info(f"Analyzing task: {task_description}")
 
         try:
@@ -291,13 +291,21 @@ class TaskAnalyzer:
 
             # Create and return analysis
             analysis = self._create_task_analysis(
-                task_description, task_intent, category, capabilities, requirements,
-                complexity_level, estimated_steps, skill_level, confidence, patterns
+                task_description,
+                task_intent,
+                category,
+                capabilities,
+                requirements,
+                complexity_level,
+                estimated_steps,
+                skill_level,
+                confidence,
+                patterns,
             )
-            
+
             logger.info(f"Task analysis complete: category={category}, complexity={complexity_level}")
             return analysis
-            
+
         except ValueError:
             # Re-raise validation errors
             raise
@@ -418,12 +426,12 @@ class TaskAnalyzer:
     def _create_fallback_analysis(self, task_description: str, error_message: str) -> TaskAnalysis:
         """Create a minimal analysis when full processing fails."""
         logger.warning(f"Creating fallback analysis: {error_message}")
-        
+
         # Create a basic analysis with minimal information
         return TaskAnalysis(
             task_description=task_description[:100],  # Truncate if too long
             task_intent="unknown",
-            task_category="general", 
+            task_category="general",
             required_capabilities=["general_purpose"],
             input_specifications=["text_input"],
             output_specifications=["text_output"],
@@ -434,13 +442,21 @@ class TaskAnalyzer:
             estimated_steps=3,  # Safe default
             skill_level_required="intermediate",
             confidence=0.3,  # Low confidence due to fallback
-            analysis_notes=[f"Fallback analysis due to error: {error_message[:100]}"]
+            analysis_notes=[f"Fallback analysis due to error: {error_message[:100]}"],
         )
 
     def _create_task_analysis(
-        self, task_description: str, task_intent: str, category: str, capabilities: List[str], 
-        requirements: "TaskRequirements", complexity_level: str, estimated_steps: int, 
-        skill_level: str, confidence: float, patterns: List[str]
+        self,
+        task_description: str,
+        task_intent: str,
+        category: str,
+        capabilities: List[str],
+        requirements: "TaskRequirements",
+        complexity_level: str,
+        estimated_steps: int,
+        skill_level: str,
+        confidence: float,
+        patterns: List[str],
     ) -> TaskAnalysis:
         """Create a TaskAnalysis object with all the analyzed components."""
         return TaskAnalysis(

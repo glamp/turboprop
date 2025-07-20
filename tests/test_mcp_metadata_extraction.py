@@ -169,28 +169,28 @@ class TestDocstringParser:
         """Test parsing Google-style docstrings."""
         docstring = """
         Executes a bash command in a persistent shell session.
-        
+
         This tool provides secure command execution with timeout support
         and proper error handling for development workflows.
-        
+
         Args:
             command (str): The command to execute
             timeout (int, optional): Timeout in milliseconds. Defaults to 120000.
             description (str, optional): A description of what the command does.
-            
+
         Returns:
             CommandResult: The result of command execution with stdout/stderr
-            
+
         Example:
             Execute a simple command:
             ```python
             result = bash_tool(command="ls -la", timeout=5000)
             ```
-            
+
         Note:
             Commands are executed in a persistent shell session.
             Use absolute paths for reliability.
-            
+
         Warning:
             Avoid running untrusted commands as they execute with full permissions.
         """
@@ -220,7 +220,7 @@ class TestDocstringParser:
         """Test parsing Sphinx-style docstrings."""
         docstring = """
         Read a file from the local filesystem.
-        
+
         :param file_path: The absolute path to the file to read
         :type file_path: str
         :param limit: The number of lines to read
@@ -228,10 +228,10 @@ class TestDocstringParser:
         :returns: The file contents
         :rtype: str
         :raises FileNotFoundError: When the file does not exist
-        
+
         .. example::
            Read a Python file:
-           
+
            >>> content = read_file("/path/to/script.py")
         """
 
@@ -249,12 +249,12 @@ class TestDocstringParser:
         """Test extraction of code examples from docstrings."""
         docstring = """
         Tool for searching files.
-        
+
         Example usage:
         ```bash
         grep "pattern" file.txt
         ```
-        
+
         Python example:
         ```python
         result = grep_tool(pattern="class.*:", path="src/")
@@ -276,14 +276,14 @@ class TestDocstringParser:
         """Test identification of best practices from docstrings."""
         docstring = """
         File editing tool.
-        
+
         Best practices:
         - Always backup files before editing
         - Use absolute paths for reliability
         - Test changes in development environment first
-        
+
         Performance tip: For large files, consider using streaming operations.
-        
+
         Warning: This tool will overwrite existing files.
         """
 
@@ -469,12 +469,12 @@ class TestExampleGenerator:
         """Test extraction of examples from tool documentation."""
         documentation = r"""
         Search tool for finding patterns in files.
-        
+
         Example 1: Find all Python functions
         ```python
         grep_tool(pattern=r"def \w+\(", path="src/", glob="*.py")
         ```
-        
+
         Example 2: Search in specific file
         ```bash
         grep "import" main.py
@@ -566,15 +566,15 @@ class TestMCPMetadataExtractor:
             "name": "Read",
             "description": """
             Reads a file from the local filesystem with line offset and limit support.
-            
+
             Args:
                 file_path (str): The absolute path to the file to read
-                limit (int, optional): The number of lines to read  
+                limit (int, optional): The number of lines to read
                 offset (int, optional): The line number to start reading from
-                
+
             Returns:
                 str: The file contents
-                
+
             Example:
                 Read first 100 lines of a log file:
                 ```python

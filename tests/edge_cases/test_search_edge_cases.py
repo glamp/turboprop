@@ -4,7 +4,7 @@ Edge case tests for MCP tool search engine.
 
 This module tests the scenarios identified in the code review:
 - Very large result sets (>100 tools)
-- Network/database timeout scenarios  
+- Network/database timeout scenarios
 - Invalid embedding data handling
 - Cache invalidation edge cases
 - Query processor error conditions

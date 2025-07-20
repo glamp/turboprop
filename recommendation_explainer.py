@@ -2,7 +2,7 @@
 """
 recommendation_explainer.py: Recommendation Explanation System
 
-This module generates clear explanations for tool recommendations, including 
+This module generates clear explanations for tool recommendations, including
 comparisons between alternatives and detailed usage guidance.
 """
 
@@ -550,7 +550,9 @@ class RecommendationExplainer:
             "Review tool documentation for parameter details",
         ]
 
-    def _generate_optimal_scenarios(self, recommendation: "ToolRecommendation", task_analysis: TaskAnalysis) -> List[str]:
+    def _generate_optimal_scenarios(
+        self, recommendation: "ToolRecommendation", task_analysis: TaskAnalysis
+    ) -> List[str]:
         """Generate scenarios when this tool is optimal."""
         return [
             f"When task requires {', '.join(task_analysis.required_capabilities[:2])}",
@@ -574,7 +576,9 @@ class RecommendationExplainer:
         """Extract known tool limitations."""
         return ["Performance may vary with large datasets"]
 
-    def _identify_uncertainty_areas(self, recommendation: "ToolRecommendation", task_analysis: TaskAnalysis) -> List[str]:
+    def _identify_uncertainty_areas(
+        self, recommendation: "ToolRecommendation", task_analysis: TaskAnalysis
+    ) -> List[str]:
         """Identify areas of uncertainty in the recommendation."""
         uncertainties = []
 
@@ -586,7 +590,9 @@ class RecommendationExplainer:
 
         return uncertainties
 
-    def _generate_comparison_summary(self, primary: "ToolRecommendation", alternatives: List["ToolRecommendation"]) -> str:
+    def _generate_comparison_summary(
+        self, primary: "ToolRecommendation", alternatives: List["ToolRecommendation"]
+    ) -> str:
         """Generate summary for alternative comparison."""
         return f"{primary.tool.name} recommended as primary choice, with {len(alternatives)} viable alternatives for different scenarios."
 

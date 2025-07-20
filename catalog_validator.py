@@ -571,7 +571,7 @@ class CatalogValidator:
                 # Check tool embeddings
                 invalid_tool_embeddings = conn.execute(
                     """
-                    SELECT COUNT(*) FROM mcp_tools 
+                    SELECT COUNT(*) FROM mcp_tools
                     WHERE embedding IS NOT NULL AND array_length(embedding, 1) != 384
                 """
                 ).fetchone()[0]
@@ -593,7 +593,7 @@ class CatalogValidator:
                 # Check for tools without descriptions
                 tools_without_desc = conn.execute(
                     """
-                    SELECT COUNT(*) FROM mcp_tools 
+                    SELECT COUNT(*) FROM mcp_tools
                     WHERE description IS NULL OR LENGTH(description) < 5
                 """
                 ).fetchone()[0]
@@ -604,7 +604,7 @@ class CatalogValidator:
                 # Check for tools without categories
                 tools_without_category = conn.execute(
                     """
-                    SELECT COUNT(*) FROM mcp_tools 
+                    SELECT COUNT(*) FROM mcp_tools
                     WHERE category IS NULL OR LENGTH(category) = 0
                 """
                 ).fetchone()[0]
@@ -626,7 +626,7 @@ class CatalogValidator:
                 # Check for self-referential relationships
                 self_refs = conn.execute(
                     """
-                    SELECT COUNT(*) FROM tool_relationships 
+                    SELECT COUNT(*) FROM tool_relationships
                     WHERE tool_a_id = tool_b_id
                 """
                 ).fetchone()[0]
@@ -661,8 +661,8 @@ class CatalogValidator:
             avg_params = conn.execute(
                 """
                 SELECT AVG(param_count) FROM (
-                    SELECT COUNT(*) as param_count 
-                    FROM tool_parameters 
+                    SELECT COUNT(*) as param_count
+                    FROM tool_parameters
                     GROUP BY tool_id
                 )
             """
@@ -673,8 +673,8 @@ class CatalogValidator:
             avg_examples = conn.execute(
                 """
                 SELECT AVG(example_count) FROM (
-                    SELECT COUNT(*) as example_count 
-                    FROM tool_examples 
+                    SELECT COUNT(*) as example_count
+                    FROM tool_examples
                     GROUP BY tool_id
                 )
             """

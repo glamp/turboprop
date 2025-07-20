@@ -206,7 +206,9 @@ class RecommendationAlgorithms:
 
         # Performance optimization: limit candidate processing for large sets
         if len(candidates) > MAX_CANDIDATES_TO_PROCESS:
-            logger.info(f"Large candidate set ({len(candidates)}), limiting to {MAX_CANDIDATES_TO_PROCESS} for performance")
+            logger.info(
+                f"Large candidate set ({len(candidates)}), limiting to {MAX_CANDIDATES_TO_PROCESS} for performance"
+            )
             candidates = candidates[:MAX_CANDIDATES_TO_PROCESS]
 
         recommendations = []
@@ -392,7 +394,9 @@ class RecommendationAlgorithms:
         # In full implementation, this would analyze required vs available parameters
         return 0.8
 
-    def _calculate_context_bonus(self, task_analysis: TaskAnalysis, tool: ToolSearchResult, context: Optional[Dict[str, Any]]) -> float:
+    def _calculate_context_bonus(
+        self, task_analysis: TaskAnalysis, tool: ToolSearchResult, context: Optional[Dict[str, Any]]
+    ) -> float:
         """Calculate context-based bonus/penalty."""
         bonus = 0.0
 

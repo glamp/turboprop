@@ -311,7 +311,7 @@ class TestToolRecommendationEngine:
     def test_error_handling_analysis_failure(self, recommendation_engine, simple_request, mock_components):
         """Test error handling when task analysis fails."""
         from exceptions import AnalysisError
-        
+
         # Setup mock to raise exception
         mock_components["task_analyzer"].analyze_task.side_effect = AnalysisError("Analysis failed")
 

@@ -4,7 +4,7 @@ Security tests for input validation in tool query processor.
 
 This module tests the security enhancements added to prevent:
 - SQL injection attacks
-- XSS/script injection attacks  
+- XSS/script injection attacks
 - Command injection attacks
 - Path traversal attacks
 - Size limit attacks

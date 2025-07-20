@@ -25,10 +25,10 @@ from task_analyzer import TaskAnalysis, TaskAnalyzer
 logger = get_logger(__name__)
 
 # Configuration constants with environment variable overrides
-DEFAULT_MAX_RECOMMENDATIONS = int(os.getenv('TURBOPROP_MAX_RECOMMENDATIONS', 5))
-DEFAULT_CACHE_SIZE = int(os.getenv('TURBOPROP_CACHE_SIZE', 1000))
-DEFAULT_CACHE_TTL_MINUTES = int(os.getenv('TURBOPROP_CACHE_TTL_MINUTES', 60))
-MAX_TASK_DESCRIPTION_LENGTH = int(os.getenv('TURBOPROP_MAX_DESCRIPTION_LENGTH', 1000))
+DEFAULT_MAX_RECOMMENDATIONS = int(os.getenv("TURBOPROP_MAX_RECOMMENDATIONS", 5))
+DEFAULT_CACHE_SIZE = int(os.getenv("TURBOPROP_CACHE_SIZE", 1000))
+DEFAULT_CACHE_TTL_MINUTES = int(os.getenv("TURBOPROP_CACHE_TTL_MINUTES", 60))
+MAX_TASK_DESCRIPTION_LENGTH = int(os.getenv("TURBOPROP_MAX_DESCRIPTION_LENGTH", 1000))
 
 
 @dataclass
@@ -124,7 +124,7 @@ class RecommendationCache:
         self.ttl_seconds = ttl_minutes * 60
         self.cache = {}
         self.access_times = {}
-        
+
         # Performance metrics
         self.hits = 0
         self.misses = 0
@@ -184,7 +184,7 @@ class RecommendationCache:
         """Get cache performance statistics."""
         total_requests = self.hits + self.misses
         hit_rate = (self.hits / total_requests) if total_requests > 0 else 0.0
-        
+
         return {
             "hits": self.hits,
             "misses": self.misses,
@@ -192,7 +192,7 @@ class RecommendationCache:
             "hit_rate": hit_rate,
             "cache_size": len(self.cache),
             "max_size": self.max_size,
-            "total_requests": total_requests
+            "total_requests": total_requests,
         }
 
 
@@ -237,7 +237,7 @@ class ToolRecommendationEngine:
             raise ValueError(f"Task description exceeds maximum length of {MAX_TASK_DESCRIPTION_LENGTH} characters")
         if request.max_recommendations <= 0:
             raise ValueError("max_recommendations must be positive")
-            
+
         logger.info(f"Processing recommendation request for: {request.task_description[:50]}...")
 
         # Check cache first
@@ -250,24 +250,26 @@ class ToolRecommendationEngine:
 
         try:
             response = self._process_recommendation_request(request, start_time)
-            
+
             # Cache the response
             self.cache.put(request, response)
 
             processing_time = time.time() - start_time
             logger.info(f"Recommendation processing complete in {processing_time:.2f}s")
-            
+
             # Log performance metrics periodically
-            if hasattr(self, '_log_performance_counter'):
+            if hasattr(self, "_log_performance_counter"):
                 self._log_performance_counter += 1
             else:
                 self._log_performance_counter = 1
-                
+
             if self._log_performance_counter % 10 == 0:  # Every 10 requests
                 cache_stats = self.cache.get_stats()
-                logger.info(f"Performance metrics - Cache hit rate: {cache_stats['hit_rate']:.1%}, "
-                           f"Avg processing time: {processing_time:.2f}s")
-            
+                logger.info(
+                    f"Performance metrics - Cache hit rate: {cache_stats['hit_rate']:.1%}, "
+                    f"Avg processing time: {processing_time:.2f}s"
+                )
+
             return response
 
         except ValueError as e:
@@ -300,7 +302,7 @@ class ToolRecommendationEngine:
             raise ValueError("Workflow description cannot be empty")
         if len(request.workflow_description) > MAX_TASK_DESCRIPTION_LENGTH * 2:  # Allow longer workflow descriptions
             raise ValueError(f"Workflow description exceeds maximum length")
-            
+
         logger.info(f"Processing tool sequence request for: {request.workflow_description[:50]}...")
 
         start_time = time.time()
@@ -369,7 +371,7 @@ class ToolRecommendationEngine:
             raise ValueError("Request cannot be None")
         if not request.primary_tool or not request.primary_tool.strip():
             raise ValueError("Primary tool cannot be empty")
-            
+
         logger.info(f"Processing alternative recommendations for: {request.primary_tool}")
 
         start_time = time.time()
@@ -407,7 +409,9 @@ class ToolRecommendationEngine:
         except Exception as e:
             # Unexpected errors - log and provide fallback
             logger.error(f"Unexpected error processing alternative recommendations: {str(e)}", exc_info=True)
-            return self._create_fallback_alternative_response(request, "Alternative recommendations temporarily unavailable")
+            return self._create_fallback_alternative_response(
+                request, "Alternative recommendations temporarily unavailable"
+            )
 
     def configure_caching(self, max_size: int, ttl_minutes: int) -> None:
         """Configure caching parameters."""
@@ -579,7 +583,9 @@ class ToolRecommendationEngine:
         parts = workflow_description.replace(" and ", ", ").split(", ")
         return [part.strip() for part in parts if part.strip()]
 
-    def _process_recommendation_request(self, request: RecommendationRequest, start_time: float) -> RecommendationResponse:
+    def _process_recommendation_request(
+        self, request: RecommendationRequest, start_time: float
+    ) -> RecommendationResponse:
         """Core processing logic for recommendation requests."""
         # Step 1: Analyze task requirements and constraints
         logger.debug("Analyzing task requirements")
@@ -628,18 +634,18 @@ class ToolRecommendationEngine:
     def _create_fallback_response(self, request: RecommendationRequest, error_message: str) -> RecommendationResponse:
         """Create a fallback response when full processing fails."""
         logger.warning(f"Creating fallback response: {error_message}")
-        
+
         # Create a minimal response with error information
         from context_analyzer import TaskContext
-        
+
         fallback_context = TaskContext(
             user_context=None,
             project_context=None,
             environmental_constraints=None,
             time_constraints=None,
-            quality_requirements=None
+            quality_requirements=None,
         )
-        
+
         return RecommendationResponse(
             recommendations=[],
             task_analysis=None,
@@ -650,14 +656,16 @@ class ToolRecommendationEngine:
                 "error": error_message,
                 "fallback": True,
                 "timestamp": time.time(),
-                "request_task": request.task_description[:100] if request.task_description else "Unknown"
-            }
+                "request_task": request.task_description[:100] if request.task_description else "Unknown",
+            },
         )
 
-    def _create_fallback_sequence_response(self, request: ToolSequenceRequest, error_message: str) -> ToolSequenceResponse:
+    def _create_fallback_sequence_response(
+        self, request: ToolSequenceRequest, error_message: str
+    ) -> ToolSequenceResponse:
         """Create a fallback response when sequence processing fails."""
         logger.warning(f"Creating fallback sequence response: {error_message}")
-        
+
         # Create a minimal sequence response with error information
         return ToolSequenceResponse(
             sequences=[],
@@ -667,14 +675,16 @@ class ToolRecommendationEngine:
                 "error": error_message,
                 "fallback": True,
                 "timestamp": time.time(),
-                "request_workflow": request.workflow_description[:100] if request.workflow_description else "Unknown"
-            }
+                "request_workflow": request.workflow_description[:100] if request.workflow_description else "Unknown",
+            },
         )
 
-    def _create_fallback_alternative_response(self, request: AlternativeRequest, error_message: str) -> AlternativeResponse:
+    def _create_fallback_alternative_response(
+        self, request: AlternativeRequest, error_message: str
+    ) -> AlternativeResponse:
         """Create a fallback response when alternative processing fails."""
         logger.warning(f"Creating fallback alternative response: {error_message}")
-        
+
         # Create a minimal alternative response with error information
         return AlternativeResponse(
             alternatives=[],
@@ -682,13 +692,13 @@ class ToolRecommendationEngine:
                 "primary_advantages": [f"{request.primary_tool} - analysis unavailable"],
                 "alternative_advantages": ["Alternative analysis temporarily unavailable"],
                 "trade_offs": ["Unable to perform comparison at this time"],
-                "error": error_message
+                "error": error_message,
             },
             selection_guidance=[f"Unable to provide guidance for {request.primary_tool} at this time"],
             request_metadata={
                 "error": error_message,
                 "fallback": True,
                 "timestamp": time.time(),
-                "request_tool": request.primary_tool
-            }
+                "request_tool": request.primary_tool,
+            },
         )

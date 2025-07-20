@@ -46,17 +46,17 @@ def test_enhanced_tool_discovery():
                 "name": "MultiEdit",
                 "description": """
                 Makes multiple edits to a single file in one atomic operation.
-                
+
                 This tool is designed for complex file modifications where you need to
                 make several changes simultaneously while maintaining data integrity.
-                
+
                 Args:
                     file_path (str): The absolute path to the file to modify
                     edits (array): Array of edit operations to perform sequentially
-                    
+
                 Returns:
                     bool: True if all edits were successful
-                    
+
                 Example:
                     Make multiple replacements in a configuration file:
                     ```python
@@ -65,11 +65,11 @@ def test_enhanced_tool_discovery():
                         {"old_string": "port=80", "new_string": "port=8080"}
                     ])
                     ```
-                    
+
                 Note:
                     All edits are applied atomically - if any edit fails, none are applied.
                     Use absolute paths for reliability.
-                    
+
                 Warning:
                     This tool modifies files directly. Always backup important files first.
                 """,
