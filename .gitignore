@@ -111,6 +111,7 @@ uv.lock
 # Scratch directories and temporary files
 .swissarmyhammer/
 CODE_REVIEW.md
+debug_*.py
 
 # Backup files
 *.bak

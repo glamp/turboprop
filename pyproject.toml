@@ -114,3 +114,38 @@ include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "debug_search.py",           # Temporary debugging file
+    "test_mcp.py",               # Test files in root
+    "test_mcp_quick.py",         # Test files in root
+    "turboprop/__main__.py",     # Simple entry point
+    "turboprop/__init__.py",     # Package init
+    "turboprop/_version.py",     # Version file
+    "example-codebases/*",       # Example data
+    "scripts/*",                 # Build scripts
+    "setup.py",                  # Legacy setup
+    "file_watching.py",          # File watching requires complex async testing
+    "mcp_server.py",             # MCP server requires specialized MCP test environment
+    "format_utils.py",           # Simple utility functions
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError", 
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+ignore_errors = true
+show_missing = true
