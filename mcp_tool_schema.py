@@ -8,12 +8,12 @@ migration utilities for safe database schema evolution.
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from uuid import uuid4
 
 import duckdb
 
-from config import config
+from config import EmbeddingConfig
 from exceptions import DatabaseError, DatabaseMigrationError
 from logging_config import get_logger
 
@@ -29,7 +29,7 @@ class MCPToolSchema:
     @staticmethod
     def get_mcp_tools_table_sql() -> str:
         """Get the SQL for creating the mcp_tools table."""
-        return """
+        return f"""
         CREATE TABLE IF NOT EXISTS mcp_tools (
             id VARCHAR PRIMARY KEY,           -- Tool identifier (e.g., 'bash', 'read', 'custom_tool')
             name VARCHAR NOT NULL,            -- Display name
@@ -38,7 +38,7 @@ class MCPToolSchema:
             provider VARCHAR,                -- Tool provider/source
             version VARCHAR,                 -- Tool version if available
             category VARCHAR,                -- 'file_ops', 'web', 'analysis', etc.
-            embedding DOUBLE[384],           -- Semantic embedding of description
+            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],           -- Semantic embedding of description
             metadata_json TEXT,              -- Additional metadata as JSON
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -49,7 +49,7 @@ class MCPToolSchema:
     @staticmethod
     def get_tool_parameters_table_sql() -> str:
         """Get the SQL for creating the tool_parameters table."""
-        return """
+        return f"""
         CREATE TABLE IF NOT EXISTS tool_parameters (
             id VARCHAR PRIMARY KEY,
             tool_id VARCHAR NOT NULL,
@@ -59,7 +59,7 @@ class MCPToolSchema:
             description TEXT,
             default_value TEXT,
             schema_json TEXT,                -- Full JSON schema
-            embedding DOUBLE[384],           -- Embedding of parameter description
+            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],           -- Embedding of parameter description
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -67,7 +67,7 @@ class MCPToolSchema:
     @staticmethod
     def get_tool_examples_table_sql() -> str:
         """Get the SQL for creating the tool_examples table."""
-        return """
+        return f"""
         CREATE TABLE IF NOT EXISTS tool_examples (
             id VARCHAR PRIMARY KEY,
             tool_id VARCHAR NOT NULL,
@@ -75,7 +75,7 @@ class MCPToolSchema:
             example_call TEXT,               -- Example tool invocation
             expected_output TEXT,            -- Expected response/output
             context TEXT,                    -- When to use this pattern
-            embedding DOUBLE[384],           -- Embedding of use case + context
+            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],           -- Embedding of use case + context
             effectiveness_score FLOAT DEFAULT 0.0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -129,7 +129,7 @@ class MCPToolSchema:
 class MCPToolMigration:
     """Handles database migrations for MCP tool schema."""
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager: "DatabaseManager") -> None:
         """Initialize migration manager with database manager."""
         self.db_manager = db_manager
         self.migrations_dir = Path(__file__).parent / "migrations"
@@ -145,7 +145,7 @@ class MCPToolMigration:
                 result = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
 
                 return result[0] if result and result[0] is not None else 0
-        except Exception as e:
+        except (duckdb.Error, DatabaseError, DatabaseMigrationError) as e:
             logger.warning("Failed to get schema version, assuming version 0: %s", e)
             return 0
 
@@ -271,6 +271,78 @@ class MCPToolMigration:
             migration_sql=migration_sql,
         )
 
+    def _validate_required_tables(self, conn, validation_results: Dict[str, Any]) -> None:
+        """Validate that all required tables exist and get their row counts."""
+        required_tables = ["mcp_tools", "tool_parameters", "tool_examples", "tool_relationships"]
+
+        for table in required_tables:
+            try:
+                result = conn.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", (table,)
+                ).fetchone()
+
+                if not result or result[0] == 0:
+                    validation_results["errors"].append(f"Required table {table} does not exist")
+                    validation_results["valid"] = False
+                else:
+                    # Get row count for the table
+                    count_result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+                    validation_results["table_counts"][table] = count_result[0] if count_result else 0
+
+            except Exception as e:
+                validation_results["errors"].append(f"Error checking table {table}: {e}")
+                validation_results["valid"] = False
+
+    def _validate_orphaned_parameters(self, conn, validation_results: Dict[str, Any]) -> None:
+        """Check for orphaned tool parameters that reference non-existent tools."""
+        orphaned_params = conn.execute(
+            """
+            SELECT COUNT(*) FROM tool_parameters tp
+            LEFT JOIN mcp_tools mt ON tp.tool_id = mt.id
+            WHERE mt.id IS NULL
+            """
+        ).fetchone()
+
+        if orphaned_params and orphaned_params[0] > 0:
+            validation_results["warnings"].append(f"Found {orphaned_params[0]} orphaned tool parameters")
+
+    def _validate_orphaned_examples(self, conn, validation_results: Dict[str, Any]) -> None:
+        """Check for orphaned tool examples that reference non-existent tools."""
+        orphaned_examples = conn.execute(
+            """
+            SELECT COUNT(*) FROM tool_examples te
+            LEFT JOIN mcp_tools mt ON te.tool_id = mt.id
+            WHERE mt.id IS NULL
+            """
+        ).fetchone()
+
+        if orphaned_examples and orphaned_examples[0] > 0:
+            validation_results["warnings"].append(f"Found {orphaned_examples[0]} orphaned tool examples")
+
+    def _validate_orphaned_relationships(self, conn, validation_results: Dict[str, Any]) -> None:
+        """Check for orphaned tool relationships that reference non-existent tools."""
+        orphaned_relationships = conn.execute(
+            """
+            SELECT COUNT(*) FROM tool_relationships tr
+            LEFT JOIN mcp_tools mta ON tr.tool_a_id = mta.id
+            LEFT JOIN mcp_tools mtb ON tr.tool_b_id = mtb.id
+            WHERE mta.id IS NULL OR mtb.id IS NULL
+            """
+        ).fetchone()
+
+        if orphaned_relationships and orphaned_relationships[0] > 0:
+            validation_results["warnings"].append(f"Found {orphaned_relationships[0]} orphaned tool relationships")
+
+    def _validate_foreign_key_constraints(self, conn, validation_results: Dict[str, Any]) -> None:
+        """Validate all foreign key constraints."""
+        try:
+            self._validate_orphaned_parameters(conn, validation_results)
+            self._validate_orphaned_examples(conn, validation_results)
+            self._validate_orphaned_relationships(conn, validation_results)
+        except Exception as e:
+            validation_results["errors"].append(f"Error checking foreign key constraints: {e}")
+            validation_results["valid"] = False
+
     def validate_schema_integrity(self) -> Dict[str, Any]:
         """
         Validate the integrity of the MCP tool schema.
@@ -287,71 +359,8 @@ class MCPToolMigration:
 
         try:
             with self.db_manager.get_connection() as conn:
-                # Check if all required tables exist
-                required_tables = ["mcp_tools", "tool_parameters", "tool_examples", "tool_relationships"]
-
-                for table in required_tables:
-                    try:
-                        result = conn.execute(
-                            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", (table,)
-                        ).fetchone()
-
-                        if not result or result[0] == 0:
-                            validation_results["errors"].append(f"Required table {table} does not exist")
-                            validation_results["valid"] = False
-                        else:
-                            # Get row count for the table
-                            count_result = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
-                            validation_results["table_counts"][table] = count_result[0] if count_result else 0
-
-                    except Exception as e:
-                        validation_results["errors"].append(f"Error checking table {table}: {e}")
-                        validation_results["valid"] = False
-
-                # Check foreign key constraints
-                try:
-                    # Verify tool_parameters references exist
-                    orphaned_params = conn.execute(
-                        """
-                        SELECT COUNT(*) FROM tool_parameters tp
-                        LEFT JOIN mcp_tools mt ON tp.tool_id = mt.id
-                        WHERE mt.id IS NULL
-                    """
-                    ).fetchone()
-
-                    if orphaned_params and orphaned_params[0] > 0:
-                        validation_results["warnings"].append(f"Found {orphaned_params[0]} orphaned tool parameters")
-
-                    # Verify tool_examples references exist
-                    orphaned_examples = conn.execute(
-                        """
-                        SELECT COUNT(*) FROM tool_examples te
-                        LEFT JOIN mcp_tools mt ON te.tool_id = mt.id
-                        WHERE mt.id IS NULL
-                    """
-                    ).fetchone()
-
-                    if orphaned_examples and orphaned_examples[0] > 0:
-                        validation_results["warnings"].append(f"Found {orphaned_examples[0]} orphaned tool examples")
-
-                    # Verify tool_relationships references exist
-                    orphaned_relationships = conn.execute(
-                        """
-                        SELECT COUNT(*) FROM tool_relationships tr
-                        LEFT JOIN mcp_tools mta ON tr.tool_a_id = mta.id
-                        LEFT JOIN mcp_tools mtb ON tr.tool_b_id = mtb.id
-                        WHERE mta.id IS NULL OR mtb.id IS NULL
-                    """
-                    ).fetchone()
-
-                    if orphaned_relationships and orphaned_relationships[0] > 0:
-                        validation_results["warnings"].append(
-                            f"Found {orphaned_relationships[0]} orphaned tool relationships"
-                        )
-
-                except Exception as e:
-                    validation_results["errors"].append(f"Error checking foreign key constraints: {e}")
-                    validation_results["valid"] = False
+                self._validate_required_tables(conn, validation_results)
+                self._validate_foreign_key_constraints(conn, validation_results)
 
         except Exception as e:
             validation_results["errors"].append(f"General validation error: {e}")
@@ -407,8 +416,10 @@ def validate_tool_metadata(tool_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
     if "embedding" in tool_data and tool_data["embedding"]:
         if not isinstance(tool_data["embedding"], list):
             errors.append("Embedding must be a list of numbers")
-        elif len(tool_data["embedding"]) != 384:
-            errors.append(f"Embedding must have exactly 384 dimensions, got {len(tool_data['embedding'])}")
+        elif len(tool_data["embedding"]) != EmbeddingConfig.DIMENSIONS:
+            errors.append(
+                f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {len(tool_data['embedding'])}"
+            )
 
     # Validate JSON fields
     if "metadata_json" in tool_data and tool_data["metadata_json"]:
@@ -457,7 +468,9 @@ def validate_parameter_metadata(param_data: Dict[str, Any]) -> Tuple[bool, List[
     if "embedding" in param_data and param_data["embedding"]:
         if not isinstance(param_data["embedding"], list):
             errors.append("Embedding must be a list of numbers")
-        elif len(param_data["embedding"]) != 384:
-            errors.append(f"Embedding must have exactly 384 dimensions, got {len(param_data['embedding'])}")
+        elif len(param_data["embedding"]) != EmbeddingConfig.DIMENSIONS:
+            errors.append(
+                f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {len(param_data['embedding'])}"
+            )
 
     return len(errors) == 0, errors

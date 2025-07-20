@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, TextIO
 
 import duckdb
 
-from config import config
+from config import EmbeddingConfig, config
 from exceptions import (
     DatabaseConnectionTimeoutError,
     DatabaseCorruptionError,
@@ -207,25 +207,25 @@ class DatabaseManager:
             pass
 
     @property
-    def _connections(self):
+    def _connections(self) -> Dict[int, Any]:
         """Access to connection manager's connections for testing."""
         return self._connection_manager._connections
 
     @property
-    def _connection_created_time(self):
+    def _connection_created_time(self) -> Dict[int, float]:
         """Access to connection manager's creation times for testing."""
         return self._connection_manager._connection_created_time
 
     @property
-    def _connection_last_used(self):
+    def _connection_last_used(self) -> Dict[int, float]:
         """Access to connection manager's last used times for testing."""
         return self._connection_manager._connection_last_used
 
-    def _check_connection_health(self, conn):
+    def _check_connection_health(self, conn: Any) -> bool:
         """Check if a connection is healthy - delegates to connection manager."""
         return self._connection_manager._check_connection_health(conn)
 
-    def _signal_handler(self, signum, frame):
+    def _signal_handler(self, signum: int, frame: Any) -> None:
         """Handle termination signals gracefully."""
         self.cleanup()
         sys.exit(0)
@@ -306,9 +306,16 @@ class DatabaseManager:
 
             try:
                 yield conn
-            except (DatabaseError, DatabaseMigrationError, DatabaseConnectionTimeoutError, 
-                    DatabaseCorruptionError, DatabaseDiskSpaceError, DatabaseLockError, 
-                    DatabasePermissionError, DatabaseTimeoutError) as e:
+            except (
+                DatabaseError,
+                DatabaseMigrationError,
+                DatabaseConnectionTimeoutError,
+                DatabaseCorruptionError,
+                DatabaseDiskSpaceError,
+                DatabaseLockError,
+                DatabasePermissionError,
+                DatabaseTimeoutError,
+            ) as e:
                 # These are already properly typed database exceptions, let them bubble up
                 logger.error("Database operation failed: %s", e)
                 raise
@@ -402,7 +409,7 @@ class DatabaseManager:
         """Close all connections - compatibility method for tests."""
         self.cleanup()
 
-    def __enter__(self):
+    def __enter__(self) -> "DatabaseManager":
         return self
 
     def migrate_schema(self, table_name: str) -> None:
@@ -479,7 +486,7 @@ class DatabaseManager:
         """
         logger.info("Creating code_constructs table")
 
-        create_table_sql = """
+        create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS code_constructs (
             id VARCHAR PRIMARY KEY,
             file_id VARCHAR NOT NULL,
@@ -490,7 +497,7 @@ class DatabaseManager:
             signature TEXT,
             docstring TEXT,
             parent_construct_id VARCHAR,
-            embedding DOUBLE[384],
+            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -517,6 +524,61 @@ class DatabaseManager:
             logger.error("Failed to create code_constructs table: %s", e)
             raise DatabaseError(f"Failed to create code_constructs table: {e}") from e
 
+    def _load_fts_extension(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Load the FTS extension if not already loaded."""
+        try:
+            conn.execute("LOAD fts")
+            logger.debug("FTS extension loaded")
+        except duckdb.Error as e:
+            if "already loaded" not in str(e).lower():
+                logger.warning("FTS extension load failed: %s", e)
+
+    def _drop_existing_fts_table(self, conn: duckdb.DuckDBPyConnection, fts_table_name: str) -> None:
+        """Drop existing FTS table if it exists."""
+        try:
+            conn.execute(f"DROP TABLE IF EXISTS {fts_table_name}")
+        except duckdb.Error:
+            pass
+
+    def _create_fts_index_pragma(self, conn: duckdb.DuckDBPyConnection, fts_table_name: str, table_name: str) -> bool:
+        """
+        Try to create FTS index using PRAGMA syntax.
+
+        Returns:
+            True if successful, False if failed
+        """
+        fts_create_sql = f"PRAGMA create_fts_index('{fts_table_name}', '{table_name}', 'content')"
+
+        try:
+            conn.execute(fts_create_sql)
+            logger.info("Successfully created FTS index %s", fts_table_name)
+            return True
+        except duckdb.Error as e:
+            logger.warning("PRAGMA FTS creation failed: %s. Trying alternative approach.", e)
+            return False
+
+    def _create_alternative_fts_table(
+        self, conn: duckdb.DuckDBPyConnection, fts_table_name: str, table_name: str
+    ) -> None:
+        """Create alternative FTS table and indexes when PRAGMA approach fails."""
+        # Create a separate FTS table manually
+        fts_create_alt = f"""
+        CREATE TABLE IF NOT EXISTS {fts_table_name} AS
+        SELECT id, path, content
+        FROM {table_name}
+        WHERE content IS NOT NULL
+        """
+        conn.execute(fts_create_alt)
+
+        # Create indexes for text search on the FTS table
+        index_sql = (
+            f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content "
+            f"ON {fts_table_name} USING gin(to_tsvector('english', content))"
+        )
+        conn.execute(index_sql)
+
+        logger.info("Created alternative FTS table %s with text indexes", fts_table_name)
+
     def create_fts_index(self, table_name: str = "code_files") -> None:
         """
         Create full-text search index for file content using DuckDB's FTS extension.
@@ -528,55 +590,16 @@ class DatabaseManager:
             table_name: Name of the table to create FTS index for (default: code_files)
         """
         logger.info("Creating full-text search index for table %s", table_name)
+        fts_table_name = f"{table_name}_fts"
 
         try:
             with self.get_connection() as conn:
-                # Load the FTS extension if not already loaded
-                try:
-                    conn.execute("LOAD fts")
-                    logger.debug("FTS extension loaded")
-                except duckdb.Error as e:
-                    if "already loaded" not in str(e).lower():
-                        logger.warning("FTS extension load failed: %s", e)
+                self._load_fts_extension(conn)
+                self._drop_existing_fts_table(conn, fts_table_name)
 
-                # Create FTS index on content column
-                # This creates a virtual table for full-text search
-                fts_table_name = f"{table_name}_fts"
-
-                # Drop existing FTS table if it exists
-                try:
-                    conn.execute(f"DROP TABLE IF EXISTS {fts_table_name}")
-                except duckdb.Error:
-                    pass
-
-                # Create FTS virtual table
-                # Note: DuckDB FTS syntax may vary from SQLite, adjust as needed
-                fts_create_sql = f"""
-                PRAGMA create_fts_index('{fts_table_name}', '{table_name}', 'content')
-                """
-
-                try:
-                    conn.execute(fts_create_sql)
-                    logger.info("Successfully created FTS index %s", fts_table_name)
-                except duckdb.Error as e:
-                    # If PRAGMA syntax doesn't work, try alternative approach
-                    logger.warning("PRAGMA FTS creation failed: %s. Trying alternative approach.", e)
-
-                    # Alternative: Create a separate FTS table manually
-                    fts_create_alt = f"""
-                    CREATE TABLE IF NOT EXISTS {fts_table_name} AS
-                    SELECT id, path, content
-                    FROM {table_name}
-                    WHERE content IS NOT NULL
-                    """
-                    conn.execute(fts_create_alt)
-
-                    # Create indexes for text search on the FTS table
-                    conn.execute(
-                        f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content ON {fts_table_name} USING gin(to_tsvector('english', content))"
-                    )
-
-                    logger.info("Created alternative FTS table %s with text indexes", fts_table_name)
+                # Try PRAGMA approach first, fallback to alternative if it fails
+                if not self._create_fts_index_pragma(conn, fts_table_name, table_name):
+                    self._create_alternative_fts_table(conn, fts_table_name, table_name)
 
         except Exception as e:
             logger.error("Failed to create FTS index: %s", e)
@@ -1078,7 +1101,7 @@ class DatabaseManager:
         except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to update repository context indexed time: %s", e)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Optional[Any]) -> None:
         self.cleanup()
 
     # MCP Tool-specific operations
@@ -1155,7 +1178,7 @@ class DatabaseManager:
                 conn.execute(
                     """
                     INSERT INTO mcp_tools
-                    (id, name, description, tool_type, provider, version, category, 
+                    (id, name, description, tool_type, provider, version, category,
                      embedding, metadata_json, is_active, last_updated)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (id) DO UPDATE SET
@@ -1222,7 +1245,7 @@ class DatabaseManager:
                 conn.execute(
                     """
                     INSERT INTO tool_parameters
-                    (id, tool_id, parameter_name, parameter_type, is_required, 
+                    (id, tool_id, parameter_name, parameter_type, is_required,
                      description, default_value, schema_json, embedding)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (id) DO UPDATE SET
@@ -1281,7 +1304,7 @@ class DatabaseManager:
                 conn.execute(
                     """
                     INSERT INTO tool_examples
-                    (id, tool_id, use_case, example_call, expected_output, 
+                    (id, tool_id, use_case, example_call, expected_output,
                      context, embedding, effectiveness_score)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (id) DO UPDATE SET
@@ -1461,6 +1484,38 @@ class DatabaseManager:
             logger.error("Failed to get related tools for %s: %s", tool_id, e)
             return []
 
+    def _build_embedding_search_query(self, table_name: str, filters: Dict[str, Any], limit: int) -> tuple[str, list]:
+        """
+        Build SQL query and parameters for embedding-based search.
+
+        Args:
+            table_name: Table to search in
+            filters: Dictionary of filter conditions
+            limit: Result limit
+
+        Returns:
+            Tuple of (query_string, parameters_list)
+        """
+        base_query = f"""
+            SELECT *,
+                   list_dot_product(embedding, ?) as similarity_score
+            FROM {table_name}
+            WHERE embedding IS NOT NULL
+        """
+
+        params = [filters.pop("query_embedding")]  # Always first parameter
+
+        # Add dynamic filters
+        for column, value in filters.items():
+            if value is not None:
+                base_query += f" AND {column} = ?"
+                params.append(value)
+
+        base_query += " ORDER BY similarity_score DESC LIMIT ?"
+        params.append(limit)
+
+        return base_query, params
+
     def search_mcp_tools_by_embedding(
         self,
         query_embedding: list,
@@ -1473,7 +1528,7 @@ class DatabaseManager:
         Search MCP tools using semantic similarity.
 
         Args:
-            query_embedding: 384-dimension query embedding
+            query_embedding: Query embedding vector
             limit: Maximum number of results to return
             category: Optional filter by category
             tool_type: Optional filter by tool type
@@ -1483,33 +1538,17 @@ class DatabaseManager:
             List of tool dictionaries with similarity scores
         """
         try:
+            filters = {
+                "query_embedding": query_embedding,
+                "is_active": is_active,
+                "category": category,
+                "tool_type": tool_type,
+            }
+
+            query, params = self._build_embedding_search_query("mcp_tools", filters, limit)
+
             with self.get_connection() as conn:
-                # Build query with optional filters
-                base_query = """
-                    SELECT *, 
-                           list_dot_product(embedding, ?) as similarity_score
-                    FROM mcp_tools 
-                    WHERE embedding IS NOT NULL
-                """
-
-                params = [query_embedding]
-
-                if is_active is not None:
-                    base_query += " AND is_active = ?"
-                    params.append(is_active)
-
-                if category:
-                    base_query += " AND category = ?"
-                    params.append(category)
-
-                if tool_type:
-                    base_query += " AND tool_type = ?"
-                    params.append(tool_type)
-
-                base_query += " ORDER BY similarity_score DESC LIMIT ?"
-                params.append(limit)
-
-                results = conn.execute(base_query, params).fetchall()
+                results = conn.execute(query, params).fetchall()
 
                 if results:
                     columns = [desc[0] for desc in conn.description]
