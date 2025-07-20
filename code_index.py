@@ -160,7 +160,8 @@ def init_db(repo_path: Path = None):
                     file_type VARCHAR,
                     language VARCHAR,
                     size_bytes INTEGER,
-                    line_count INTEGER
+                    line_count INTEGER,
+                    category VARCHAR
                 )
             """
             )

@@ -382,6 +382,7 @@ class DatabaseManager:
         - language VARCHAR - detected programming language
         - size_bytes INTEGER - file size in bytes
         - line_count INTEGER - number of lines in the file
+        - category VARCHAR - file category (source/configuration/documentation/build/etc.)
 
         Args:
             table_name: Name of the table to migrate
@@ -395,7 +396,8 @@ class DatabaseManager:
             'file_type': 'VARCHAR',
             'language': 'VARCHAR',
             'size_bytes': 'INTEGER',
-            'line_count': 'INTEGER'
+            'line_count': 'INTEGER',
+            'category': 'VARCHAR'
         }
 
         try:

@@ -22,6 +22,7 @@ from tqdm import tqdm
 
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
+from language_detection import LanguageDetector
 
 # Constants
 TABLE_NAME = "code_files"
@@ -40,6 +41,42 @@ def compute_id(text: str) -> str:
         A SHA-256 hash string
     """
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+def extract_file_metadata(file_path: Path, content: str) -> Dict[str, any]:
+    """
+    Extract metadata from a file including language detection and file statistics.
+    
+    Args:
+        file_path: Path to the file
+        content: Content of the file
+        
+    Returns:
+        Dictionary containing file metadata:
+        - file_type: File extension
+        - language: Detected programming language
+        - size_bytes: File size in bytes
+        - line_count: Number of lines in the file
+        - category: File category (source/configuration/documentation/build/etc.)
+    """
+    detector = LanguageDetector()
+    detection_result = detector.detect_language(str(file_path), content)
+    
+    # Count lines - handle edge cases properly
+    if not content:
+        line_count = 0
+    elif content.endswith('\n'):
+        line_count = content.count('\n')
+    else:
+        line_count = content.count('\n') + 1
+    
+    return {
+        "file_type": detection_result.file_type,
+        "language": detection_result.language,
+        "size_bytes": len(content),
+        "line_count": line_count,
+        "category": detection_result.category,
+    }
 
 
 def scan_repo(repo_path: Path, max_bytes: int) -> List[Path]:
@@ -190,7 +227,15 @@ def embed_and_store(
                 emb = embedder.encode(text)
                 # Get file modification time
                 file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
-                rows.append((uid, str(path), text, emb.tolist(), file_mtime))
+                
+                # Extract file metadata
+                metadata = extract_file_metadata(path, text)
+                
+                rows.append((
+                    uid, str(path), text, emb.tolist(), file_mtime,
+                    metadata["file_type"], metadata["language"], 
+                    metadata["size_bytes"], metadata["line_count"], metadata["category"]
+                ))
 
             except Exception as e:
                 print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
@@ -215,7 +260,8 @@ def embed_and_store(
             (
                 (
                     f"INSERT OR REPLACE INTO {TABLE_NAME} "
-                    f"(id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)"
+                    f"(id, path, content, embedding, file_mtime, file_type, language, size_bytes, line_count, category) "
+                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 ),
                 row,
             )
@@ -262,12 +308,18 @@ def embed_and_store_single(db_manager: DatabaseManager, embedder: EmbeddingGener
         emb = embedder.encode(text)
         # Get file modification time
         file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
+        
+        # Extract file metadata
+        metadata = extract_file_metadata(path, text)
 
         # Insert into database
         db_manager.execute_with_retry(
             f"INSERT OR REPLACE INTO {TABLE_NAME} "
-            f"(id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)",
-            (uid, str(path), text, emb.tolist(), file_mtime),
+            f"(id, path, content, embedding, file_mtime, file_type, language, size_bytes, line_count, category) "
+            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (uid, str(path), text, emb.tolist(), file_mtime,
+             metadata["file_type"], metadata["language"], 
+             metadata["size_bytes"], metadata["line_count"], metadata["category"]),
         )
         return True
 

@@ -57,7 +57,8 @@ class TestDatabaseMigration:
                     "file_type",
                     "language",
                     "size_bytes",
-                    "line_count"
+                    "line_count",
+                    "category"
                 ]
 
                 for col in expected_columns:
@@ -129,7 +130,8 @@ class TestDatabaseMigration:
                         file_type VARCHAR,
                         language VARCHAR,
                         size_bytes INTEGER,
-                        line_count INTEGER
+                        line_count INTEGER,
+                        category VARCHAR
                     )
                 """
                 )
@@ -155,7 +157,8 @@ class TestDatabaseMigration:
                     "file_type",
                     "language",
                     "size_bytes",
-                    "line_count"
+                    "line_count",
+                    "category"
                 ]
 
                 assert len(column_names) == len(expected_columns), "Should not have duplicate columns"

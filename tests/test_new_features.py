@@ -121,7 +121,8 @@ class TestRemoveOrphanedFiles:
                 file_type VARCHAR,
                 language VARCHAR,
                 size_bytes INTEGER,
-                line_count INTEGER
+                line_count INTEGER,
+                category VARCHAR
             )
         """
         )
@@ -131,13 +132,13 @@ class TestRemoveOrphanedFiles:
 
         # Insert some test data with full schema
         test_data = [
-            ("id1", "/path/to/existing.py", "code1", [0.1] * 384, None, None, ".py", "python", 100, 10),
-            ("id2", "/path/to/deleted.py", "code2", [0.2] * 384, None, None, ".py", "python", 200, 20),
-            ("id3", "/path/to/another_existing.py", "code3", [0.3] * 384, None, None, ".py", "python", 300, 30),
+            ("id1", "/path/to/existing.py", "code1", [0.1] * 384, None, None, ".py", "python", 100, 10, "source"),
+            ("id2", "/path/to/deleted.py", "code2", [0.2] * 384, None, None, ".py", "python", 200, 20, "source"),
+            ("id3", "/path/to/another_existing.py", "code3", [0.3] * 384, None, None, ".py", "python", 300, 30, "source"),
         ]
 
         for data in test_data:
-            self.db_manager.execute_with_retry(f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", data)
+            self.db_manager.execute_with_retry(f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", data)
 
     def teardown_method(self):
         """Clean up test environment."""
@@ -233,7 +234,8 @@ class TestEnhancedReindexAll:
                 file_type VARCHAR,
                 language VARCHAR,
                 size_bytes INTEGER,
-                line_count INTEGER
+                line_count INTEGER,
+                category VARCHAR
             )
         """
         )
@@ -253,7 +255,7 @@ class TestEnhancedReindexAll:
         """Test that reindex_all removes orphaned files."""
         # First, manually add an orphaned entry
         self.db_manager.execute_with_retry(
-            f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO {TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 "orphan_id",
                 str(self.repo_path / "deleted.py"),
@@ -265,6 +267,7 @@ class TestEnhancedReindexAll:
                 "python",
                 100,
                 10,
+                "source",
             ),
         )
 
