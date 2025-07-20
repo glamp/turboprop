@@ -35,10 +35,10 @@ class TestIDEIntegration(unittest.TestCase):
         urls = self.ide_integration.generate_navigation_urls(
             self.test_file_path, self.test_line, self.test_column
         )
-        
+
         # Should always return at least the generic file:// URL
         self.assertGreater(len(urls), 0)
-        
+
         # Check that generic URL is always present
         generic_urls = [url for url in urls if url.ide_type == IDEType.GENERIC]
         self.assertEqual(len(generic_urls), 1)
@@ -50,10 +50,10 @@ class TestIDEIntegration(unittest.TestCase):
             urls = self.ide_integration.generate_navigation_urls(
                 self.test_file_path, self.test_line, self.test_column
             )
-            
+
             vscode_urls = [url for url in urls if url.ide_type == IDEType.VSCODE]
             self.assertGreater(len(vscode_urls), 0)
-            
+
             vscode_url = vscode_urls[0]
             expected = f"vscode://file/{Path(self.test_file_path).resolve()}:{self.test_line}:{self.test_column}"
             self.assertEqual(vscode_url.url, expected)
@@ -65,7 +65,7 @@ class TestIDEIntegration(unittest.TestCase):
             urls = self.ide_integration.generate_navigation_urls(
                 self.test_file_path, self.test_line, self.test_column
             )
-            
+
             jetbrains_urls = [url for url in urls if url.ide_type == IDEType.JETBRAINS]
             if jetbrains_urls:  # Only test if JetBrains URLs are generated
                 jetbrains_url = jetbrains_urls[0]
@@ -80,7 +80,7 @@ class TestIDEIntegration(unittest.TestCase):
             urls = self.ide_integration.generate_navigation_urls(
                 self.test_file_path, self.test_line
             )
-            
+
             vim_urls = [url for url in urls if url.ide_type in [IDEType.VIM, IDEType.NEOVIM]]
             if vim_urls:  # Only test if Vim URLs are generated
                 vim_url = vim_urls[0]
@@ -93,7 +93,7 @@ class TestIDEIntegration(unittest.TestCase):
         """Test successful IDE availability detection."""
         # Mock successful command execution
         mock_subprocess.return_value = MagicMock(returncode=0)
-        
+
         result = self.ide_integration._check_command_exists(['code'])
         self.assertTrue(result)
         mock_subprocess.assert_called()
@@ -103,7 +103,7 @@ class TestIDEIntegration(unittest.TestCase):
         """Test failed IDE availability detection."""
         # Mock failed command execution
         mock_subprocess.side_effect = subprocess.CalledProcessError(1, 'which')
-        
+
         result = self.ide_integration._check_command_exists(['nonexistent-editor'])
         self.assertFalse(result)
 
@@ -111,7 +111,7 @@ class TestIDEIntegration(unittest.TestCase):
         """Test basic path normalization."""
         test_path = "./relative/path/file.py"
         normalized = self.ide_integration.normalize_path(test_path)
-        
+
         # Should return absolute path
         self.assertTrue(Path(normalized).is_absolute())
         self.assertIn("file.py", normalized)
@@ -121,10 +121,10 @@ class TestIDEIntegration(unittest.TestCase):
         """Test WSL path normalization on Windows."""
         mock_platform.return_value = "Windows"
         self.ide_integration.platform = "windows"
-        
+
         wsl_path = "/mnt/c/Users/test/project/file.py"
         normalized = self.ide_integration.normalize_path(wsl_path)
-        
+
         # Should convert WSL path to Windows path
         self.assertTrue(normalized.startswith("C:"))
         self.assertIn("file.py", normalized)
@@ -142,7 +142,7 @@ class TestIDEIntegration(unittest.TestCase):
             ("/path/README.md", "markdown"),
             ("/path/unknown.xyz", "plaintext"),
         ]
-        
+
         for file_path, expected_language in test_cases:
             with self.subTest(file_path=file_path):
                 language = self.ide_integration.get_language_from_extension(file_path)
@@ -157,14 +157,14 @@ class TestIDEIntegration(unittest.TestCase):
 
 class TestClass:
     pass'''
-        
+
         hints = self.ide_integration.generate_syntax_hints(
             "test.py", python_code, target_line=1
         )
-        
+
         # Should detect at least some keywords
         self.assertGreater(len(hints), 0)
-        
+
         # Check for function keyword detection
         keyword_hints = [h for h in hints if h.token_type == "keyword"]
         self.assertGreater(len(keyword_hints), 0)
@@ -180,18 +180,18 @@ class TestClass:
 class TestClass {
     constructor() {}
 }'''
-        
+
         hints = self.ide_integration.generate_syntax_hints(
             "test.js", js_code, target_line=1
         )
-        
+
         # Should detect keywords and comments
         self.assertGreater(len(hints), 0)
-        
+
         # Check for keyword detection
         keyword_hints = [h for h in hints if h.token_type == "keyword"]
         comment_hints = [h for h in hints if h.token_type == "comment"]
-        
+
         # Should have at least some syntax elements
         self.assertGreater(len(keyword_hints) + len(comment_hints), 0)
 
@@ -213,21 +213,21 @@ class TestClass {
                     is_available=True
                 )
             ]
-            
+
             actions = self.ide_integration.create_mcp_navigation_actions(
                 self.test_file_path, self.test_line
             )
-            
+
             # Check structure
             self.assertIn("navigation_urls", actions)
             self.assertIn("file_info", actions)
-            
+
             # Check navigation URLs
             nav_urls = actions["navigation_urls"]
             self.assertEqual(len(nav_urls), 2)
             self.assertEqual(nav_urls[0]["ide"], "VS Code")
             self.assertTrue(nav_urls[0]["available"])
-            
+
             # Check file info
             file_info = actions["file_info"]
             self.assertIn("path", file_info)
@@ -242,7 +242,7 @@ class TestClass {
             mock_method.return_value = []
             get_ide_navigation_urls(self.test_file_path, self.test_line)
             mock_method.assert_called_once_with(self.test_file_path, self.test_line)
-        
+
         # Test get_mcp_navigation_actions
         with patch.object(IDEIntegration, 'create_mcp_navigation_actions') as mock_method:
             mock_method.return_value = {}
@@ -263,7 +263,7 @@ class TestSyntaxHighlightingHint(unittest.TestCase):
             start_column=0,
             end_column=3
         )
-        
+
         self.assertEqual(hint.language, "python")
         self.assertEqual(hint.token_type, "keyword")
         self.assertEqual(hint.start_line, 1)
@@ -283,7 +283,7 @@ class TestIDENavigationUrl(unittest.TestCase):
             display_name="VS Code",
             is_available=True
         )
-        
+
         self.assertEqual(url.ide_type, IDEType.VSCODE)
         self.assertEqual(url.url, "vscode://file/test.py:42")
         self.assertEqual(url.display_name, "VS Code")
@@ -303,11 +303,11 @@ class TestCrossPlatformCompatibility(unittest.TestCase):
         mock_platform.return_value = "Darwin"
         integration = IDEIntegration()
         self.assertEqual(integration.platform, "darwin")
-        
+
         mock_platform.return_value = "Windows"
         integration = IDEIntegration()
         self.assertEqual(integration.platform, "windows")
-        
+
         mock_platform.return_value = "Linux"
         integration = IDEIntegration()
         self.assertEqual(integration.platform, "linux")
@@ -316,7 +316,7 @@ class TestCrossPlatformCompatibility(unittest.TestCase):
         """Test that paths are properly resolved to absolute paths."""
         relative_path = "./test_file.py"
         urls = self.ide_integration.generate_navigation_urls(relative_path, 1)
-        
+
         # All URLs should contain absolute paths
         for url in urls:
             if url.ide_type != IDEType.GENERIC:  # Generic uses file:// which handles this differently

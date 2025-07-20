@@ -124,12 +124,12 @@ class CodeSearchResult:
     def generate_ide_navigation(self) -> None:
         """
         Generate IDE navigation URLs and actions for this search result.
-        
+
         This method populates the ide_navigation_urls and mcp_navigation_actions
         fields with data suitable for IDE integration.
         """
         primary_line = self.snippet.start_line
-        
+
         # Generate IDE navigation URLs
         nav_urls = get_ide_navigation_urls(self.file_path, primary_line)
         self.ide_navigation_urls = [
@@ -141,17 +141,17 @@ class CodeSearchResult:
             }
             for url in nav_urls
         ]
-        
+
         # Generate MCP navigation actions
         self.mcp_navigation_actions = get_mcp_navigation_actions(
-            self.file_path, 
+            self.file_path,
             primary_line
         )
 
-    def generate_syntax_hints(self, file_content: str = None) -> None:
+    def generate_syntax_hints(self, file_content: Optional[str] = None) -> None:
         """
         Generate syntax highlighting hints for this search result.
-        
+
         Args:
             file_content: Optional file content to analyze. If not provided,
                          will attempt to read the file from disk.
@@ -163,7 +163,7 @@ class CodeSearchResult:
             except (IOError, UnicodeDecodeError):
                 # If we can't read the file, skip syntax highlighting
                 return
-        
+
         from ide_integration import ide_integration
         self.syntax_highlighting_hints = ide_integration.generate_syntax_hints(
             self.file_path,

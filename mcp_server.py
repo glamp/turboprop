@@ -17,6 +17,7 @@ The server uses stdio transport for communication with MCP clients.
 """
 
 import argparse
+import logging
 import sys
 import threading
 from pathlib import Path
@@ -44,23 +45,27 @@ from embedding_helper import EmbeddingGenerator
 
 # Import enhanced search functionality
 from search_operations import (
-    search_index_enhanced,
-    format_enhanced_search_results,
     search_with_comprehensive_response,
     search_hybrid,
-    search_with_construct_focus,
     format_hybrid_search_results
 )
 from construct_search import ConstructSearchOperations, format_construct_search_results
 from mcp_response_types import (
-    SearchResponse, IndexResponse, StatusResponse,
-    create_search_response_from_results
+    SearchResponse, IndexResponse, StatusResponse
 )
-from search_result_types import CodeSearchResult
-from format_utils import convert_results_to_legacy_format, convert_legacy_to_enhanced_format
+# Removed unused imports: CodeSearchResult, convert_results_to_legacy_format, convert_legacy_to_enhanced_format
 
 # Global lock for database connection management
 _db_connection_lock: threading.Lock = threading.Lock()
+
+# Initialize logger for MCP server
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 # Initialize the MCP server
 mcp = FastMCP("🚀 Turboprop: Semantic Code Search & AI-Powered Discovery")
@@ -268,7 +273,7 @@ def search_code(query: str, max_results: int = None) -> str:
             formatted_results.append(f"{i}. {path}")
             formatted_results.append(f"   Similarity: {similarity_pct:.1f}%")
             formatted_results.append(f"   Preview: {snippet.strip()[:config.file_processing.PREVIEW_LENGTH]}" "...")
-            
+
             # Add IDE navigation URLs for enhanced user experience
             from ide_integration import get_ide_navigation_urls
             nav_urls = get_ide_navigation_urls(path, 1)  # Use line 1 as default
@@ -276,7 +281,7 @@ def search_code(query: str, max_results: int = None) -> str:
                 # Show the first available IDE navigation URL
                 primary_url = next((url for url in nav_urls if url.is_available), nav_urls[0])
                 formatted_results.append(f"   🔗 Open in {primary_url.display_name}: {primary_url.url}")
-            
+
             formatted_results.append("")
 
         return "\n".join(formatted_results)
@@ -427,7 +432,7 @@ def index_repository_structured(
             error_response = IndexResponse(
                 operation="index",
                 status="failed",
-                message=f"Repository path does not exist",
+                message="Repository path does not exist",
                 repository_path=repository_path,
                 execution_time=time.time() - start_time
             )
@@ -438,7 +443,7 @@ def index_repository_structured(
             error_response = IndexResponse(
                 operation="index",
                 status="failed",
-                message=f"Path is not a directory",
+                message="Path is not a directory",
                 repository_path=repository_path,
                 execution_time=time.time() - start_time
             )
@@ -979,35 +984,35 @@ def list_indexed_files(limit: int = 20) -> str:
 def search_functions(query: str, max_results: int = None) -> str:
     """
     🔧 TURBOPROP: Search functions and methods semantically (CONSTRUCT-LEVEL SEARCH!)
-    
+
     FIND FUNCTIONS BY MEANING! This performs construct-level semantic search specifically
     for functions and methods, providing much more precise results than file-level search.
-    
+
     🎯 SPECIALIZED SEARCH FOR:
     • Function definitions (def, function, async def)
-    • Class methods and static methods  
+    • Class methods and static methods
     • Arrow functions and lambda expressions
     • Function signatures and parameters
     • Function docstrings and documentation
-    
+
     💡 EXAMPLES:
     • "password validation function" - Find functions that validate passwords
     • "async database query method" - Find async methods that query databases
     • "error handling function" - Find functions that handle errors
     • "HTTP request handler" - Find functions that handle HTTP requests
     • "data transformation function" - Find functions that transform data
-    
+
     🏆 ADVANTAGES:
     • More precise than file-level search
     • Shows function signatures and docstrings
     • Includes parent class context for methods
     • Filters out non-function code constructs
     • Better relevance ranking for function-specific queries
-    
+
     Args:
         query: Natural language description of the function you're looking for
         max_results: Maximum number of results to return (optional - uses configured default)
-        
+
     Returns:
         Formatted list of matching functions with signatures, locations, and context
     """
@@ -1015,22 +1020,22 @@ def search_functions(query: str, max_results: int = None) -> str:
         # Use default max results if not provided
         if max_results is None:
             max_results = config.search.DEFAULT_SEARCH_RESULTS
-        
+
         # Validate max_results
         max_results = max(1, min(max_results, config.search.MAX_SEARCH_RESULTS))
-        
+
         db_manager = get_db_connection()
         embedder = get_embedder()
-        
-        # Initialize construct search operations  
+
+        # Initialize construct search operations
         construct_ops = ConstructSearchOperations(db_manager, embedder)
-        
+
         # Search for functions and methods specifically
         construct_results = construct_ops.search_functions(query=query, k=max_results)
-        
+
         if not construct_results:
             return f"No function matches found for query: '{query}'"
-        
+
         # Format the results specifically for functions
         formatted_result = format_construct_search_results(
             results=construct_results,
@@ -1038,9 +1043,9 @@ def search_functions(query: str, max_results: int = None) -> str:
             show_signatures=True,
             show_docstrings=True
         )
-        
+
         return formatted_result
-        
+
     except Exception as e:
         logger.error(f"Error in search_functions for query '{query}': {e}")
         return f"❌ Function search failed for query '{query}': {e}"
@@ -1050,36 +1055,36 @@ def search_functions(query: str, max_results: int = None) -> str:
 def search_classes(query: str, max_results: int = None, include_methods: bool = True) -> str:
     """
     🏗️ TURBOPROP: Search classes semantically (CONSTRUCT-LEVEL SEARCH!)
-    
+
     FIND CLASSES BY MEANING! This performs construct-level semantic search specifically
     for class definitions, providing detailed information about classes and their methods.
-    
+
     🎯 SPECIALIZED SEARCH FOR:
     • Class definitions and declarations
     • Class inheritance and base classes
     • Class docstrings and documentation
     • Class methods and member functions
     • Abstract classes and interfaces
-    
+
     💡 EXAMPLES:
     • "user authentication class" - Find classes that handle user auth
-    • "database connection manager" - Find classes that manage DB connections  
+    • "database connection manager" - Find classes that manage DB connections
     • "HTTP client class" - Find classes for making HTTP requests
     • "data model class" - Find classes that represent data models
     • "exception handling class" - Find custom exception classes
-    
+
     🏆 ADVANTAGES:
     • Shows class signatures with inheritance
     • Includes class docstrings and documentation
     • Lists class methods when requested
     • Better relevance ranking for class-specific queries
     • Provides object-oriented code structure insights
-    
+
     Args:
         query: Natural language description of the class you're looking for
         max_results: Maximum number of results to return (optional - uses configured default)
         include_methods: Whether to show methods of found classes (default: True)
-        
+
     Returns:
         Formatted list of matching classes with signatures, methods, and context
     """
@@ -1087,22 +1092,22 @@ def search_classes(query: str, max_results: int = None, include_methods: bool = 
         # Use default max results if not provided
         if max_results is None:
             max_results = config.search.DEFAULT_SEARCH_RESULTS
-        
+
         # Validate max_results
         max_results = max(1, min(max_results, config.search.MAX_SEARCH_RESULTS))
-        
+
         db_manager = get_db_connection()
         embedder = get_embedder()
-        
-        # Initialize construct search operations  
+
+        # Initialize construct search operations
         construct_ops = ConstructSearchOperations(db_manager, embedder)
-        
+
         # Search for classes specifically
         class_results = construct_ops.search_classes(query=query, k=max_results)
-        
+
         if not class_results:
             return f"No class matches found for query: '{query}'"
-        
+
         # Format the results specifically for classes
         formatted_result = format_construct_search_results(
             results=class_results,
@@ -1110,11 +1115,11 @@ def search_classes(query: str, max_results: int = None, include_methods: bool = 
             show_signatures=True,
             show_docstrings=True
         )
-        
+
         # Add methods for each class if requested
         if include_methods and class_results:
             enhanced_lines = formatted_result.split('\n')
-            
+
             for class_result in class_results:
                 try:
                     # Find related methods for this class
@@ -1122,33 +1127,33 @@ def search_classes(query: str, max_results: int = None, include_methods: bool = 
                         construct_id=class_result.construct_id,
                         k=5  # Limit to top 5 methods per class
                     )
-                    
+
                     methods = [c for c in related_constructs if c.construct_type == 'method']
-                    
+
                     if methods:
                         # Find the position to insert method information
                         class_header = f"   📁 {class_result.file_path}:{class_result.start_line}"
                         try:
                             insert_idx = enhanced_lines.index(class_header) + 1
                             enhanced_lines.insert(insert_idx, f"   🔧 Methods ({len(methods)}):")
-                            
+
                             for method in methods[:3]:  # Show top 3 methods
                                 method_line = f"      • {method.name}() - line {method.start_line}"
                                 enhanced_lines.insert(insert_idx + 1, method_line)
                                 insert_idx += 1
-                                
+
                         except ValueError:
                             # Header not found, skip method insertion for this class
                             continue
-                            
+
                 except Exception as e:
                     logger.warning(f"Error adding methods for class {class_result.name}: {e}")
                     continue
-            
+
             formatted_result = '\n'.join(enhanced_lines)
-        
+
         return formatted_result
-        
+
     except Exception as e:
         logger.error(f"Error in search_classes for query '{query}': {e}")
         return f"❌ Class search failed for query '{query}': {e}"
@@ -1158,35 +1163,35 @@ def search_classes(query: str, max_results: int = None, include_methods: bool = 
 def search_imports(query: str, max_results: int = None) -> str:
     """
     📦 TURBOPROP: Search import statements semantically (CONSTRUCT-LEVEL SEARCH!)
-    
+
     FIND IMPORTS BY MEANING! This performs construct-level semantic search specifically
     for import statements, helping you understand dependencies and module usage.
-    
+
     🎯 SPECIALIZED SEARCH FOR:
     • Import statements (import, from...import)
     • Module and package imports
     • Third-party library imports
     • Relative and absolute imports
     • Import aliases and renaming
-    
+
     💡 EXAMPLES:
     • "database connection import" - Find imports for DB libraries
     • "HTTP request library" - Find imports for HTTP client libraries
     • "JSON parsing imports" - Find imports for JSON handling
     • "testing framework import" - Find imports for test frameworks
     • "async library imports" - Find imports for async/await libraries
-    
+
     🏆 ADVANTAGES:
     • Understand project dependencies
     • Find usage patterns of specific libraries
     • Identify import organization and structure
     • Better relevance ranking for import-specific queries
     • Track how modules are used across the codebase
-    
+
     Args:
         query: Natural language description of the imports you're looking for
         max_results: Maximum number of results to return (optional - uses configured default)
-        
+
     Returns:
         Formatted list of matching import statements with locations and context
     """
@@ -1194,22 +1199,22 @@ def search_imports(query: str, max_results: int = None) -> str:
         # Use default max results if not provided
         if max_results is None:
             max_results = config.search.DEFAULT_SEARCH_RESULTS
-        
+
         # Validate max_results
         max_results = max(1, min(max_results, config.search.MAX_SEARCH_RESULTS))
-        
+
         db_manager = get_db_connection()
         embedder = get_embedder()
-        
-        # Initialize construct search operations  
+
+        # Initialize construct search operations
         construct_ops = ConstructSearchOperations(db_manager, embedder)
-        
+
         # Search for imports specifically
         import_results = construct_ops.search_imports(query=query, k=max_results)
-        
+
         if not import_results:
             return f"No import matches found for query: '{query}'"
-        
+
         # Format the results specifically for imports
         formatted_result = format_construct_search_results(
             results=import_results,
@@ -1217,9 +1222,9 @@ def search_imports(query: str, max_results: int = None) -> str:
             show_signatures=True,
             show_docstrings=False  # Imports typically don't have docstrings
         )
-        
+
         return formatted_result
-        
+
     except Exception as e:
         logger.error(f"Error in search_imports for query '{query}': {e}")
         return f"❌ Import search failed for query '{query}': {e}"
@@ -1227,7 +1232,7 @@ def search_imports(query: str, max_results: int = None) -> str:
 
 @mcp.tool()
 def search_hybrid_constructs(
-    query: str, 
+    query: str,
     max_results: int = None,
     construct_weight: float = 0.7,
     file_weight: float = 0.3,
@@ -1235,37 +1240,37 @@ def search_hybrid_constructs(
 ) -> str:
     """
     🔀 TURBOPROP: Hybrid search combining files and constructs (BEST OF BOTH WORLDS!)
-    
+
     INTELLIGENT HYBRID SEARCH! This combines file-level and construct-level search
     results, intelligently merging and ranking them for comprehensive code discovery.
-    
+
     🎯 HYBRID SEARCH PROVIDES:
     • Best of file-level and construct-level search
     • Intelligent result merging and deduplication
     • Configurable weighting between search types
     • Rich construct context for file results
     • Enhanced relevance ranking
-    
+
     💡 EXAMPLES:
     • "authentication implementation" - Find both auth files and specific functions
     • "database query handling" - Find DB files and specific query functions
     • "error logging system" - Find logging files and specific error functions
     • "API endpoint handlers" - Find API files and specific handler functions
-    
+
     🏆 ADVANTAGES:
     • More comprehensive than single search type
     • Construct matches typically ranked higher for precision
     • File context provided for construct matches
     • Configurable search weighting
     • Better coverage for complex queries
-    
+
     Args:
         query: Natural language search query
         max_results: Maximum number of results to return (optional - uses configured default)
         construct_weight: Weight for construct matches (0.0-1.0, default: 0.7)
-        file_weight: Weight for file matches (0.0-1.0, default: 0.3)  
+        file_weight: Weight for file matches (0.0-1.0, default: 0.3)
         construct_types: Comma-separated construct types to filter (e.g., "function,class")
-        
+
     Returns:
         Formatted hybrid search results with rich construct context
     """
@@ -1273,22 +1278,22 @@ def search_hybrid_constructs(
         # Use default max results if not provided
         if max_results is None:
             max_results = config.search.DEFAULT_SEARCH_RESULTS
-        
+
         # Validate max_results
         max_results = max(1, min(max_results, config.search.MAX_SEARCH_RESULTS))
-        
+
         # Validate weights
         construct_weight = max(0.0, min(1.0, construct_weight))
         file_weight = max(0.0, min(1.0, file_weight))
-        
+
         # Parse construct types filter
         construct_types_list = None
         if construct_types:
             construct_types_list = [t.strip() for t in construct_types.split(',') if t.strip()]
-        
+
         db_manager = get_db_connection()
         embedder = get_embedder()
-        
+
         # Perform hybrid search
         hybrid_results = search_hybrid(
             db_manager=db_manager,
@@ -1299,19 +1304,19 @@ def search_hybrid_constructs(
             file_weight=file_weight,
             construct_types=construct_types_list
         )
-        
+
         if not hybrid_results:
             return f"No hybrid search results found for query: '{query}'"
-        
+
         # Format hybrid results with construct context
         formatted_result = format_hybrid_search_results(
             results=hybrid_results,
             query=query,
             show_construct_context=True
         )
-        
+
         return formatted_result
-        
+
     except Exception as e:
         logger.error(f"Error in search_hybrid_constructs for query '{query}': {e}")
         return f"❌ Hybrid search failed for query '{query}': {e}"
