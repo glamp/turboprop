@@ -46,7 +46,9 @@ from embedding_helper import EmbeddingGenerator
 # Import enhanced search functionality
 from search_operations import (
     search_with_comprehensive_response,
-    search_hybrid,
+    search_hybrid,  # Legacy construct hybrid search
+    search_with_hybrid_fusion,  # New semantic+text hybrid search
+    search_with_intelligent_routing,
     format_hybrid_search_results
 )
 from construct_search import ConstructSearchOperations, format_construct_search_results
@@ -377,6 +379,133 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             performance_notes=[f"Error in structured search: {str(e)}"]
         )
         return error_response.to_json()
+
+
+@mcp.tool()
+def search_code_hybrid(
+    query: str, 
+    search_mode: str = "auto",
+    max_results: int = None,
+    semantic_weight: float = 0.6,
+    text_weight: float = 0.4,
+    enable_advanced_features: bool = True
+) -> str:
+    """
+    🔀 TURBOPROP: Advanced hybrid search combining semantic + exact text matching!
+    
+    ULTIMATE SEARCH EXPERIENCE! This combines the best of semantic understanding
+    with exact text matching using advanced fusion algorithms. Gets better results
+    by understanding both MEANING and EXACT CONTENT.
+    
+    🎯 SEARCH MODES:
+    • "auto" - Smart routing based on query type (RECOMMENDED)  
+    • "hybrid" - Full semantic+text fusion with custom weights
+    • "semantic" - Pure semantic search using AI embeddings
+    • "text" - Exact text matching with Boolean operators
+    
+    🚀 QUERY TYPES HANDLED:
+    • "function to parse JSON" → semantic search
+    • "def parse_json" → exact text matching  
+    • "JWT AND authentication" → Boolean text search
+    • "class UserAuth" → intelligent routing
+    • filetype:py authentication → file type filtering
+    • "exact phrase" → quoted phrase matching
+    
+    ⚖️ FUSION ALGORITHM:
+    • Reciprocal Rank Fusion (RRF) combines rankings
+    • Weighted scoring balances semantic vs text matches
+    • Exact match boosting for precise queries
+    • Smart query expansion for semantic searches
+    
+    🔧 ADVANCED FEATURES:
+    • Regex pattern matching
+    • File type filtering (filetype:py, ext:js)  
+    • Date range filtering for recent changes
+    • Wildcard matching with *
+    • Boolean operators (AND, OR, NOT)
+    
+    Args:
+        query: Natural language or exact search query
+        search_mode: "auto", "hybrid", "semantic", or "text" 
+        max_results: Number of results (default: 5, max: 20)
+        semantic_weight: Weight for semantic matches (0.0-1.0)
+        text_weight: Weight for text matches (0.0-1.0) 
+        enable_advanced_features: Enable regex, wildcards, file filters
+        
+    Returns:
+        Enhanced search results with fusion scoring and match explanations
+    """
+    try:
+        if max_results is None:
+            max_results = config.search.DEFAULT_MAX_RESULTS
+        if max_results > config.search.MAX_RESULTS_LIMIT:
+            max_results = config.search.MAX_RESULTS_LIMIT
+        
+        # Validate search mode
+        valid_modes = ["auto", "hybrid", "semantic", "text"]
+        if search_mode not in valid_modes:
+            search_mode = "auto"
+        
+        # Normalize weights to sum to 1.0
+        total_weight = semantic_weight + text_weight
+        if total_weight > 0:
+            semantic_weight = semantic_weight / total_weight
+            text_weight = text_weight / total_weight
+        else:
+            semantic_weight, text_weight = 0.6, 0.4
+        
+        db_manager = get_db_connection()
+        embedder = get_embedder()
+        
+        # Check if index exists
+        file_count = db_manager.execute_with_retry(
+            f"SELECT COUNT(*) FROM {TABLE_NAME}"
+        )[0][0]
+        if file_count == 0:
+            return "No index found. Please index a repository first using the index_repository tool."
+        
+        # Execute hybrid search
+        if search_mode == "auto":
+            results = search_with_intelligent_routing(
+                db_manager, embedder, query, max_results, enable_advanced_features
+            )
+        else:
+            fusion_weights = {
+                'semantic_weight': semantic_weight,
+                'text_weight': text_weight,
+                'rrf_k': 60,
+                'boost_exact_matches': True,
+                'exact_match_boost': 1.5
+            }
+            results = search_with_hybrid_fusion(
+                db_manager, embedder, query, max_results, search_mode, 
+                fusion_weights, enable_query_expansion=True
+            )
+        
+        if not results:
+            return (f"No results found for hybrid search: '{query}' (mode: {search_mode}). "
+                   "Try different search terms, change the search mode, or check that the repository is indexed.")
+        
+        # Format results with hybrid search formatting
+        repo_path = _config.get("repository_path")
+        formatted_results = format_hybrid_search_results(
+            results, query, show_fusion_details=(search_mode == "hybrid"), 
+            repo_path=repo_path
+        )
+        
+        # Add search mode and configuration info
+        header_lines = [
+            f"🔀 HYBRID SEARCH RESULTS",
+            f"Query: '{query}' | Mode: {search_mode} | Results: {len(results)}",
+            f"Weights: semantic={semantic_weight:.2f}, text={text_weight:.2f}",
+            "=" * 60,
+            ""
+        ]
+        
+        return "\n".join(header_lines) + formatted_results
+        
+    except Exception as e:
+        return f"Error in hybrid search: {str(e)}"
 
 
 @mcp.tool()

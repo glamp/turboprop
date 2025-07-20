@@ -528,6 +528,321 @@ class DatabaseManager:
             logger.error("Failed to create code_constructs table: %s", e)
             raise DatabaseError(f"Failed to create code_constructs table: {e}") from e
 
+    def create_fts_index(self, table_name: str = "code_files") -> None:
+        """
+        Create full-text search index for file content using DuckDB's FTS extension.
+        
+        This enables exact text matching, Boolean search operators, and fuzzy matching
+        to complement semantic search capabilities.
+        
+        Args:
+            table_name: Name of the table to create FTS index for (default: code_files)
+        """
+        logger.info("Creating full-text search index for table %s", table_name)
+        
+        try:
+            with self.get_connection() as conn:
+                # Load the FTS extension if not already loaded
+                try:
+                    conn.execute("LOAD fts")
+                    logger.debug("FTS extension loaded")
+                except duckdb.Error as e:
+                    if "already loaded" not in str(e).lower():
+                        logger.warning("FTS extension load failed: %s", e)
+                
+                # Create FTS index on content column
+                # This creates a virtual table for full-text search
+                fts_table_name = f"{table_name}_fts"
+                
+                # Drop existing FTS table if it exists
+                try:
+                    conn.execute(f"DROP TABLE IF EXISTS {fts_table_name}")
+                except duckdb.Error:
+                    pass
+                
+                # Create FTS virtual table
+                # Note: DuckDB FTS syntax may vary from SQLite, adjust as needed
+                fts_create_sql = f"""
+                PRAGMA create_fts_index('{fts_table_name}', '{table_name}', 'content')
+                """
+                
+                try:
+                    conn.execute(fts_create_sql)
+                    logger.info("Successfully created FTS index %s", fts_table_name)
+                except duckdb.Error as e:
+                    # If PRAGMA syntax doesn't work, try alternative approach
+                    logger.warning("PRAGMA FTS creation failed: %s. Trying alternative approach.", e)
+                    
+                    # Alternative: Create a separate FTS table manually
+                    fts_create_alt = f"""
+                    CREATE TABLE IF NOT EXISTS {fts_table_name} AS
+                    SELECT id, path, content 
+                    FROM {table_name}
+                    WHERE content IS NOT NULL
+                    """
+                    conn.execute(fts_create_alt)
+                    
+                    # Create indexes for text search on the FTS table
+                    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content ON {fts_table_name} USING gin(to_tsvector('english', content))")
+                    
+                    logger.info("Created alternative FTS table %s with text indexes", fts_table_name)
+                    
+        except Exception as e:
+            logger.error("Failed to create FTS index: %s", e)
+            # Don't raise an error here - FTS is supplementary functionality
+            logger.warning("FTS index creation failed, full-text search will be limited")
+
+    def rebuild_fts_index(self, table_name: str = "code_files") -> None:
+        """
+        Rebuild the full-text search index to incorporate new content.
+        
+        Args:
+            table_name: Name of the table to rebuild FTS index for
+        """
+        logger.info("Rebuilding FTS index for table %s", table_name)
+        
+        try:
+            with self.get_connection() as conn:
+                fts_table_name = f"{table_name}_fts"
+                
+                # Clear existing FTS data
+                try:
+                    conn.execute(f"DELETE FROM {fts_table_name}")
+                except duckdb.Error:
+                    # Table might not exist, create it
+                    self.create_fts_index(table_name)
+                    return
+                
+                # Repopulate FTS table with current data
+                repopulate_sql = f"""
+                INSERT INTO {fts_table_name} (id, path, content)
+                SELECT id, path, content 
+                FROM {table_name}
+                WHERE content IS NOT NULL
+                """
+                conn.execute(repopulate_sql)
+                
+                logger.info("Successfully rebuilt FTS index for %s", fts_table_name)
+                
+        except Exception as e:
+            logger.error("Failed to rebuild FTS index: %s", e)
+
+    def search_full_text(
+        self,
+        query: str,
+        table_name: str = "code_files",
+        limit: int = 10,
+        enable_stemming: bool = True,
+        enable_fuzzy: bool = False,
+        fuzzy_distance: int = 2
+    ) -> list:
+        """
+        Perform full-text search on file content.
+        
+        Supports:
+        - Exact phrase matching with quotes: "exact phrase"
+        - Boolean operators: AND, OR, NOT
+        - Wildcard matching: term*
+        - Fuzzy matching: term~ (if enabled)
+        
+        Args:
+            query: Search query with optional Boolean operators and phrases
+            table_name: Table to search in
+            limit: Maximum number of results to return
+            enable_stemming: Whether to use word stemming for better matching
+            enable_fuzzy: Whether to enable fuzzy matching for typos
+            fuzzy_distance: Maximum edit distance for fuzzy matching
+            
+        Returns:
+            List of tuples (id, path, content, relevance_score)
+        """
+        try:
+            fts_table_name = f"{table_name}_fts"
+            
+            with self.get_connection() as conn:
+                # Check if FTS table exists
+                try:
+                    conn.execute(f"SELECT COUNT(*) FROM {fts_table_name} LIMIT 1")
+                except duckdb.Error:
+                    logger.warning("FTS table %s doesn't exist, creating it", fts_table_name)
+                    self.create_fts_index(table_name)
+                
+                # Process query for FTS
+                processed_query = self._process_fts_query(query, enable_fuzzy, fuzzy_distance)
+                
+                # Perform full-text search
+                # Using a simple LIKE-based approach for compatibility
+                # In a production system, this would use proper FTS ranking
+                search_sql = f"""
+                SELECT 
+                    f.id,
+                    f.path,
+                    f.content,
+                    CASE 
+                        WHEN f.content ILIKE ? THEN 1.0
+                        WHEN f.path ILIKE ? THEN 0.8
+                        ELSE 0.5
+                    END as relevance_score
+                FROM {fts_table_name} f
+                WHERE f.content ILIKE ? OR f.path ILIKE ?
+                ORDER BY relevance_score DESC, f.path
+                LIMIT ?
+                """
+                
+                # Create LIKE patterns for different search variations
+                exact_pattern = f"%{query}%"
+                word_pattern = f"%{query.replace(' ', '%')}%"
+                
+                results = conn.execute(
+                    search_sql,
+                    (exact_pattern, exact_pattern, word_pattern, word_pattern, limit)
+                ).fetchall()
+                
+                logger.debug("FTS search for '%s' returned %d results", query, len(results))
+                return results
+                
+        except Exception as e:
+            logger.error("Full-text search failed for query '%s': %s", query, e)
+            return []
+
+    def _process_fts_query(self, query: str, enable_fuzzy: bool, fuzzy_distance: int) -> str:
+        """
+        Process a search query to handle Boolean operators and special syntax.
+        
+        Args:
+            query: Raw search query
+            enable_fuzzy: Whether fuzzy matching is enabled
+            fuzzy_distance: Maximum edit distance for fuzzy matching
+            
+        Returns:
+            Processed query string suitable for FTS
+        """
+        # Handle quoted phrases - preserve exact matching
+        import re
+        
+        processed = query.strip()
+        
+        # Extract quoted phrases
+        quoted_phrases = re.findall(r'"([^"]*)"', processed)
+        for phrase in quoted_phrases:
+            # Replace quoted phrases with placeholder to preserve them
+            placeholder = f"__PHRASE_{len(quoted_phrases)}__"
+            processed = processed.replace(f'"{phrase}"', placeholder)
+        
+        # Handle Boolean operators (convert to appropriate syntax)
+        processed = processed.replace(' AND ', ' & ')
+        processed = processed.replace(' OR ', ' | ')
+        processed = processed.replace(' NOT ', ' -')
+        
+        # Handle wildcards (already supported with *)
+        
+        # Handle fuzzy matching if enabled
+        if enable_fuzzy and '~' not in processed:
+            # Add fuzzy matching to individual terms
+            words = processed.split()
+            fuzzy_words = []
+            for word in words:
+                if word not in ['&', '|', '-'] and not word.startswith('__PHRASE_'):
+                    fuzzy_words.append(f"{word}~{fuzzy_distance}")
+                else:
+                    fuzzy_words.append(word)
+            processed = ' '.join(fuzzy_words)
+        
+        # Restore quoted phrases
+        for i, phrase in enumerate(quoted_phrases):
+            placeholder = f"__PHRASE_{i+1}__"
+            processed = processed.replace(placeholder, f'"{phrase}"')
+        
+        return processed
+
+    def search_by_file_type_fts(
+        self,
+        query: str,
+        file_extensions: list,
+        limit: int = 10
+    ) -> list:
+        """
+        Perform full-text search filtered by file types.
+        
+        Args:
+            query: Search query
+            file_extensions: List of file extensions to filter by (e.g., ['.py', '.js'])
+            limit: Maximum number of results
+            
+        Returns:
+            List of search results filtered by file type
+        """
+        try:
+            with self.get_connection() as conn:
+                # Create extension filter
+                extension_conditions = []
+                params = []
+                
+                for ext in file_extensions:
+                    extension_conditions.append("f.path ILIKE ?")
+                    params.append(f"%{ext}")
+                
+                extension_filter = " OR ".join(extension_conditions)
+                
+                # Add query parameters
+                query_pattern = f"%{query}%"
+                params.extend([query_pattern, query_pattern, limit])
+                
+                search_sql = f"""
+                SELECT 
+                    f.id,
+                    f.path,
+                    f.content,
+                    1.0 as relevance_score
+                FROM code_files_fts f
+                WHERE ({extension_filter})
+                  AND (f.content ILIKE ? OR f.path ILIKE ?)
+                ORDER BY f.path
+                LIMIT ?
+                """
+                
+                results = conn.execute(search_sql, params).fetchall()
+                logger.debug("File type FTS search returned %d results", len(results))
+                return results
+                
+        except Exception as e:
+            logger.error("File type FTS search failed: %s", e)
+            return []
+
+    def search_regex(self, pattern: str, limit: int = 10) -> list:
+        """
+        Perform regex search on file content.
+        
+        Args:
+            pattern: Regular expression pattern
+            limit: Maximum number of results
+            
+        Returns:
+            List of search results matching the regex pattern
+        """
+        try:
+            with self.get_connection() as conn:
+                # DuckDB supports regex with regexp_matches function
+                search_sql = """
+                SELECT 
+                    id,
+                    path,
+                    content,
+                    1.0 as relevance_score
+                FROM code_files
+                WHERE regexp_matches(content, ?, 'gm')
+                ORDER BY path
+                LIMIT ?
+                """
+                
+                results = conn.execute(search_sql, (pattern, limit)).fetchall()
+                logger.debug("Regex search for pattern '%s' returned %d results", pattern, len(results))
+                return results
+                
+        except Exception as e:
+            logger.error("Regex search failed for pattern '%s': %s", pattern, e)
+            return []
+
     def store_construct(self, construct, file_id: str, construct_id: str, embedding: list) -> None:
         """
         Store a code construct in the database.

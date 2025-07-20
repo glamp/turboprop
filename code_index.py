@@ -1155,6 +1155,32 @@ Query Examples:
         metavar="NUM",
         help="Number of results to return (default: 5, max recommended: 20)",
     )
+    p_s.add_argument(
+        "--mode",
+        choices=["auto", "hybrid", "semantic", "text"],
+        default="auto", 
+        help="Search mode: 'auto' (intelligent routing), 'hybrid' (semantic+text), "
+             "'semantic' (embeddings only), 'text' (exact matching only)",
+    )
+    p_s.add_argument(
+        "--enable-advanced",
+        action="store_true",
+        help="Enable advanced features like regex search, wildcards, and file type filtering"
+    )
+    p_s.add_argument(
+        "--semantic-weight",
+        type=float,
+        default=0.6,
+        metavar="WEIGHT", 
+        help="Weight for semantic search in hybrid mode (0.0-1.0, default: 0.6)"
+    )
+    p_s.add_argument(
+        "--text-weight",
+        type=float,
+        default=0.4,
+        metavar="WEIGHT",
+        help="Weight for text search in hybrid mode (0.0-1.0, default: 0.4)"
+    )
 
     # 'watch' command: Monitor repository for changes
     p_w = sub.add_parser(
@@ -1343,15 +1369,41 @@ def handle_index_command(args, embedder):
 
 
 def handle_search_command(args, embedder):
-    """Handle the search command logic."""
+    """Handle the search command logic with hybrid search support."""
     print(f'\n🔎 Searching for: "{args.query}"')
-    print(f"📊 Returning top {args.k} results...")
+    print(f"📊 Mode: {args.mode} | Results: {args.k}")
+    if args.mode == "hybrid":
+        print(f"⚖️  Weights: semantic={args.semantic_weight}, text={args.text_weight}")
 
     repo_path = Path(args.repo).resolve()
     db_manager = init_db(repo_path)
 
     try:
-        results = search_index_enhanced(db_manager, embedder, args.query, args.k)
+        # Import hybrid search functions
+        from search_operations import search_with_intelligent_routing, search_with_hybrid_fusion
+        
+        # Create fusion weights if using hybrid mode
+        fusion_weights = None
+        if args.mode == "hybrid":
+            fusion_weights = {
+                'semantic_weight': args.semantic_weight,
+                'text_weight': args.text_weight,
+                'rrf_k': 60,
+                'boost_exact_matches': True,
+                'exact_match_boost': 1.5
+            }
+        
+        # Use intelligent routing for auto mode, hybrid fusion for others
+        if args.mode == "auto":
+            results = search_with_intelligent_routing(
+                db_manager, embedder, args.query, args.k, args.enable_advanced
+            )
+        else:
+            results = search_with_hybrid_fusion(
+                db_manager, embedder, args.query, args.k, args.mode, 
+                fusion_weights, enable_query_expansion=True
+            )
+        
     except Exception as e:
         logger.error(f"Search failed: {e}")
         print("💡 Make sure you've built an index first: turboprop index <repo>")
@@ -1365,11 +1417,16 @@ def handle_search_command(args, embedder):
         print("💡 Try:")
         print("   • Building an index first: turboprop index <repo>")
         print("   • Using different search terms")
+        print("   • Trying a different search mode")
         print("   • Making sure your query describes code concepts")
         return
 
-    # Use enhanced search result formatting
-    formatted_results = format_enhanced_search_results(results, args.query, str(repo_path))
+    # Use hybrid search result formatting for enhanced display
+    from search_operations import format_hybrid_search_results
+    formatted_results = format_hybrid_search_results(
+        results, args.query, show_fusion_details=(args.mode == "hybrid"), 
+        repo_path=str(repo_path)
+    )
     print(formatted_results)
 
 
