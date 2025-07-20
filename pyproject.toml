@@ -4,7 +4,7 @@
 
 [project]
 name = "turboprop"
-version = "0.2.3"
+version = "0.2.6"
 description = "Lightning-fast semantic code search and indexing with DuckDB vector operations"
 readme = "README.md"
 license = {text = "MIT"}
@@ -83,8 +83,20 @@ dev = [
 
 # Setuptools configuration
 [tool.setuptools]
-py-modules = ["code_index", "server", "mcp_server", "embedding_helper", "database_manager"]
+py-modules = [
+    "code_index", "server", "mcp_server", "embedding_helper", "database_manager", 
+    "apple_silicon_compat", "config", "logging_config", "exceptions", 
+    "code_construct_extractor", "construct_search", "error_handling_utils", 
+    "file_watching", "format_utils", "git_integration", "hybrid_search", 
+    "ide_integration", "indexing_operations", "language_detection", 
+    "mcp_response_types", "ranking_config", "ranking_exceptions", 
+    "ranking_scorers", "ranking_utils", "response_config", "result_ranking", 
+    "search_operations", "search_result_types", "search_utils", "snippet_extractor"
+]
 packages = ["turboprop"]
+
+[tool.setuptools.package-dir]
+"" = "."
 
 [tool.setuptools.package-data]
 turboprop = ["py.typed"]
