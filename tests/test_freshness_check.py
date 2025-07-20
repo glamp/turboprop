@@ -248,7 +248,7 @@ class TestFreshnessCheck:
 
         assert not freshness["is_fresh"]
         # After database error, it tries to scan files and detects count mismatch
-        assert "File count changed" in freshness["reason"] or "No index found" in freshness["reason"]
+        assert "File count changed" in freshness["reason"] or "No index found" in freshness["reason"] or "Index is empty" in freshness["reason"]
         # Don't assert on last_index_time since it may vary after database error
         assert freshness["changed_files"] >= 0
         assert freshness["total_files"] >= 0

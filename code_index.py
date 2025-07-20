@@ -86,6 +86,17 @@ def compute_id(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def reset_db():
+    """
+    Reset the global database manager instance (useful for tests).
+    """
+    global _db_manager
+    with _db_manager_lock:
+        if _db_manager is not None:
+            _db_manager.cleanup()
+            _db_manager = None
+
+
 def init_db(repo_path: Path = None):
     """
     Initialize or get the database manager instance.
@@ -100,6 +111,15 @@ def init_db(repo_path: Path = None):
     global _db_manager
 
     with _db_manager_lock:
+        # Check if we need to reinitialize for a different path
+        if _db_manager is not None and repo_path is not None:
+            current_db_path = _db_manager.db_path
+            expected_db_path = repo_path / ".turboprop" / "code_index.duckdb"
+            if current_db_path != expected_db_path:
+                # Different path requested, reset and reinitialize
+                _db_manager.cleanup()
+                _db_manager = None
+        
         if _db_manager is None:
             # Create database in the repository directory or current directory
             if repo_path is None:
@@ -139,6 +159,12 @@ def init_db(repo_path: Path = None):
                 _db_manager.migrate_schema(config.database.TABLE_NAME)
             except Exception as e:
                 logger.warning(f"Schema migration failed, continuing with existing schema: {e}")
+
+            # Create repository_context table for storing repository-level metadata
+            try:
+                _db_manager.create_repository_context_table()
+            except Exception as e:
+                logger.warning(f"Failed to create repository_context table: {e}")
 
         return _db_manager
 
@@ -206,6 +232,10 @@ def scan_repo(repo_path: Path, max_bytes: int):
     for file_path_str in all_files:
         p = repo_path / file_path_str
 
+        # Skip .turboprop directory and its contents
+        if '.turboprop' in p.parts:
+            continue
+            
         try:
             # Skip files that are too large to process efficiently
             if p.stat().st_size > max_bytes:
@@ -230,6 +260,7 @@ def get_existing_file_hashes(db_manager):
         result = db_manager.execute_with_retry(f"SELECT path, id FROM {config.database.TABLE_NAME}")
         return {path: hash_id for path, hash_id in result}
     except Exception:
+        # Table doesn't exist yet or other error - return empty dict
         return {}
 
 
@@ -274,7 +305,7 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
         progress_callback: Function to call with progress updates (deprecated, use tqdm)
     """
     if not files:
-        return
+        return 0, 0
 
     rows = []
     failed_files = []
@@ -325,6 +356,11 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
         db_manager.execute_transaction(operations)
         print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
+    # Return processed and skipped counts for testing
+    processed_count = len(rows) if rows else 0
+    skipped_count = len(failed_files)
+    return processed_count, skipped_count
+
 
 def build_full_index(db_manager):
     """
@@ -362,8 +398,8 @@ def search_index(db_manager, embedder, query: str, k: int):
         k: Number of top results to return
 
     Returns:
-        List of tuples: (file_path, content_snippet, distance_score)
-        Distance is cosine distance (lower = more similar)
+        List of tuples: (file_path, content_snippet, similarity_score)
+        Similarity is cosine similarity (higher = more similar)
     """
     # Generate embedding for the search query
     q_emb = embedder.encode(query).tolist()
@@ -371,24 +407,28 @@ def search_index(db_manager, embedder, query: str, k: int):
     # Use DuckDB's array operations for cosine similarity search
     # Cosine similarity = dot(a,b) / (norm(a) * norm(b))
     # Cosine distance = 1 - cosine similarity
-    with db_manager.get_connection() as con:
-        results = con.execute(
-            f"""
-            SELECT
-                path,
-                substr(content, 1, 300) as snippet,
-                1 - (list_dot_product(embedding, $1) /
-                    (sqrt(list_dot_product(embedding, embedding)) *
-                     sqrt(list_dot_product($1, $1)))) as distance
-            FROM {config.database.TABLE_NAME}
-            WHERE embedding IS NOT NULL
-            ORDER BY distance ASC
-            LIMIT {k}
-        """,
-            [q_emb],
-        ).fetchall()
+    try:
+        with db_manager.get_connection() as con:
+            results = con.execute(
+                f"""
+                SELECT
+                    path,
+                    substr(content, 1, 300) as snippet,
+                    (list_dot_product(embedding, $1) /
+                        (sqrt(list_dot_product(embedding, embedding)) *
+                         sqrt(list_dot_product($1, $1)))) as similarity
+                FROM {config.database.TABLE_NAME}
+                WHERE embedding IS NOT NULL
+                ORDER BY similarity DESC
+                LIMIT {k}
+            """,
+                [q_emb],
+            ).fetchall()
 
-    return results
+        return results
+    except Exception:
+        # Table doesn't exist yet or other error - return empty results
+        return []
 
 
 def embed_and_store_single(db_manager, embedder, path: Path):
@@ -725,6 +765,7 @@ def remove_orphaned_files(db_manager, current_files):
         result = db_manager.execute_with_retry(f"SELECT path FROM {config.database.TABLE_NAME}")
         existing_paths = {row[0] for row in result}
     except Exception:
+        # Table doesn't exist yet or other error - no orphaned files to remove
         return 0
 
     # Convert current files to string paths for comparison
@@ -960,7 +1001,8 @@ def reindex_all(
     if not files:
         # Even if no files, we should clean up orphaned entries
         removed_count = remove_orphaned_files(db_manager, [])
-        return 0, 0, 0
+        elapsed = time.time() - start_time
+        return 0, 0, elapsed
 
     # Remove orphaned files from database (files that no longer exist in repo)
     removed_count = remove_orphaned_files(db_manager, files)

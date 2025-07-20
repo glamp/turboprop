@@ -167,12 +167,20 @@ def http_index(req: IndexRequest):
         # Convert megabytes to bytes for internal processing
         max_bytes = int(req.max_mb * 1024**2)
 
+        # Initialize database manager for the specific repository being indexed
+        repo_path = Path(req.repo)
+        repo_db_manager = init_db(repo_path)
+
         # Trigger full reindexing of the specified repository
-        total_files, processed_files, elapsed = reindex_all(Path(req.repo), max_bytes, db_manager, embedder)
+        total_files, processed_files, elapsed = reindex_all(repo_path, max_bytes, repo_db_manager, embedder)
 
         # Count total files in database to report back to user
-        count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
-        count = count_result[0][0] if count_result and count_result[0] else 0
+        try:
+            count_result = repo_db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+            count = count_result[0][0] if count_result and count_result[0] else 0
+        except Exception:
+            # Table might not exist yet - return number of processed files
+            count = processed_files
 
         return {"status": "indexed", "files": count}
 
@@ -264,9 +272,13 @@ def http_status():
             "embedding_dimensions": 384
         }
     """
-    # Get file count from database
-    count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
-    file_count = count_result[0][0] if count_result and count_result[0] else 0
+    # Get file count from database (handle case where table doesn't exist yet)
+    try:
+        count_result = db_manager.execute_with_retry(f"SELECT count(*) FROM {TABLE_NAME}")
+        file_count = count_result[0][0] if count_result and count_result[0] else 0
+    except Exception:
+        # Table doesn't exist yet - return 0 files indexed
+        file_count = 0
 
     # Check if database file exists and get its size
     db_path = current_dir / ".turboprop" / "code_index.duckdb"

@@ -53,6 +53,7 @@ Thumbs.db
 
 # Testing
 .coverage
+.coverage.*
 .pytest_cache/
 .tox/
 .nox/
