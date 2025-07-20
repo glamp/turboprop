@@ -331,3 +331,79 @@ class TestIntegrationScenarios:
         assert metadata.total_results == 2
         high_confidence_count = sum(1 for r in results if r.confidence_level == "high")
         assert metadata.confidence_distribution['high'] == high_confidence_count
+
+    def test_multi_snippet_support(self):
+        """Test CodeSearchResult with multiple snippets."""
+        snippet1 = CodeSnippet(text="def function1():", start_line=1, end_line=2)
+        snippet2 = CodeSnippet(text="def function2():", start_line=5, end_line=6)
+        snippet3 = CodeSnippet(text="class MyClass:", start_line=10, end_line=15)
+        
+        # Create result with multiple snippets
+        result = CodeSearchResult.from_multi_snippets(
+            file_path="/test/file.py",
+            snippets=[snippet1, snippet2, snippet3],
+            similarity_score=0.85
+        )
+        
+        assert result.file_path == "/test/file.py"
+        assert result.snippet == snippet1  # Primary snippet
+        assert len(result.additional_snippets) == 2
+        assert result.additional_snippets[0] == snippet2
+        assert result.additional_snippets[1] == snippet3
+        assert len(result.all_snippets) == 3
+        
+    def test_add_snippet_method(self):
+        """Test adding additional snippets to a search result."""
+        primary_snippet = CodeSnippet(text="def main():", start_line=1, end_line=3)
+        result = CodeSearchResult(
+            file_path="/test/main.py",
+            snippet=primary_snippet,
+            similarity_score=0.9
+        )
+        
+        # Initially no additional snippets
+        assert len(result.additional_snippets) == 0
+        assert len(result.all_snippets) == 1
+        
+        # Add an additional snippet
+        additional_snippet = CodeSnippet(text="def helper():", start_line=5, end_line=7)
+        result.add_snippet(additional_snippet)
+        
+        assert len(result.additional_snippets) == 1
+        assert len(result.all_snippets) == 2
+        assert result.additional_snippets[0] == additional_snippet
+        
+    def test_multi_snippet_to_dict(self):
+        """Test dictionary serialization with multiple snippets."""
+        snippet1 = CodeSnippet(text="def test1():", start_line=1, end_line=2)
+        snippet2 = CodeSnippet(text="def test2():", start_line=4, end_line=5)
+        
+        result = CodeSearchResult.from_multi_snippets(
+            file_path="/test/multi.py",
+            snippets=[snippet1, snippet2],
+            similarity_score=0.75,
+            file_metadata={"language": "python"}
+        )
+        
+        result_dict = result.to_dict()
+        
+        # Check basic fields
+        assert result_dict['file_path'] == "/test/multi.py"
+        assert result_dict['similarity_score'] == 0.75
+        assert result_dict['file_metadata'] == {"language": "python"}
+        
+        # Check snippet fields
+        assert 'snippet' in result_dict
+        assert 'additional_snippets' in result_dict
+        assert 'total_snippets' in result_dict
+        assert result_dict['total_snippets'] == 2
+        assert len(result_dict['additional_snippets']) == 1
+        
+    def test_multi_snippet_from_empty_list_raises_error(self):
+        """Test that creating multi-snippet result from empty list raises error."""
+        with pytest.raises(ValueError, match="At least one snippet is required"):
+            CodeSearchResult.from_multi_snippets(
+                file_path="/test/empty.py",
+                snippets=[],
+                similarity_score=0.5
+            )

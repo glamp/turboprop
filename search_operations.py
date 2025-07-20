@@ -17,6 +17,7 @@ from typing import List, Optional, Tuple
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from search_result_types import CodeSnippet, CodeSearchResult
+from snippet_extractor import SnippetExtractor
 from config import config
 
 # Constants
@@ -41,20 +42,40 @@ def _detect_file_language(file_path: str) -> str:
     return config.file_processing.EXTENSION_TO_LANGUAGE_MAP.get(ext, 'unknown')
 
 
-def _create_enhanced_snippet(content: str, file_path: str) -> CodeSnippet:
+def _create_enhanced_snippet(content: str, file_path: str, query: str = "") -> CodeSnippet:
     """
-    Create an enhanced code snippet with intelligent extraction.
+    Create an enhanced code snippet with intelligent extraction using language-aware parsing.
 
     Args:
         content: File content
         file_path: Path to the file
+        query: Search query for relevance-based extraction
 
     Returns:
-        CodeSnippet with enhanced information
+        CodeSnippet with enhanced information from intelligent extraction
     """
-    # For now, use the simple truncation approach with line number calculation
-    # TODO: In future iterations, add intelligent function/class boundary detection
-
+    # Use the new intelligent snippet extractor
+    extractor = SnippetExtractor()
+    
+    try:
+        # Extract intelligent snippets
+        extracted_snippets = extractor.extract_snippets(
+            content=content,
+            file_path=file_path,
+            query=query,
+            max_snippets=1,  # For compatibility, return only the best snippet
+            max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH
+        )
+        
+        if extracted_snippets:
+            # Convert the best ExtractedSnippet to CodeSnippet
+            return extracted_snippets[0].to_code_snippet()
+        
+    except Exception as e:
+        logger.warning(f"Intelligent snippet extraction failed for {file_path}: {e}")
+        # Fall back to simple extraction
+    
+    # Fallback to simple truncation if intelligent extraction fails
     lines = content.split('\n')
 
     if len(content) <= config.search.SNIPPET_CONTENT_MAX_LENGTH:
@@ -76,6 +97,40 @@ def _create_enhanced_snippet(content: str, file_path: str) -> CodeSnippet:
             start_line=1,
             end_line=min(snippet_lines, len(lines))
         )
+
+
+def _create_multi_snippets(content: str, file_path: str, query: str, max_snippets: int = 3) -> List[CodeSnippet]:
+    """
+    Create multiple intelligent code snippets from content.
+    
+    Args:
+        content: File content
+        file_path: Path to the file
+        query: Search query for relevance-based extraction
+        max_snippets: Maximum number of snippets to return
+        
+    Returns:
+        List of CodeSnippet objects ranked by relevance
+    """
+    extractor = SnippetExtractor()
+    
+    try:
+        # Extract multiple intelligent snippets
+        extracted_snippets = extractor.extract_snippets(
+            content=content,
+            file_path=file_path,
+            query=query,
+            max_snippets=max_snippets,
+            max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH
+        )
+        
+        # Convert ExtractedSnippet objects to CodeSnippet objects
+        return [snippet.to_code_snippet() for snippet in extracted_snippets]
+        
+    except Exception as e:
+        logger.warning(f"Multi-snippet extraction failed for {file_path}: {e}")
+        # Fall back to single snippet
+        return [_create_enhanced_snippet(content, file_path, query)]
 
 
 def _extract_file_metadata(file_path: str, content: str) -> dict:
@@ -167,8 +222,8 @@ def search_index_enhanced(
             # Convert distance to similarity score
             similarity_score = 1.0 - distance
 
-            # Create enhanced snippet
-            snippet = _create_enhanced_snippet(content, path)
+            # Create enhanced snippet with query context
+            snippet = _create_enhanced_snippet(content, path, query)
 
             # Extract file metadata
             file_metadata = _extract_file_metadata(path, content)
@@ -293,7 +348,7 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
             else:
                 formatted_lines.append(f"   Type: {lang}")
 
-        # Show snippet with line information
+        # Show primary snippet with line information
         snippet = result.snippet
         if snippet.start_line == snippet.end_line:
             line_info = f"Line {snippet.start_line}"
@@ -301,6 +356,23 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
             line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
 
         formatted_lines.append(f"   {line_info}: {snippet.text.strip()}")
+        
+        # Show additional snippets if present
+        if result.additional_snippets:
+            formatted_lines.append(f"   Additional snippets ({len(result.additional_snippets)}):")
+            for i, additional_snippet in enumerate(result.additional_snippets, 1):
+                if additional_snippet.start_line == additional_snippet.end_line:
+                    add_line_info = f"Line {additional_snippet.start_line}"
+                else:
+                    add_line_info = f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
+                
+                # Truncate additional snippets for display
+                add_text = additional_snippet.text.strip()
+                if len(add_text) > 100:
+                    add_text = add_text[:100] + "..."
+                
+                formatted_lines.append(f"     {i}. {add_line_info}: {add_text}")
+        
         formatted_lines.append("")
 
     return "\n".join(formatted_lines)
@@ -553,8 +625,8 @@ def find_similar_files_enhanced(
             # Convert distance to similarity score
             similarity_score = 1.0 - distance
 
-            # Create enhanced snippet
-            snippet = _create_enhanced_snippet(content, path)
+            # Create enhanced snippet with query context
+            snippet = _create_enhanced_snippet(content, path, query)
 
             # Extract file metadata
             file_metadata = _extract_file_metadata(path, content)

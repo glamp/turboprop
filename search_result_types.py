@@ -12,8 +12,8 @@ Classes:
 - SearchMetadata: Overall search execution information
 """
 
-from dataclasses import dataclass, asdict
-from typing import Dict, Optional, Tuple, Any
+from dataclasses import dataclass, asdict, field
+from typing import Dict, Optional, Tuple, Any, List, Union
 from pathlib import Path
 from config import config
 
@@ -62,14 +62,16 @@ class CodeSearchResult:
     Comprehensive search result with rich metadata and backward compatibility.
 
     This class represents a single search result with detailed information about
-    the matched file, including the code snippet, similarity score, file metadata,
-    and confidence assessment.
+    the matched file, including the code snippet(s), similarity score, file metadata,
+    and confidence assessment. Supports both single and multiple snippets per file.
     """
     file_path: str
     snippet: CodeSnippet
     similarity_score: float
     file_metadata: Optional[Dict[str, Any]] = None
     confidence_level: Optional[str] = None
+    # Additional snippets from the same file (for multi-snippet support)
+    additional_snippets: List[CodeSnippet] = field(default_factory=list)
 
     def __post_init__(self):
         """Initialize default values after dataclass construction."""
@@ -84,6 +86,59 @@ class CodeSearchResult:
                 self.confidence_level = "medium"
             else:
                 self.confidence_level = "low"
+
+    @property
+    def all_snippets(self) -> List[CodeSnippet]:
+        """
+        Get all snippets (primary + additional) for this search result.
+        
+        Returns:
+            List of all CodeSnippet objects for this file
+        """
+        return [self.snippet] + self.additional_snippets
+
+    def add_snippet(self, snippet: CodeSnippet) -> None:
+        """
+        Add an additional snippet to this search result.
+        
+        Args:
+            snippet: CodeSnippet to add
+        """
+        self.additional_snippets.append(snippet)
+
+    @classmethod
+    def from_multi_snippets(
+        cls,
+        file_path: str,
+        snippets: List[CodeSnippet],
+        similarity_score: float,
+        file_metadata: Optional[Dict[str, Any]] = None
+    ) -> 'CodeSearchResult':
+        """
+        Create a CodeSearchResult from multiple snippets.
+        
+        Args:
+            file_path: Path to the file
+            snippets: List of CodeSnippet objects (first becomes primary)
+            similarity_score: Similarity score for the result
+            file_metadata: Optional file metadata
+            
+        Returns:
+            CodeSearchResult with primary and additional snippets
+        """
+        if not snippets:
+            raise ValueError("At least one snippet is required")
+        
+        primary_snippet = snippets[0]
+        additional_snippets = snippets[1:] if len(snippets) > 1 else []
+        
+        return cls(
+            file_path=file_path,
+            snippet=primary_snippet,
+            similarity_score=similarity_score,
+            file_metadata=file_metadata,
+            additional_snippets=additional_snippets
+        )
 
     @property
     def similarity_percentage(self) -> float:
@@ -186,7 +241,7 @@ class CodeSearchResult:
         Returns:
             Dictionary representation suitable for JSON/API responses
         """
-        return {
+        result = {
             'file_path': self.file_path,
             'snippet': self.snippet.to_dict(),
             'similarity_score': self.similarity_score,
@@ -194,6 +249,13 @@ class CodeSearchResult:
             'file_metadata': self.file_metadata,
             'confidence_level': self.confidence_level
         }
+        
+        # Include additional snippets if present
+        if self.additional_snippets:
+            result['additional_snippets'] = [s.to_dict() for s in self.additional_snippets]
+            result['total_snippets'] = len(self.all_snippets)
+        
+        return result
 
 
 @dataclass

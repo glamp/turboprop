@@ -41,6 +41,7 @@ from watchdog.observers import Observer  # noqa: E402
 
 from database_manager import DatabaseManager  # noqa: E402
 from embedding_helper import EmbeddingGenerator  # noqa: E402
+from search_operations import search_index_enhanced, format_enhanced_search_results  # noqa: E402
 from logging_config import get_logger  # noqa: E402
 
 # Global database manager instance
@@ -1347,7 +1348,7 @@ def handle_search_command(args, embedder):
     db_manager = init_db(repo_path)
 
     try:
-        results = search_index(db_manager, embedder, args.query, args.k)
+        results = search_index_enhanced(db_manager, embedder, args.query, args.k)
     except Exception as e:
         logger.error(f"Search failed: {e}")
         print("💡 Make sure you've built an index first: turboprop index <repo>")
@@ -1364,20 +1365,9 @@ def handle_search_command(args, embedder):
         print("   • Making sure your query describes code concepts")
         return
 
-    # Display search results with enhanced formatting
-    print(f"\n🎯 Found {len(results)} relevant results:\n")
-    for i, (path, snippet, dist) in enumerate(results, 1):
-        similarity_pct = (1 - dist) * 100
-        print(f"┌─ {i}. {path}")
-        print(f"│  📈 Similarity: {similarity_pct:.1f}%")
-        print("│")
-        # Clean up the snippet display
-        clean_snippet = snippet.strip()[:200]
-        if len(snippet) > 200:
-            clean_snippet += "..."
-        print(f"│  {clean_snippet}")
-        print("└" + "─" * 60)
-        print()
+    # Use enhanced search result formatting
+    formatted_results = format_enhanced_search_results(results, args.query, str(repo_path))
+    print(formatted_results)
 
 
 def handle_watch_command(args):
