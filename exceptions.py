@@ -36,6 +36,12 @@ class DatabaseSchemaError(DatabaseError):
     pass
 
 
+class DatabaseMigrationError(DatabaseError):
+    """Raised when database migration operations fail."""
+
+    pass
+
+
 class DatabaseTimeoutError(DatabaseError):
     """Raised when database operations timeout."""
 
