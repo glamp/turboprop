@@ -205,7 +205,9 @@ def scan_repo(repo_path: Path, max_bytes: int):
             text=True,
             check=True,
         )
-        tracked_files = {line.strip() for line in tracked_result.stdout.splitlines() if line.strip()}
+        tracked_files = {
+            line.strip() for line in tracked_result.stdout.splitlines() if line.strip()
+        }
 
         # Get all untracked files that are not ignored
         untracked_result = subprocess.run(
@@ -216,7 +218,9 @@ def scan_repo(repo_path: Path, max_bytes: int):
             text=True,
             check=True,
         )
-        untracked_files = {line.strip() for line in untracked_result.stdout.splitlines() if line.strip()}
+        untracked_files = {
+            line.strip() for line in untracked_result.stdout.splitlines() if line.strip()
+        }
 
         # Combine tracked and untracked files
         all_files = tracked_files | untracked_files
@@ -367,7 +371,9 @@ def build_full_index(db_manager):
         Number of embeddings in the database, or 0 if none found
     """
     # Check if we have any embeddings in the database
-    result = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
+    result = db_manager.execute_with_retry(
+        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL"
+    )
     return result[0][0] if result and result[0] else 0
 
 
@@ -452,7 +458,10 @@ def embed_and_store_single(db_manager, embedder, path: Path):
     operations = [
         (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),)),
         (
-            f"INSERT INTO {TABLE_NAME} (id, path, content, embedding, " f"file_mtime) VALUES (?, ?, ?, ?, ?)",
+            (
+                f"INSERT INTO {TABLE_NAME} (id, path, content, embedding, "
+                f"file_mtime) VALUES (?, ?, ?, ?, ?)"
+            ),
             (uid, str(path), text, emb.tolist(), file_mtime),
         ),
     ]
@@ -603,7 +612,9 @@ class DebouncedHandler(FileSystemEventHandler):
                     pass
         elif ev_type == "deleted":
             # Remove deleted file from database
-            self.db_manager.execute_with_retry(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),))
+            self.db_manager.execute_with_retry(
+                f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),)
+            )
             logger.debug(f"[debounce] {p} deleted from database")
 
 
@@ -1081,7 +1092,10 @@ Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, et
         type=float,
         default=1.0,
         metavar="SIZE",
-        help="Maximum file size in MB to include (default: 1.0). " "Larger files are skipped to avoid memory issues.",
+        help=(
+            "Maximum file size in MB to include (default: 1.0). "
+            "Larger files are skipped to avoid memory issues."
+        ),
     )
     p_i.add_argument(
         "--workers",

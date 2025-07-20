@@ -79,7 +79,11 @@ class DatabaseManager:
                     fcntl.flock(self._file_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     lock_acquired = True
                 except (IOError, OSError) as e:
-                    if "Resource temporarily unavailable" in str(e) or "temporarily unavailable" in str(e):
+                    error_str = str(e)
+                    if (
+                        "Resource temporarily unavailable" in error_str or
+                        "temporarily unavailable" in error_str
+                    ):
                         # Lock is held by another process, wait and retry
                         time.sleep(config.database.LOCK_RETRY_INTERVAL)
                         continue
@@ -88,16 +92,22 @@ class DatabaseManager:
                         raise
 
             if not lock_acquired:
-                raise DatabaseTimeoutError(f"Could not acquire database lock within {self.lock_timeout} seconds")
+                raise DatabaseTimeoutError(
+                    f"Could not acquire database lock within {self.lock_timeout} seconds"
+                )
 
         except (IOError, OSError) as e:
             if self._file_lock:
                 self._file_lock.close()
                 self._file_lock = None
             if "permission denied" in str(e).lower():
-                raise DatabasePermissionError(f"Permission denied when acquiring database lock: {e}")
+                raise DatabasePermissionError(
+                    f"Permission denied when acquiring database lock: {e}"
+                )
             elif "no space left" in str(e).lower():
-                raise DatabaseDiskSpaceError(f"Insufficient disk space when acquiring database lock: {e}")
+                raise DatabaseDiskSpaceError(
+                    f"Insufficient disk space when acquiring database lock: {e}"
+                )
             else:
                 raise DatabaseLockError(f"Could not acquire database lock: {e}")
 
@@ -128,7 +138,8 @@ class DatabaseManager:
             conn.execute(f"SET threads = {config.database.THREADS}")
 
             # Configure timeout settings
-            if hasattr(conn, "execute") and config.database.STATEMENT_TIMEOUT > 0:
+            if (hasattr(conn, "execute") and 
+                config.database.STATEMENT_TIMEOUT > 0):
                 # Note: DuckDB doesn't have a direct statement timeout, but we can use this for logging
                 pass
 
@@ -143,10 +154,14 @@ class DatabaseManager:
 
             return conn
         except PermissionError as e:
-            raise DatabasePermissionError(f"Permission denied when creating database connection: {e}")
+            raise DatabasePermissionError(
+                f"Permission denied when creating database connection: {e}"
+            )
         except OSError as e:
             if "no space left" in str(e).lower():
-                raise DatabaseDiskSpaceError(f"Insufficient disk space when creating database connection: {e}")
+                raise DatabaseDiskSpaceError(
+                    f"Insufficient disk space when creating database connection: {e}"
+                )
             else:
                 raise DatabaseConnectionTimeoutError(f"Failed to create database connection: {e}")
         except duckdb.Error as e:
@@ -361,62 +376,68 @@ class DatabaseManager:
     def migrate_schema(self, table_name: str) -> None:
         """
         Migrate database schema to add new metadata columns if they don't exist.
-        
+
         Adds the following columns:
         - file_type VARCHAR - file extension (.py, .js, .md, etc.)
-        - language VARCHAR - detected programming language 
+        - language VARCHAR - detected programming language
         - size_bytes INTEGER - file size in bytes
         - line_count INTEGER - number of lines in the file
-        
+
         Args:
             table_name: Name of the table to migrate
         """
         logger.info(f"Starting schema migration for table {table_name}")
-        
+
         # Define all columns to add (includes legacy columns for backward compatibility)
         new_columns = {
             'last_modified': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
             'file_mtime': 'TIMESTAMP',
             'file_type': 'VARCHAR',
-            'language': 'VARCHAR', 
+            'language': 'VARCHAR',
             'size_bytes': 'INTEGER',
             'line_count': 'INTEGER'
         }
-        
+
         try:
             # Get existing columns using DuckDB's information_schema
             with self.get_connection() as conn:
                 result = conn.execute(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = ? ORDER BY ordinal_position",
                     (table_name,)
                 ).fetchall()
-                
+
                 existing_columns = [row[0].lower() for row in result]
                 logger.debug(f"Existing columns: {existing_columns}")
-                
+
                 # Check if table exists (if no columns found, table likely doesn't exist)
                 if not existing_columns:
                     raise DatabaseError(f"Table {table_name} does not exist or has no columns")
-                
+
                 # Add new columns that don't exist
                 columns_added = []
                 for column_name, column_type in new_columns.items():
                     if column_name.lower() not in existing_columns:
                         try:
-                            alter_query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                            alter_query = (
+                                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                            )
                             conn.execute(alter_query)
                             columns_added.append(column_name)
                             logger.info(f"Added column: {column_name} {column_type}")
                         except Exception as e:
-                            logger.warning(f"Failed to add column {column_name}: {e}")
+                            logger.warning(
+                                f"Failed to add column {column_name}: {e}"
+                            )
                     else:
                         logger.debug(f"Column {column_name} already exists, skipping")
-                        
+
                 if columns_added:
-                    logger.info(f"Schema migration completed successfully. Added columns: {columns_added}")
+                    logger.info(
+                        f"Schema migration completed successfully. Added columns: {columns_added}"
+                    )
                 else:
                     logger.info("Schema migration completed - no columns needed to be added")
-                    
         except Exception as e:
             logger.error(f"Schema migration failed: {e}")
             raise DatabaseError(f"Failed to migrate schema for table {table_name}: {e}") from e

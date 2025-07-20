@@ -49,14 +49,14 @@ class TestDatabaseMigration:
                 column_names = [row[0] for row in result]
                 expected_columns = [
                     "id",
-                    "path", 
+                    "path",
                     "content",
                     "embedding",
                     "last_modified",
                     "file_mtime",
                     "file_type",
                     "language",
-                    "size_bytes", 
+                    "size_bytes",
                     "line_count"
                 ]
 
@@ -99,7 +99,7 @@ class TestDatabaseMigration:
                 column_names = [row[0] for row in result]
                 expected_new_columns = [
                     "file_mtime",
-                    "language", 
+                    "language",
                     "size_bytes",
                     "line_count"
                 ]
@@ -148,7 +148,7 @@ class TestDatabaseMigration:
                 expected_columns = [
                     "id",
                     "path",
-                    "content", 
+                    "content",
                     "embedding",
                     "last_modified",
                     "file_mtime",
@@ -167,7 +167,7 @@ class TestDatabaseMigration:
     def test_migrate_schema_nonexistent_table(self):
         """Test migration on a nonexistent table (should raise error)."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            db_path = Path(tmp_dir) / "test.duckdb" 
+            db_path = Path(tmp_dir) / "test.duckdb"
             db_manager = DatabaseManager(db_path)
 
             # Try to migrate a table that doesn't exist
@@ -194,7 +194,6 @@ class TestDatabaseMigration:
                     )
                 """
                 )
-                
                 # Insert test data
                 test_embedding = [0.1] * 384
                 conn.execute(
@@ -210,10 +209,9 @@ class TestDatabaseMigration:
                 result = conn.execute(
                     "SELECT id, path, content, file_type FROM code_files WHERE id = 'test_id'"
                 ).fetchone()
-                
                 assert result is not None, "Data should be preserved after migration"
                 assert result[0] == "test_id"
-                assert result[1] == "/test/path.py" 
+                assert result[1] == "/test/path.py"
                 assert result[2] == "print('hello')"
                 assert result[3] is None  # New column should be null
 

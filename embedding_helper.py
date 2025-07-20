@@ -106,7 +106,10 @@ class EmbeddingGenerator:
                 batch_num = (i // batch_size) + 1
 
                 if show_progress:
-                    print(f"Processing batch {batch_num}/{total_batches} ({len(batch_texts)} texts)", file=sys.stderr)
+                    print(
+                        f"Processing batch {batch_num}/{total_batches} ({len(batch_texts)} texts)",
+                        file=sys.stderr
+                    )
 
                 # Process this batch
                 batch_embeddings = self.model.encode(batch_texts, show_progress_bar=False)
@@ -117,7 +120,10 @@ class EmbeddingGenerator:
             final_embeddings = np.concatenate(all_embeddings, axis=0)
 
             if show_progress:
-                print(f"✅ Completed processing {len(texts)} texts in {total_batches} batches", file=sys.stderr)
+                print(
+                    f"✅ Completed processing {len(texts)} texts in {total_batches} batches",
+                    file=sys.stderr
+                )
 
             return final_embeddings
 
@@ -125,7 +131,9 @@ class EmbeddingGenerator:
             print(f"❌ Failed to encode large batch: {e}", file=sys.stderr)
             raise
 
-    def encode_batch_with_retry(self, texts, batch_size=None, max_retries=None, show_progress=False):
+    def encode_batch_with_retry(
+        self, texts, batch_size=None, max_retries=None, show_progress=False
+    ):
         """Generate embeddings with retry logic for better reliability"""
         if self.model is None:
             raise ValueError("Model not initialized")
@@ -138,11 +146,18 @@ class EmbeddingGenerator:
                 return self.encode_batch(texts, effective_batch_size, show_progress)
             except Exception as e:
                 if attempt == effective_max_retries - 1:
-                    print(f"❌ Failed to encode batch after {effective_max_retries} attempts: {e}", file=sys.stderr)
+                    print(
+                        f"❌ Failed to encode batch after {effective_max_retries} attempts: {e}",
+                        file=sys.stderr
+                    )
                     raise
                 else:
-                    print(f"⚠️ Batch encoding attempt {attempt + 1} failed, retrying: {e}", file=sys.stderr)
-                    time.sleep(config.embedding.RETRY_BASE_DELAY * (2**attempt))  # Exponential backoff
+                    print(
+                        f"⚠️ Batch encoding attempt {attempt + 1} failed, retrying: {e}",
+                        file=sys.stderr
+                    )
+                    # Exponential backoff
+                    time.sleep(config.embedding.RETRY_BASE_DELAY * (2**attempt))
 
         # This should never be reached, but just in case
         raise RuntimeError(f"Failed to encode batch after {effective_max_retries} attempts")
