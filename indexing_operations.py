@@ -24,6 +24,7 @@ from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from language_detection import LanguageDetector
 from code_construct_extractor import CodeConstructExtractor
+from git_integration import RepositoryContextExtractor
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -66,6 +67,79 @@ def get_language_detector() -> LanguageDetector:
 def get_construct_extractor() -> CodeConstructExtractor:
     """Get a cached CodeConstructExtractor instance for efficient reuse."""
     return _instance_cache.get_construct_extractor()
+
+
+def extract_and_store_repository_context(db_manager: DatabaseManager, repo_path: Path) -> Optional[str]:
+    """
+    Extract repository context and store it in the database.
+
+    This function extracts git information, project type, dependencies, and other
+    repository-level metadata to provide better context for code understanding.
+
+    Args:
+        db_manager: DatabaseManager instance
+        repo_path: Path to the repository
+
+    Returns:
+        Repository ID if successful, None if extraction fails
+    """
+    try:
+        # Ensure repository context table exists
+        db_manager.create_repository_context_table()
+
+        # Extract repository context
+        extractor = RepositoryContextExtractor()
+        context = extractor.extract_context(repo_path)
+
+        if context:
+            # Store the context in the database
+            db_manager.store_repository_context(context)
+            logger.info(
+                "Stored repository context: type=%s, branch=%s, deps=%d",
+                context.project_type, context.git_branch, len(context.dependencies)
+            )
+            return context.repository_id
+        else:
+            logger.warning("Failed to extract repository context for %s", repo_path)
+            return None
+
+    except Exception as error:
+        logger.error("Failed to extract and store repository context: %s", error)
+        return None
+
+
+def update_repository_context_if_needed(db_manager: DatabaseManager, repo_path: Path) -> Optional[str]:
+    """
+    Update repository context if it's outdated or doesn't exist.
+
+    Args:
+        db_manager: DatabaseManager instance  
+        repo_path: Path to the repository
+
+    Returns:
+        Repository ID if successful, None if extraction fails
+    """
+    from git_integration import RepositoryContext
+
+    repo_path = repo_path.resolve()
+    repository_id = RepositoryContext.compute_repository_id(str(repo_path))
+
+    try:
+        # Check if context exists and is current
+        existing_context = db_manager.get_repository_context(repository_id)
+        
+        if existing_context:
+            # Update the indexed timestamp to show the repository was recently processed
+            db_manager.update_repository_context_indexed_time(repository_id)
+            logger.debug("Updated repository context timestamp for %s", repo_path)
+            return repository_id
+        else:
+            # Extract and store new context
+            return extract_and_store_repository_context(db_manager, repo_path)
+
+    except Exception as error:
+        logger.error("Failed to update repository context: %s", error)
+        return None
 
 
 def compute_id(text: str) -> str:
@@ -373,6 +447,30 @@ def embed_and_store(
     if not files:
         return
 
+    # Extract repository context once at the beginning
+    if files:
+        repo_path = files[0].parent
+        # Find the common parent directory or git repository root
+        try:
+            # Use git to find repository root if available
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                repo_path = Path(result.stdout.strip())
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to current working directory
+            repo_path = Path.cwd()
+
+        # Extract and store repository context
+        repository_id = update_repository_context_if_needed(db_manager, repo_path)
+        if repository_id:
+            logger.info("Repository context updated for %s", repo_path)
+
     rows = []
     failed_count = 0
     total_constructs = 0
@@ -578,6 +676,11 @@ def reindex_all(
     Returns:
         Tuple of (files_processed, embeddings_count)
     """
+    # Extract and store repository context at the beginning
+    repository_id = update_repository_context_if_needed(db_manager, repo_path)
+    if repository_id:
+        logger.info("Repository context extracted for %s", repo_path)
+
     # Scan repository for files
     files = scan_repo(repo_path, max_bytes)
 

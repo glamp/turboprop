@@ -629,5 +629,158 @@ class DatabaseManager:
             logger.error("Failed to get construct count: %s", e)
             return 0
 
+    def create_repository_context_table(self) -> None:
+        """
+        Create the repository_context table for storing repository-level metadata.
+
+        This table stores git information, project type, dependencies, and other
+        repository-level context that helps with code understanding.
+        """
+        logger.info("Creating repository_context table")
+
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS repository_context (
+            repository_id VARCHAR PRIMARY KEY,
+            repository_path VARCHAR NOT NULL,
+            git_branch VARCHAR,
+            git_commit VARCHAR,
+            git_remote_url VARCHAR,
+            project_type VARCHAR,
+            dependencies JSON,
+            package_managers JSON,
+            indexed_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+        create_indexes_sql = [
+            "CREATE INDEX IF NOT EXISTS idx_repository_context_path ON repository_context(repository_path)",
+            "CREATE INDEX IF NOT EXISTS idx_repository_context_type ON repository_context(project_type)",
+            "CREATE INDEX IF NOT EXISTS idx_repository_context_indexed ON repository_context(indexed_at)"
+        ]
+
+        try:
+            with self.get_connection() as conn:
+                # Create the table
+                conn.execute(create_table_sql)
+
+                # Create indexes
+                for index_sql in create_indexes_sql:
+                    conn.execute(index_sql)
+
+                logger.info("Successfully created repository_context table with indexes")
+
+        except Exception as e:
+            logger.error("Failed to create repository_context table: %s", e)
+            raise DatabaseError(f"Failed to create repository_context table: {e}") from e
+
+    def store_repository_context(self, context) -> None:
+        """
+        Store repository context information in the database.
+
+        Args:
+            context: RepositoryContext instance to store
+        """
+        try:
+            context_dict = context.to_dict()
+            with self.get_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO repository_context
+                    (repository_id, repository_path, git_branch, git_commit, git_remote_url,
+                     project_type, dependencies, package_managers, indexed_at, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        context_dict['repository_id'],
+                        context_dict['repository_path'],
+                        context_dict['git_branch'],
+                        context_dict['git_commit'],
+                        context_dict['git_remote_url'],
+                        context_dict['project_type'],
+                        context_dict['dependencies'],
+                        context_dict['package_managers'],
+                        context_dict['indexed_at'],
+                        context_dict['created_at']
+                    )
+                )
+                logger.debug("Stored repository context for %s", context.repository_path)
+
+        except Exception as e:
+            logger.error("Failed to store repository context: %s", e)
+            raise DatabaseError(f"Failed to store repository context: {e}") from e
+
+    def get_repository_context(self, repository_id: str) -> Optional[dict]:
+        """
+        Get repository context by repository ID.
+
+        Args:
+            repository_id: ID of the repository
+
+        Returns:
+            Dictionary with repository context, or None if not found
+        """
+        try:
+            with self.get_connection() as conn:
+                result = conn.execute(
+                    "SELECT * FROM repository_context WHERE repository_id = ?",
+                    (repository_id,)
+                ).fetchone()
+                
+                if result:
+                    # Convert result to dictionary
+                    columns = [desc[0] for desc in conn.description]
+                    return dict(zip(columns, result))
+                return None
+
+        except Exception as e:
+            logger.error("Failed to get repository context for %s: %s", repository_id, e)
+            return None
+
+    def get_repository_context_by_path(self, repository_path: str) -> Optional[dict]:
+        """
+        Get repository context by repository path.
+
+        Args:
+            repository_path: Path of the repository
+
+        Returns:
+            Dictionary with repository context, or None if not found
+        """
+        try:
+            with self.get_connection() as conn:
+                result = conn.execute(
+                    "SELECT * FROM repository_context WHERE repository_path = ?",
+                    (repository_path,)
+                ).fetchone()
+                
+                if result:
+                    # Convert result to dictionary  
+                    columns = [desc[0] for desc in conn.description]
+                    return dict(zip(columns, result))
+                return None
+
+        except Exception as e:
+            logger.error("Failed to get repository context for path %s: %s", repository_path, e)
+            return None
+
+    def update_repository_context_indexed_time(self, repository_id: str) -> None:
+        """
+        Update the indexed_at timestamp for a repository.
+
+        Args:
+            repository_id: ID of the repository to update
+        """
+        try:
+            with self.get_connection() as conn:
+                conn.execute(
+                    "UPDATE repository_context SET indexed_at = CURRENT_TIMESTAMP WHERE repository_id = ?",
+                    (repository_id,)
+                )
+                logger.debug("Updated indexed time for repository %s", repository_id)
+
+        except Exception as e:
+            logger.error("Failed to update repository context indexed time: %s", e)
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cleanup()

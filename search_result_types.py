@@ -75,6 +75,8 @@ class CodeSearchResult:
     confidence_level: Optional[str] = None
     # Additional snippets from the same file (for multi-snippet support)
     additional_snippets: List[CodeSnippet] = field(default_factory=list)
+    # Repository context information
+    repository_context: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Initialize default values after dataclass construction."""
@@ -115,7 +117,8 @@ class CodeSearchResult:
         file_path: str,
         snippets: List[CodeSnippet],
         similarity_score: float,
-        file_metadata: Optional[Dict[str, Any]] = None
+        file_metadata: Optional[Dict[str, Any]] = None,
+        repository_context: Optional[Dict[str, Any]] = None
     ) -> 'CodeSearchResult':
         """
         Create a CodeSearchResult from multiple snippets.
@@ -125,6 +128,7 @@ class CodeSearchResult:
             snippets: List of CodeSnippet objects (first becomes primary)
             similarity_score: Similarity score for the result
             file_metadata: Optional file metadata
+            repository_context: Optional repository context
 
         Returns:
             CodeSearchResult with primary and additional snippets
@@ -140,7 +144,8 @@ class CodeSearchResult:
             snippet=primary_snippet,
             similarity_score=similarity_score,
             file_metadata=file_metadata,
-            additional_snippets=additional_snippets
+            additional_snippets=additional_snippets,
+            repository_context=repository_context
         )
 
     @property
@@ -181,7 +186,11 @@ class CodeSearchResult:
             return self.file_path
 
     @classmethod
-    def from_tuple(cls, legacy_tuple: Tuple[str, str, float]) -> 'CodeSearchResult':
+    def from_tuple(
+        cls, 
+        legacy_tuple: Tuple[str, str, float], 
+        repository_context: Optional[Dict[str, Any]] = None
+    ) -> 'CodeSearchResult':
         """
         Create CodeSearchResult from legacy tuple format.
 
@@ -190,6 +199,7 @@ class CodeSearchResult:
 
         Args:
             legacy_tuple: Tuple in format (file_path, snippet_text, distance_score)
+            repository_context: Optional repository context to include
 
         Returns:
             CodeSearchResult instance created from tuple data
@@ -209,7 +219,8 @@ class CodeSearchResult:
         return cls(
             file_path=file_path,
             snippet=snippet,
-            similarity_score=similarity_score
+            similarity_score=similarity_score,
+            repository_context=repository_context
         )
 
     def to_tuple(self) -> Tuple[str, str, float]:
@@ -250,7 +261,8 @@ class CodeSearchResult:
             'similarity_score': self.similarity_score,
             'similarity_percentage': self.similarity_percentage,
             'file_metadata': self.file_metadata,
-            'confidence_level': self.confidence_level
+            'confidence_level': self.confidence_level,
+            'repository_context': self.repository_context
         }
 
         # Include additional snippets if present
