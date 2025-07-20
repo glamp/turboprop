@@ -17,11 +17,12 @@ The server uses stdio transport for communication with MCP clients.
 """
 
 import argparse
+import json
 import logging
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
@@ -55,6 +56,15 @@ from search_operations import (
 )
 
 # Removed unused imports: CodeSearchResult, convert_results_to_legacy_format, convert_legacy_to_enhanced_format
+
+# Import MCP tool search functionality
+from tool_search_mcp_tools import (
+    initialize_search_engines,
+    search_mcp_tools as _search_mcp_tools,
+    get_tool_details as _get_tool_details,
+    list_tool_categories as _list_tool_categories,
+    search_tools_by_capability as _search_tools_by_capability,
+)
 
 # Global lock for database connection management
 _db_connection_lock: threading.Lock = threading.Lock()
@@ -1435,6 +1445,174 @@ def search_hybrid_constructs(
         return f"❌ Hybrid search failed for query '{query}': {e}"
 
 
+# MCP Tool Search Tools
+
+@mcp.tool()
+def search_mcp_tools(
+    query: str,
+    category: str = None,
+    tool_type: str = None,
+    max_results: int = 10,
+    include_examples: bool = True,
+    search_mode: str = "hybrid"
+) -> str:
+    """
+    🔍 TURBOPROP: Search MCP tools by functionality or description
+    
+    FIND MCP TOOLS BY MEANING! This performs semantic search over available MCP tools,
+    finding tools that match the functional requirements described in natural language.
+    
+    🎯 SEARCH EXAMPLES:
+    • "file operations with error handling" - Find file manipulation tools
+    • "execute shell commands" - Find command execution tools
+    • "web scraping tools" - Find web and HTTP tools
+    • "data analysis functions" - Find analysis and processing tools
+    
+    🏆 ADVANTAGES:
+    • Understands TOOL FUNCTIONALITY, not just names
+    • Finds tools across different categories
+    • Provides usage examples and guidance
+    • Perfect for discovering tools you didn't know existed
+    
+    Args:
+        query: Natural language description of desired functionality
+        category: Optional filter by tool category (file_ops, web, analysis, etc.)
+        tool_type: Optional filter by tool type (system, custom, third_party)
+        max_results: Maximum number of tools to return (1-50)
+        include_examples: Whether to include usage examples in results
+        search_mode: Search strategy ('semantic', 'hybrid', 'keyword')
+        
+    Returns:
+        JSON with tool search results, metadata, and suggestions
+    """
+    try:
+        result = _search_mcp_tools(query, category, tool_type, max_results, include_examples, search_mode)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error searching MCP tools: {str(e)}"
+
+
+@mcp.tool()
+def get_tool_details(
+    tool_id: str,
+    include_schema: bool = True,
+    include_examples: bool = True,
+    include_relationships: bool = True,
+    include_usage_guidance: bool = True
+) -> str:
+    """
+    📋 TURBOPROP: Get comprehensive information about a specific MCP tool
+    
+    DEEP DIVE INTO ANY TOOL! This provides detailed information about a specific MCP tool
+    including parameters, usage examples, relationships with other tools, and best practices.
+    
+    🎯 WHAT YOU GET:
+    • Complete parameter schema with types and constraints
+    • Real usage examples with expected outputs
+    • Alternative and complementary tools
+    • Best practices and common pitfalls
+    • Implementation guidance and tips
+    
+    💡 PERFECT FOR:
+    • Understanding tool capabilities before use
+    • Learning proper usage patterns
+    • Finding alternative tools for comparison
+    • Debugging tool usage issues
+    
+    Args:
+        tool_id: Identifier of the tool to inspect (e.g., 'bash', 'read', 'search_code')
+        include_schema: Include full parameter schema and type information
+        include_examples: Include usage examples and code snippets
+        include_relationships: Include alternative and complementary tools
+        include_usage_guidance: Include best practices and common pitfalls
+        
+    Returns:
+        JSON with comprehensive tool documentation and metadata
+    """
+    try:
+        result = _get_tool_details(tool_id, include_schema, include_examples, include_relationships, include_usage_guidance)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error getting tool details: {str(e)}"
+
+
+@mcp.tool()
+def list_tool_categories() -> str:
+    """
+    📊 TURBOPROP: Get overview of available tool categories and their contents
+    
+    BROWSE TOOLS BY CATEGORY! This provides a structured overview of all available tool
+    categories, helping you understand the organization of tools and browse by functional area.
+    
+    🎯 CATEGORY OVERVIEW INCLUDES:
+    • Category names and descriptions
+    • Tool counts per category
+    • Representative tools in each category
+    • Usage patterns and common workflows
+    
+    💡 USEFUL FOR:
+    • Understanding tool organization
+    • Discovering tools in specific domains
+    • Planning multi-tool workflows
+    • Getting oriented with available functionality
+    
+    Returns:
+        JSON with categories, tool counts, descriptions, and representative tools
+    """
+    try:
+        result = _list_tool_categories()
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error listing tool categories: {str(e)}"
+
+
+@mcp.tool()
+def search_tools_by_capability(
+    capability_description: str,
+    required_parameters: List[str] = None,
+    preferred_complexity: str = "any",
+    max_results: int = 10
+) -> str:
+    """
+    🎯 TURBOPROP: Search tools by specific capability requirements
+    
+    PRECISION TOOL MATCHING! This finds tools that have specific capabilities or parameter
+    requirements, enabling precise tool matching for technical requirements.
+    
+    🎯 CAPABILITY SEARCH FOR:
+    • Specific parameter requirements
+    • Complexity preferences (simple, moderate, complex)
+    • Technical capabilities and features
+    • Performance characteristics
+    
+    💡 EXAMPLES:
+    • "timeout support" - Find tools with timeout capabilities
+    • "file path handling" with required_parameters=["file_path"]
+    • "error handling" with preferred_complexity="simple"
+    • "batch processing" - Find tools that can process multiple items
+    
+    🏆 ADVANTAGES:
+    • Matches exact technical requirements
+    • Filters by complexity to match user skill level
+    • Explains why each tool matches requirements
+    • Provides implementation guidance
+    
+    Args:
+        capability_description: Description of required capability
+        required_parameters: List of parameter names that must be supported
+        preferred_complexity: Complexity preference ('simple', 'moderate', 'complex', 'any')
+        max_results: Maximum number of tools to return
+        
+    Returns:
+        JSON with tools matching capability requirements and match explanations
+    """
+    try:
+        result = _search_tools_by_capability(capability_description, required_parameters, preferred_complexity, max_results)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error searching tools by capability: {str(e)}"
+
+
 @mcp.prompt()
 def search(query: str = "") -> str:
     """
@@ -1800,6 +1978,15 @@ def main():
         start_file_watcher()
         print(file=sys.stderr)
 
+    # Initialize MCP tool search engines
+    try:
+        db_connection = get_db_connection()
+        embedder = get_embedder()
+        initialize_search_engines(db_connection, embedder)
+        print("🔧 MCP tool search engines initialized", file=sys.stderr)
+    except Exception as e:
+        print(f"⚠️  Warning: MCP tool search engines not initialized: {e}", file=sys.stderr)
+    
     print("🎯 MCP Server ready - listening for tool calls...", file=sys.stderr)
     print("=" * 40, file=sys.stderr)
     print(file=sys.stderr)
@@ -1809,6 +1996,12 @@ def main():
     print("  • tp:get_index_status - Check index health & stats", file=sys.stderr)
     print("  • tp:watch_repository - Live index updates", file=sys.stderr)
     print("  • tp:list_indexed_files - Browse indexed files", file=sys.stderr)
+    print(file=sys.stderr)
+    print("🧰 MCP TOOL SEARCH (NEW!):", file=sys.stderr)
+    print("  • tp:search_mcp_tools - Find MCP tools by functionality", file=sys.stderr)
+    print("  • tp:get_tool_details - Get comprehensive tool information", file=sys.stderr)
+    print("  • tp:list_tool_categories - Browse tools by category", file=sys.stderr)
+    print("  • tp:search_tools_by_capability - Find tools by specific capabilities", file=sys.stderr)
     print(file=sys.stderr)
     print("⚡ SLASH COMMANDS (type '/' to see all):", file=sys.stderr)
     print("  • /mcp__turboprop__search <query> - Fast semantic search", file=sys.stderr)
