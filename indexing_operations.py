@@ -29,6 +29,17 @@ TABLE_NAME = "code_files"
 DIMENSIONS = 384
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
+# Global language detector instance for efficient reuse
+_language_detector = None
+
+
+def get_language_detector() -> LanguageDetector:
+    """Get a cached LanguageDetector instance for efficient reuse."""
+    global _language_detector
+    if _language_detector is None:
+        _language_detector = LanguageDetector()
+    return _language_detector
+
 
 def compute_id(text: str) -> str:
     """
@@ -46,11 +57,11 @@ def compute_id(text: str) -> str:
 def extract_file_metadata(file_path: Path, content: str) -> Dict[str, any]:
     """
     Extract metadata from a file including language detection and file statistics.
-    
+
     Args:
         file_path: Path to the file
         content: Content of the file
-        
+
     Returns:
         Dictionary containing file metadata:
         - file_type: File extension
@@ -59,9 +70,9 @@ def extract_file_metadata(file_path: Path, content: str) -> Dict[str, any]:
         - line_count: Number of lines in the file
         - category: File category (source/configuration/documentation/build/etc.)
     """
-    detector = LanguageDetector()
+    detector = get_language_detector()
     detection_result = detector.detect_language(str(file_path), content)
-    
+
     # Count lines - handle edge cases properly
     if not content:
         line_count = 0
@@ -69,7 +80,7 @@ def extract_file_metadata(file_path: Path, content: str) -> Dict[str, any]:
         line_count = content.count('\n')
     else:
         line_count = content.count('\n') + 1
-    
+
     return {
         "file_type": detection_result.file_type,
         "language": detection_result.language,
@@ -159,7 +170,8 @@ def get_existing_file_hashes(db_manager: DatabaseManager) -> Dict[str, str]:
     try:
         rows = db_manager.execute_with_retry(f"SELECT path, id FROM {TABLE_NAME}")
         return {row[0]: row[1] for row in rows}
-    except Exception:
+    except (OSError, RuntimeError) as error:
+        print(f"⚠️  Database query failed: {error}", file=sys.stderr)
         return {}
 
 
@@ -183,21 +195,72 @@ def filter_changed_files(files: List[Path], existing_hashes: Dict[str, str]) -> 
             current_hash = compute_id(str(file_path) + content)
 
             # Check if file is new or changed
-            if str(file_path) not in existing_hashes or existing_hashes[str(file_path)] != current_hash:
+            file_path_str = str(file_path)
+            if (file_path_str not in existing_hashes or 
+                existing_hashes[file_path_str] != current_hash):
                 changed_files.append(file_path)
 
-        except Exception as e:
-            print(f"⚠️  Could not read {file_path}: {e}", file=sys.stderr)
+        except (OSError, UnicodeDecodeError) as error:
+            print(f"⚠️  Could not read {file_path}: {error}", file=sys.stderr)
             continue
 
     return changed_files
+
+
+def _process_single_file(embedder: EmbeddingGenerator, path: Path) -> Optional[Tuple]:
+    """
+    Process a single file to create database row data.
+    
+    Args:
+        embedder: EmbeddingGenerator instance
+        path: Path to the file to process
+        
+    Returns:
+        Tuple of database row data, or None if processing failed
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+        uid = compute_id(str(path) + text)
+        
+        emb = embedder.encode(text)
+        file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
+        metadata = extract_file_metadata(path, text)
+        
+        return (
+            uid, str(path), text, emb.tolist(), file_mtime,
+            metadata["file_type"], metadata["language"],
+            metadata["size_bytes"], metadata["line_count"], metadata["category"]
+        )
+    except (OSError, UnicodeDecodeError, RuntimeError) as error:
+        print(f"⚠️  Failed to process {path}: {error}", file=sys.stderr)
+        return None
+
+
+def _batch_insert_rows(db_manager: DatabaseManager, rows: List[Tuple]) -> None:
+    """
+    Insert processed rows into the database in batch.
+    
+    Args:
+        db_manager: DatabaseManager instance
+        rows: List of database row tuples to insert
+    """
+    operations = [
+        (
+            f"INSERT OR REPLACE INTO {TABLE_NAME} "
+            f"(id, path, content, embedding, file_mtime, file_type, language, "
+            f"size_bytes, line_count, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            row,
+        )
+        for row in rows
+    ]
+    db_manager.execute_transaction(operations)
+    print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
 
 
 def embed_and_store(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
     files: List[Path],
-    max_workers: Optional[int] = None,
     progress_callback: Optional[Callable] = None,
 ) -> None:
     """
@@ -208,67 +271,36 @@ def embed_and_store(
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance for generating embeddings
         files: List of Path objects to process
-        max_workers: Number of parallel workers (ignored - always sequential)
         progress_callback: Function to call with progress updates (deprecated, use tqdm)
     """
     if not files:
         return
 
     rows = []
-    failed_files = []
+    failed_count = 0
 
     # Use sequential processing for reliability
     with tqdm(total=len(files), desc="🔍 Generating embeddings", unit="files") as pbar:
         for path in files:
-            try:
-                text = path.read_text(encoding="utf-8")
-                uid = compute_id(str(path) + text)
-
-                emb = embedder.encode(text)
-                # Get file modification time
-                file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
-                
-                # Extract file metadata
-                metadata = extract_file_metadata(path, text)
-                
-                rows.append((
-                    uid, str(path), text, emb.tolist(), file_mtime,
-                    metadata["file_type"], metadata["language"], 
-                    metadata["size_bytes"], metadata["line_count"], metadata["category"]
-                ))
-
-            except Exception as e:
-                print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
-                failed_files.append(path)
+            row_data = _process_single_file(embedder, path)
+            if row_data:
+                rows.append(row_data)
+            else:
+                failed_count += 1
 
             pbar.update(1)
-
+            
             # Maintain backward compatibility with progress_callback
             if progress_callback:
                 progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
 
     # Report processing results
-    if failed_files:
-        print(
-            f"⚠️  Failed to process {len(failed_files)} files out of " f"{len(files)} total",
-            file=sys.stderr,
-        )
+    if failed_count > 0:
+        print(f"⚠️  Failed to process {failed_count} files out of {len(files)} total", file=sys.stderr)
 
     # Insert all rows in a single batch operation for better performance
     if rows:
-        operations = [
-            (
-                (
-                    f"INSERT OR REPLACE INTO {TABLE_NAME} "
-                    f"(id, path, content, embedding, file_mtime, file_type, language, size_bytes, line_count, category) "
-                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                ),
-                row,
-            )
-            for row in rows
-        ]
-        db_manager.execute_transaction(operations)
-        print(f"✅ Successfully processed {len(rows)} files", file=sys.stderr)
+        _batch_insert_rows(db_manager, rows)
 
 
 def build_full_index(db_manager: DatabaseManager) -> int:
@@ -285,11 +317,14 @@ def build_full_index(db_manager: DatabaseManager) -> int:
         Number of embeddings in the database, or 0 if none found
     """
     # Check if we have any embeddings in the database
-    result = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
+    query = f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL"
+    result = db_manager.execute_with_retry(query)
     return result[0][0] if result and result[0] else 0
 
 
-def embed_and_store_single(db_manager: DatabaseManager, embedder: EmbeddingGenerator, path: Path) -> bool:
+def embed_and_store_single(
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, path: Path
+) -> bool:
     """
     Process a single file by generating embeddings and storing them in the database.
 
@@ -308,23 +343,23 @@ def embed_and_store_single(db_manager: DatabaseManager, embedder: EmbeddingGener
         emb = embedder.encode(text)
         # Get file modification time
         file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
-        
+
         # Extract file metadata
         metadata = extract_file_metadata(path, text)
 
         # Insert into database
         db_manager.execute_with_retry(
             f"INSERT OR REPLACE INTO {TABLE_NAME} "
-            f"(id, path, content, embedding, file_mtime, file_type, language, size_bytes, line_count, category) "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"(id, path, content, embedding, file_mtime, file_type, language, "
+            f"size_bytes, line_count, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (uid, str(path), text, emb.tolist(), file_mtime,
-             metadata["file_type"], metadata["language"], 
+             metadata["file_type"], metadata["language"],
              metadata["size_bytes"], metadata["line_count"], metadata["category"]),
         )
         return True
 
-    except Exception as e:
-        print(f"⚠️  Failed to process {path}: {e}", file=sys.stderr)
+    except (OSError, UnicodeDecodeError, RuntimeError) as error:
+        print(f"⚠️  Failed to process {path}: {error}", file=sys.stderr)
         return False
 
 
@@ -356,7 +391,10 @@ def remove_orphaned_files(db_manager: DatabaseManager, current_files: List[Path]
 
     # Remove orphaned files
     if orphaned_files:
-        operations = [(f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)) for path in orphaned_files]
+        operations = [
+            (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)) 
+            for path in orphaned_files
+        ]
         db_manager.execute_transaction(operations)
         print(
             f"🗑️  Removed {len(orphaned_files)} orphaned files from index",
@@ -381,7 +419,8 @@ def get_last_index_time(db_manager: DatabaseManager) -> Optional[datetime.dateti
         if result and result[0] and result[0][0]:
             return result[0][0]
         return None
-    except Exception:
+    except (OSError, RuntimeError) as error:
+        print(f"⚠️  Failed to get last index time: {error}", file=sys.stderr)
         return None
 
 

@@ -24,6 +24,157 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
+class ConnectionManager:
+    """Manages database connections with lifecycle management."""
+
+    def __init__(self, db_path: Path, connection_timeout: float):
+        self.db_path = db_path
+        self.connection_timeout = connection_timeout
+        self._connections: Dict[int, duckdb.DuckDBPyConnection] = {}
+        self._connection_created_time: Dict[int, float] = {}
+        self._connection_last_used: Dict[int, float] = {}
+
+    def get_thread_connection(self) -> duckdb.DuckDBPyConnection:
+        """Get or create a connection for the current thread with lifecycle management."""
+        thread_id = threading.get_ident()
+        current_time = time.time()
+
+        # Check if connection exists and is still valid
+        if thread_id in self._connections:
+            conn = self._connections[thread_id]
+            created_time = self._connection_created_time.get(thread_id, 0)
+            last_used = self._connection_last_used.get(thread_id, 0)
+
+            # Check connection age
+            if current_time - created_time > config.database.CONNECTION_MAX_AGE:
+                logger.debug("Recreating connection for thread %s: max age exceeded", thread_id)
+                self._close_thread_connection(thread_id)
+            # Check idle timeout
+            elif current_time - last_used > config.database.CONNECTION_IDLE_TIMEOUT:
+                logger.debug("Recreating connection for thread %s: idle timeout exceeded", thread_id)
+                self._close_thread_connection(thread_id)
+            # Check connection health
+            elif not self._check_connection_health(conn):
+                logger.debug("Recreating connection for thread %s: health check failed", thread_id)
+                self._close_thread_connection(thread_id)
+            else:
+                # Update last used time and return existing connection
+                self._connection_last_used[thread_id] = current_time
+                return conn
+
+        # Create new connection if needed
+        if thread_id not in self._connections:
+            self._connections[thread_id] = self._create_connection()
+            self._connection_created_time[thread_id] = current_time
+            self._connection_last_used[thread_id] = current_time
+            logger.debug("Created new connection for thread %s", thread_id)
+
+        return self._connections[thread_id]
+
+    def _create_connection(self) -> duckdb.DuckDBPyConnection:
+        """Create a new database connection with proper configuration."""
+        try:
+            # Ensure database directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create connection - DuckDB uses different configuration than SQLite
+            conn = duckdb.connect(str(self.db_path))
+
+            # Configure for better performance and concurrency
+            # DuckDB automatically handles WAL-like behavior and concurrency
+            conn.execute(f"SET memory_limit = '{config.database.MEMORY_LIMIT}'")
+            conn.execute(f"SET threads = {config.database.THREADS}")
+
+            # Configure timeout settings
+            if (hasattr(conn, "execute") and
+                config.database.STATEMENT_TIMEOUT > 0):
+                # Note: DuckDB doesn't have a direct statement timeout,
+                # but we can use this for logging
+                pass
+
+            # Configure temporary directory if specified
+            if config.database.TEMP_DIRECTORY:
+                conn.execute(f"SET temp_directory = '{config.database.TEMP_DIRECTORY}'")
+
+            # Configure auto-vacuum if enabled
+            if config.database.AUTO_VACUUM:
+                # DuckDB handles this automatically, but we can add related optimizations
+                pass
+
+            return conn
+        except PermissionError as e:
+            raise DatabasePermissionError(
+                f"Permission denied when creating database connection: {e}"
+            ) from e
+        except OSError as e:
+            if "no space left" in str(e).lower():
+                raise DatabaseDiskSpaceError(
+                    f"Insufficient disk space when creating database connection: {e}"
+                ) from e
+            raise DatabaseConnectionTimeoutError(f"Failed to create database connection: {e}") from e
+        except duckdb.Error as e:
+            if "corrupt" in str(e).lower():
+                raise DatabaseCorruptionError(f"Database corruption detected: {e}") from e
+            raise DatabaseError(f"Database error when creating connection: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error when creating database connection: {e}") from e
+
+    def _check_connection_health(self, conn: duckdb.DuckDBPyConnection) -> bool:
+        """Check if a connection is healthy and usable."""
+        try:
+            # Simple health check - execute a basic query
+            conn.execute("SELECT 1").fetchone()
+            return True
+        except (duckdb.Error, OSError, RuntimeError) as e:
+            logger.debug("Connection health check failed: %s", e)
+            return False
+
+    def _close_thread_connection(self, thread_id: int) -> None:
+        """Close and remove a specific thread connection."""
+        if thread_id in self._connections:
+            try:
+                self._connections[thread_id].close()
+            except Exception as e:
+                logger.debug("Error closing connection for thread %s: %s", thread_id, e)
+
+            # Remove from all tracking dictionaries
+            self._connections.pop(thread_id, None)
+            self._connection_created_time.pop(thread_id, None)
+            self._connection_last_used.pop(thread_id, None)
+
+    def cleanup_idle_connections(self) -> int:
+        """Clean up idle connections and return the number of connections closed."""
+        current_time = time.time()
+        closed_count = 0
+
+        threads_to_close = []
+        for thread_id, last_used in self._connection_last_used.items():
+            if current_time - last_used > config.database.CONNECTION_IDLE_TIMEOUT:
+                threads_to_close.append(thread_id)
+
+        for thread_id in threads_to_close:
+            self._close_thread_connection(thread_id)
+            closed_count += 1
+
+        if closed_count > 0:
+            logger.debug("Cleaned up %d idle connections", closed_count)
+
+        return closed_count
+
+    def cleanup(self) -> None:
+        """Clean up all connections."""
+        # Close all thread connections
+        for conn in self._connections.values():
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        self._connections.clear()
+        self._connection_created_time.clear()
+        self._connection_last_used.clear()
+
+
 class DatabaseManager:
     """
     Thread-safe database connection manager with file locking and proper lifecycle
@@ -41,14 +192,14 @@ class DatabaseManager:
         self.db_path = db_path
         self.max_retries = max_retries or config.database.MAX_RETRIES
         self.retry_delay = retry_delay or config.database.RETRY_DELAY
-        self.connection_timeout = connection_timeout or config.database.CONNECTION_TIMEOUT
         self.lock_timeout = lock_timeout or config.database.LOCK_TIMEOUT
         self._lock = threading.RLock()
-        self._connections: Dict[int, duckdb.DuckDBPyConnection] = {}
-        self._connection_created_time: Dict[int, float] = {}
-        self._connection_last_used: Dict[int, float] = {}
         self._file_lock: Optional[TextIO] = None
         self._lock_file_path = db_path.with_suffix(".lock")
+        
+        # Use ConnectionManager for connection handling
+        self.connection_timeout = connection_timeout or config.database.CONNECTION_TIMEOUT
+        self._connection_manager = ConnectionManager(db_path, self.connection_timeout)
 
         # Register cleanup handlers only in main thread
         try:
@@ -57,6 +208,25 @@ class DatabaseManager:
         except ValueError:
             # Signal handling only works in main thread, ignore in other threads
             pass
+
+    @property
+    def _connections(self):
+        """Access to connection manager's connections for testing."""
+        return self._connection_manager._connections
+
+    @property
+    def _connection_created_time(self):
+        """Access to connection manager's creation times for testing."""
+        return self._connection_manager._connection_created_time
+
+    @property
+    def _connection_last_used(self):
+        """Access to connection manager's last used times for testing."""
+        return self._connection_manager._connection_last_used
+
+    def _check_connection_health(self, conn):
+        """Check if a connection is healthy - delegates to connection manager."""
+        return self._connection_manager._check_connection_health(conn)
 
     def _signal_handler(self, signum, frame):
         """Handle termination signals gracefully."""
@@ -123,135 +293,10 @@ class DatabaseManager:
             finally:
                 self._file_lock = None
 
-    def _create_connection(self) -> duckdb.DuckDBPyConnection:
-        """Create a new database connection with proper configuration."""
-        try:
-            # Ensure database directory exists
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Create connection - DuckDB uses different configuration than SQLite
-            conn = duckdb.connect(str(self.db_path))
-
-            # Configure for better performance and concurrency
-            # DuckDB automatically handles WAL-like behavior and concurrency
-            conn.execute(f"SET memory_limit = '{config.database.MEMORY_LIMIT}'")
-            conn.execute(f"SET threads = {config.database.THREADS}")
-
-            # Configure timeout settings
-            if (hasattr(conn, "execute") and 
-                config.database.STATEMENT_TIMEOUT > 0):
-                # Note: DuckDB doesn't have a direct statement timeout, but we can use this for logging
-                pass
-
-            # Configure temporary directory if specified
-            if config.database.TEMP_DIRECTORY:
-                conn.execute(f"SET temp_directory = '{config.database.TEMP_DIRECTORY}'")
-
-            # Configure auto-vacuum if enabled
-            if config.database.AUTO_VACUUM:
-                # DuckDB handles this automatically, but we can add related optimizations
-                pass
-
-            return conn
-        except PermissionError as e:
-            raise DatabasePermissionError(
-                f"Permission denied when creating database connection: {e}"
-            )
-        except OSError as e:
-            if "no space left" in str(e).lower():
-                raise DatabaseDiskSpaceError(
-                    f"Insufficient disk space when creating database connection: {e}"
-                )
-            else:
-                raise DatabaseConnectionTimeoutError(f"Failed to create database connection: {e}")
-        except duckdb.Error as e:
-            if "corrupt" in str(e).lower():
-                raise DatabaseCorruptionError(f"Database corruption detected: {e}")
-            else:
-                raise DatabaseError(f"Database error when creating connection: {e}")
-        except Exception as e:
-            raise DatabaseError(f"Unexpected error when creating database connection: {e}")
-
-    def _get_thread_connection(self) -> duckdb.DuckDBPyConnection:
-        """Get or create a connection for the current thread with lifecycle management."""
-        thread_id = threading.get_ident()
-        current_time = time.time()
-
-        # Check if connection exists and is still valid
-        if thread_id in self._connections:
-            conn = self._connections[thread_id]
-            created_time = self._connection_created_time.get(thread_id, 0)
-            last_used = self._connection_last_used.get(thread_id, 0)
-
-            # Check connection age
-            if current_time - created_time > config.database.CONNECTION_MAX_AGE:
-                logger.debug(f"Recreating connection for thread {thread_id}: max age exceeded")
-                self._close_thread_connection(thread_id)
-            # Check idle timeout
-            elif current_time - last_used > config.database.CONNECTION_IDLE_TIMEOUT:
-                logger.debug(f"Recreating connection for thread {thread_id}: idle timeout exceeded")
-                self._close_thread_connection(thread_id)
-            # Check connection health
-            elif not self._check_connection_health(conn):
-                logger.debug(f"Recreating connection for thread {thread_id}: health check failed")
-                self._close_thread_connection(thread_id)
-            else:
-                # Update last used time and return existing connection
-                self._connection_last_used[thread_id] = current_time
-                return conn
-
-        # Create new connection if needed
-        if thread_id not in self._connections:
-            self._connections[thread_id] = self._create_connection()
-            self._connection_created_time[thread_id] = current_time
-            self._connection_last_used[thread_id] = current_time
-            logger.debug(f"Created new connection for thread {thread_id}")
-
-        return self._connections[thread_id]
-
-    def _check_connection_health(self, conn: duckdb.DuckDBPyConnection) -> bool:
-        """Check if a connection is healthy and usable."""
-        try:
-            # Simple health check - execute a basic query
-            conn.execute("SELECT 1").fetchone()
-            return True
-        except Exception as e:
-            logger.debug(f"Connection health check failed: {e}")
-            return False
-
-    def _close_thread_connection(self, thread_id: int) -> None:
-        """Close and remove a specific thread connection."""
-        if thread_id in self._connections:
-            try:
-                self._connections[thread_id].close()
-            except Exception as e:
-                logger.debug(f"Error closing connection for thread {thread_id}: {e}")
-
-            # Remove from all tracking dictionaries
-            self._connections.pop(thread_id, None)
-            self._connection_created_time.pop(thread_id, None)
-            self._connection_last_used.pop(thread_id, None)
-
     def cleanup_idle_connections(self) -> int:
         """Clean up idle connections and return the number of connections closed."""
-        current_time = time.time()
-        closed_count = 0
-
         with self._lock:
-            threads_to_close = []
-
-            for thread_id, last_used in self._connection_last_used.items():
-                if current_time - last_used > config.database.CONNECTION_IDLE_TIMEOUT:
-                    threads_to_close.append(thread_id)
-
-            for thread_id in threads_to_close:
-                self._close_thread_connection(thread_id)
-                closed_count += 1
-
-        if closed_count > 0:
-            logger.debug(f"Cleaned up {closed_count} idle connections")
-
-        return closed_count
+            return self._connection_manager.cleanup_idle_connections()
 
     @contextmanager
     def get_connection(self):
@@ -266,13 +311,13 @@ class DatabaseManager:
             if not self._file_lock:
                 self._acquire_file_lock()
 
-            conn = self._get_thread_connection()
+            conn = self._connection_manager.get_thread_connection()
 
             try:
                 yield conn
             except Exception as e:
                 # Log error but don't re-raise to allow cleanup
-                logger.error(f"Database operation failed: {e}")
+                logger.error("Database operation failed: %s", e)
                 raise DatabaseError(f"Database operation failed: {e}") from e
 
     def execute_with_retry(self, query: str, params: Optional[tuple] = None) -> Any:
@@ -284,20 +329,19 @@ class DatabaseManager:
                 with self.get_connection() as conn:
                     if params:
                         return conn.execute(query, params).fetchall()
-                    else:
-                        return conn.execute(query).fetchall()
+                    return conn.execute(query).fetchall()
             except duckdb.Error as e:
                 if "database is locked" in str(e).lower() and attempt < self.max_retries - 1:
                     logger.warning(
-                        f"Database locked on attempt {attempt + 1}, retrying in "
-                        f"{self.retry_delay * (2**attempt):.1f}s"
+                        "Database locked on attempt %d, retrying in %.1fs",
+                        attempt + 1, self.retry_delay * (2**attempt)
                     )
                     time.sleep(self.retry_delay * (2**attempt))  # Exponential backoff
                     continue
-                logger.error(f"Database error after {attempt + 1} attempts: {e}")
+                logger.error("Database error after %d attempts: %s", attempt + 1, e)
                 raise DatabaseLockError(f"Database is locked after {attempt + 1} attempts") from e
             except Exception as e:
-                logger.error(f"Unexpected error during database operation: {e}")
+                logger.error("Unexpected error during database operation: %s", e)
                 raise DatabaseError(f"Database operation failed: {e}") from e
 
         raise RuntimeError(f"Failed to execute query after {self.max_retries} attempts")
@@ -337,8 +381,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             if params:
                 return conn.execute(query, params)
-            else:
-                return conn.execute(query)
+            return conn.execute(query)
 
     def executemany(self, query: str, param_list: list) -> None:
         """
@@ -354,16 +397,7 @@ class DatabaseManager:
     def cleanup(self) -> None:
         """Clean up all connections and locks."""
         with self._lock:
-            # Close all thread connections
-            for conn in self._connections.values():
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-            self._connections.clear()
-            self._connection_created_time.clear()
-            self._connection_last_used.clear()
+            self._connection_manager.cleanup()
             self._release_file_lock()
 
     def close(self) -> None:
@@ -387,7 +421,7 @@ class DatabaseManager:
         Args:
             table_name: Name of the table to migrate
         """
-        logger.info(f"Starting schema migration for table {table_name}")
+        logger.info("Starting schema migration for table %s", table_name)
 
         # Define all columns to add (includes legacy columns for backward compatibility)
         new_columns = {
@@ -410,7 +444,7 @@ class DatabaseManager:
                 ).fetchall()
 
                 existing_columns = [row[0].lower() for row in result]
-                logger.debug(f"Existing columns: {existing_columns}")
+                logger.debug("Existing columns: %s", existing_columns)
 
                 # Check if table exists (if no columns found, table likely doesn't exist)
                 if not existing_columns:
@@ -426,22 +460,22 @@ class DatabaseManager:
                             )
                             conn.execute(alter_query)
                             columns_added.append(column_name)
-                            logger.info(f"Added column: {column_name} {column_type}")
-                        except Exception as e:
+                            logger.info("Added column: %s %s", column_name, column_type)
+                        except (duckdb.Error, OSError) as e:
                             logger.warning(
-                                f"Failed to add column {column_name}: {e}"
+                                "Failed to add column %s: %s", column_name, e
                             )
                     else:
-                        logger.debug(f"Column {column_name} already exists, skipping")
+                        logger.debug("Column %s already exists, skipping", column_name)
 
                 if columns_added:
                     logger.info(
-                        f"Schema migration completed successfully. Added columns: {columns_added}"
+                        "Schema migration completed successfully. Added columns: %s", columns_added
                     )
                 else:
                     logger.info("Schema migration completed - no columns needed to be added")
         except Exception as e:
-            logger.error(f"Schema migration failed: {e}")
+            logger.error("Schema migration failed: %s", e)
             raise DatabaseError(f"Failed to migrate schema for table {table_name}: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
