@@ -346,6 +346,22 @@ class SearchConfig:
         os.getenv("TURBOPROP_SNIPPET_CONTENT_LENGTH", "200"), "TURBOPROP_SNIPPET_CONTENT_LENGTH", 200
     )
 
+    # Snippet extraction relevance thresholds
+    HIGH_RELEVANCE_THRESHOLD: float = validate_range_float(
+        os.getenv("TURBOPROP_HIGH_RELEVANCE_THRESHOLD", "0.8"), "TURBOPROP_HIGH_RELEVANCE_THRESHOLD", 0.0, 1.0
+    )
+    CANDIDATE_FILTER_THRESHOLD: float = validate_range_float(
+        os.getenv("TURBOPROP_CANDIDATE_FILTER_THRESHOLD", "0.7"), "TURBOPROP_CANDIDATE_FILTER_THRESHOLD", 0.0, 1.0
+    )
+
+    # Snippet extraction scoring bonuses
+    EXACT_MATCH_BONUS: float = validate_range_float(
+        os.getenv("TURBOPROP_EXACT_MATCH_BONUS", "0.8"), "TURBOPROP_EXACT_MATCH_BONUS", 0.0, 2.0
+    )
+    TITLE_MATCH_SCORE: float = validate_range_float(
+        os.getenv("TURBOPROP_TITLE_MATCH_SCORE", "0.7"), "TURBOPROP_TITLE_MATCH_SCORE", 0.0, 2.0
+    )
+
 
 class EmbeddingConfig:
     """Embedding model and processing configuration."""

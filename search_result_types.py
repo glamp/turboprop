@@ -13,7 +13,7 @@ Classes:
 """
 
 from dataclasses import dataclass, asdict, field
-from typing import Dict, Optional, Tuple, Any, List, Union
+from typing import Dict, Optional, Tuple, Any, List
 from pathlib import Path
 from config import config
 
@@ -44,7 +44,10 @@ class CodeSnippet:
         else:
             line_info = f"Lines {self.start_line}-{self.end_line}"
 
-        return f"{line_info}: {self.text[:config.search.SNIPPET_DISPLAY_MAX_LENGTH]}{'...' if len(self.text) > config.search.SNIPPET_DISPLAY_MAX_LENGTH else ''}"
+        max_length = config.search.SNIPPET_DISPLAY_MAX_LENGTH
+        truncated_text = self.text[:max_length]
+        ellipsis = '...' if len(self.text) > max_length else ''
+        return f"{line_info}: {truncated_text}{ellipsis}"
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -91,7 +94,7 @@ class CodeSearchResult:
     def all_snippets(self) -> List[CodeSnippet]:
         """
         Get all snippets (primary + additional) for this search result.
-        
+
         Returns:
             List of all CodeSnippet objects for this file
         """
@@ -100,7 +103,7 @@ class CodeSearchResult:
     def add_snippet(self, snippet: CodeSnippet) -> None:
         """
         Add an additional snippet to this search result.
-        
+
         Args:
             snippet: CodeSnippet to add
         """
@@ -116,22 +119,22 @@ class CodeSearchResult:
     ) -> 'CodeSearchResult':
         """
         Create a CodeSearchResult from multiple snippets.
-        
+
         Args:
             file_path: Path to the file
             snippets: List of CodeSnippet objects (first becomes primary)
             similarity_score: Similarity score for the result
             file_metadata: Optional file metadata
-            
+
         Returns:
             CodeSearchResult with primary and additional snippets
         """
         if not snippets:
             raise ValueError("At least one snippet is required")
-        
+
         primary_snippet = snippets[0]
         additional_snippets = snippets[1:] if len(snippets) > 1 else []
-        
+
         return cls(
             file_path=file_path,
             snippet=primary_snippet,
@@ -168,11 +171,11 @@ class CodeSearchResult:
                 return str(file_path_obj.relative_to(base_path_obj))
             else:
                 return self.file_path
-        except ValueError as e:
+        except ValueError:
             # ValueError typically occurs when paths are on different drives or malformed
             # Fall back to original path for cross-drive path calculations
             return self.file_path
-        except OSError as e:
+        except OSError:
             # OSError occurs with invalid path characters or permission issues
             # Fall back to original path for filesystem access issues
             return self.file_path
@@ -249,12 +252,12 @@ class CodeSearchResult:
             'file_metadata': self.file_metadata,
             'confidence_level': self.confidence_level
         }
-        
+
         # Include additional snippets if present
         if self.additional_snippets:
             result['additional_snippets'] = [s.to_dict() for s in self.additional_snippets]
             result['total_snippets'] = len(self.all_snippets)
-        
+
         return result
 
 
@@ -313,7 +316,8 @@ def convert_legacy_results(legacy_results: list) -> Tuple[list, SearchMetadata]:
     # Create metadata
     confidence_counts = {'high': 0, 'medium': 0, 'low': 0}
     for result in structured_results:
-        confidence_counts[result.confidence_level] += 1
+        if result.confidence_level is not None:
+            confidence_counts[result.confidence_level] += 1
 
     metadata = SearchMetadata(
         query="legacy_conversion",

@@ -56,7 +56,7 @@ def _create_enhanced_snippet(content: str, file_path: str, query: str = "") -> C
     """
     # Use the new intelligent snippet extractor
     extractor = SnippetExtractor()
-    
+
     try:
         # Extract intelligent snippets
         extracted_snippets = extractor.extract_snippets(
@@ -66,15 +66,15 @@ def _create_enhanced_snippet(content: str, file_path: str, query: str = "") -> C
             max_snippets=1,  # For compatibility, return only the best snippet
             max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH
         )
-        
+
         if extracted_snippets:
             # Convert the best ExtractedSnippet to CodeSnippet
             return extracted_snippets[0].to_code_snippet()
-        
+
     except Exception as e:
         logger.warning(f"Intelligent snippet extraction failed for {file_path}: {e}")
         # Fall back to simple extraction
-    
+
     # Fallback to simple truncation if intelligent extraction fails
     lines = content.split('\n')
 
@@ -99,21 +99,23 @@ def _create_enhanced_snippet(content: str, file_path: str, query: str = "") -> C
         )
 
 
-def _create_multi_snippets(content: str, file_path: str, query: str, max_snippets: int = 3) -> List[CodeSnippet]:
+def _create_multi_snippets(
+    content: str, file_path: str, query: str, max_snippets: int = 3
+) -> List[CodeSnippet]:
     """
     Create multiple intelligent code snippets from content.
-    
+
     Args:
         content: File content
         file_path: Path to the file
         query: Search query for relevance-based extraction
         max_snippets: Maximum number of snippets to return
-        
+
     Returns:
         List of CodeSnippet objects ranked by relevance
     """
     extractor = SnippetExtractor()
-    
+
     try:
         # Extract multiple intelligent snippets
         extracted_snippets = extractor.extract_snippets(
@@ -123,10 +125,10 @@ def _create_multi_snippets(content: str, file_path: str, query: str, max_snippet
             max_snippets=max_snippets,
             max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH
         )
-        
+
         # Convert ExtractedSnippet objects to CodeSnippet objects
         return [snippet.to_code_snippet() for snippet in extracted_snippets]
-        
+
     except Exception as e:
         logger.warning(f"Multi-snippet extraction failed for {file_path}: {e}")
         # Fall back to single snippet
@@ -150,7 +152,9 @@ def _extract_file_metadata(file_path: str, content: str) -> dict:
         'language': _detect_file_language(file_path),
         'extension': path_obj.suffix,
         'size': len(content.encode('utf-8')),  # Size in bytes
-        'type': 'source' if path_obj.suffix in {'.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs'} else 'other',
+        'type': 'source' if path_obj.suffix in {
+            '.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs'
+        } else 'other',
         'filename': path_obj.name,
         'directory': str(path_obj.parent)
     }
@@ -185,7 +189,7 @@ def search_index_enhanced(
         query_norm = math.sqrt(sum(x * x for x in query_emb_list))
 
         # Optimized SQL query for semantic similarity search using cosine similarity
-        # 
+        #
         # Mathematical background:
         # Cosine similarity = dot_product(A, B) / (||A|| × ||B||)
         # where ||A|| is the L2 norm (magnitude) of vector A
@@ -213,7 +217,8 @@ def search_index_enhanced(
         LIMIT ?
         """
 
-        # Execute the search query with optimized parameters (query embedding once + pre-calculated norm)
+        # Execute the search query with optimized parameters
+        # (query embedding once + pre-calculated norm)
         results = db_manager.execute_with_retry(sql_query, (query_emb_list, query_norm, k))
 
         # Format results as CodeSearchResult objects
@@ -277,7 +282,7 @@ def search_index(
 
         # Construct SQL query for semantic search with cosine similarity
         sql_query = f"""
-        SELECT path, content, (1 - array_dot_product(?, embedding) / 
+        SELECT path, content, (1 - array_dot_product(?, embedding) /
                               (list_norm(?) * list_norm(embedding))) AS distance
         FROM {TABLE_NAME}
         WHERE embedding IS NOT NULL
@@ -287,12 +292,13 @@ def search_index(
 
         # Execute the search query - direct tuple format, no object creation
         results = db_manager.execute_with_retry(sql_query, (query_emb_list, query_emb_list, k))
-        
+
         # Format results as simple tuples with basic snippets
         legacy_results = []
         for path, content, distance in results:
             # Create simple snippet (no object overhead)
-            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + \
+                "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
             legacy_results.append((path, snippet, distance))
 
         return legacy_results
@@ -309,7 +315,9 @@ def search_index(
         return []
 
 
-def format_enhanced_search_results(results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None) -> str:
+def format_enhanced_search_results(
+    results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None
+) -> str:
     """
     Format enhanced search results for display with rich metadata.
 
@@ -335,7 +343,8 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
         # Display enriched information
         formatted_lines.append(f"{i}. {display_path}")
         formatted_lines.append(
-            f"   Similarity: {result.similarity_percentage:.1f}% ({result.confidence_level} confidence)")
+            f"   Similarity: {result.similarity_percentage:.1f}% "
+            f"({result.confidence_level} confidence)")
 
         # Show file metadata if available
         if result.file_metadata:
@@ -356,7 +365,7 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
             line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
 
         formatted_lines.append(f"   {line_info}: {snippet.text.strip()}")
-        
+
         # Show additional snippets if present
         if result.additional_snippets:
             formatted_lines.append(f"   Additional snippets ({len(result.additional_snippets)}):")
@@ -364,21 +373,25 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
                 if additional_snippet.start_line == additional_snippet.end_line:
                     add_line_info = f"Line {additional_snippet.start_line}"
                 else:
-                    add_line_info = f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
-                
+                    add_line_info = (
+                        f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
+                    )
+
                 # Truncate additional snippets for display
                 add_text = additional_snippet.text.strip()
                 if len(add_text) > 100:
                     add_text = add_text[:100] + "..."
-                
+
                 formatted_lines.append(f"     {i}. {add_line_info}: {add_text}")
-        
+
         formatted_lines.append("")
 
     return "\n".join(formatted_lines)
 
 
-def format_search_results(results: List[Tuple[str, str, float]], query: str, repo_path: Optional[str] = None) -> str:
+def format_search_results(
+    results: List[Tuple[str, str, float]], query: str, repo_path: Optional[str] = None
+) -> str:
     """
     Format search results for display.
 
@@ -426,14 +439,17 @@ def get_file_content(db_manager: DatabaseManager, file_path: str) -> Optional[st
         File content if found, None otherwise
     """
     try:
-        result = db_manager.execute_with_retry(f"SELECT content FROM {TABLE_NAME} WHERE path = ?", (file_path,))
+        result = db_manager.execute_with_retry(
+            f"SELECT content FROM {TABLE_NAME} WHERE path = ?", (file_path,))
         return result[0][0] if result else None
     except Exception as e:
         logger.error(f"Error getting file content for {file_path}: {e}")
         return None
 
 
-def search_by_file_extension(db_manager: DatabaseManager, extension: str, limit: int = 10) -> List[Tuple[str, str]]:
+def search_by_file_extension(
+    db_manager: DatabaseManager, extension: str, limit: int = 10
+) -> List[Tuple[str, str]]:
     """
     Search for files by file extension.
 
@@ -465,7 +481,8 @@ def search_by_file_extension(db_manager: DatabaseManager, extension: str, limit:
         # Format results with snippets
         formatted_results = []
         for path, content in results:
-            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + \
+                "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
             formatted_results.append((path, snippet))
 
         return formatted_results
@@ -475,7 +492,9 @@ def search_by_file_extension(db_manager: DatabaseManager, extension: str, limit:
         return []
 
 
-def search_by_filename(db_manager: DatabaseManager, filename_pattern: str, limit: int = 10) -> List[Tuple[str, str]]:
+def search_by_filename(
+    db_manager: DatabaseManager, filename_pattern: str, limit: int = 10
+) -> List[Tuple[str, str]]:
     """
     Search for files by filename pattern.
 
@@ -501,7 +520,8 @@ def search_by_filename(db_manager: DatabaseManager, filename_pattern: str, limit
         # Format results with snippets
         formatted_results = []
         for path, content in results:
-            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + \
+                "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
             formatted_results.append((path, snippet))
 
         return formatted_results
@@ -529,7 +549,8 @@ def get_search_statistics(db_manager: DatabaseManager) -> dict:
         stats["total_files"] = result[0][0] if result else 0
 
         # Files with embeddings
-        result = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
+        result = db_manager.execute_with_retry(
+            f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
         stats["files_with_embeddings"] = result[0][0] if result else 0
 
         # File types
@@ -584,7 +605,8 @@ def find_similar_files_enhanced(
     """
     try:
         # Get the embedding of the reference file
-        result = db_manager.execute_with_retry(f"SELECT embedding FROM {TABLE_NAME} WHERE path = ?", (reference_file,))
+        result = db_manager.execute_with_retry(
+            f"SELECT embedding FROM {TABLE_NAME} WHERE path = ?", (reference_file,))
 
         if not result:
             logger.warning(f"Reference file not found in index: {reference_file}")
@@ -626,7 +648,7 @@ def find_similar_files_enhanced(
             similarity_score = 1.0 - distance
 
             # Create enhanced snippet with query context
-            snippet = _create_enhanced_snippet(content, path, query)
+            snippet = _create_enhanced_snippet(content, path, "")
 
             # Extract file metadata
             file_metadata = _extract_file_metadata(path, content)
