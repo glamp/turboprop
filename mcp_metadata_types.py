@@ -10,6 +10,63 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
+@dataclass(frozen=True)
+class ToolId:
+    """
+    Wrapper type for tool identifiers to prevent mixing different ID types.
+    
+    This type provides type safety for tool identifiers and prevents accidental
+    mixing of tool IDs with other string identifiers.
+    """
+    
+    value: str
+    
+    def __post_init__(self):
+        """Validate the tool ID format."""
+        if not self.value:
+            raise ValueError("ToolId cannot be empty")
+        if not isinstance(self.value, str):
+            raise TypeError("ToolId must be a string")
+        # Optional: Add format validation if needed
+        # if not re.match(r'^[a-z0-9_]+$', self.value):
+        #     raise ValueError("ToolId must contain only lowercase letters, numbers, and underscores")
+    
+    def __str__(self) -> str:
+        """Return the string value for database operations."""
+        return self.value
+    
+    def __repr__(self) -> str:
+        """Return detailed representation."""
+        return f"ToolId({self.value!r})"
+    
+    @classmethod
+    def from_name(cls, tool_name: str) -> "ToolId":
+        """
+        Create a ToolId from a tool name using standard conversion.
+        
+        Args:
+            tool_name: The tool name to convert
+            
+        Returns:
+            ToolId instance with normalized ID
+        """
+        if not tool_name:
+            raise ValueError("Tool name cannot be empty")
+        
+        # Standard normalization: lowercase, replace spaces and special chars with underscores
+        normalized = tool_name.lower().replace(' ', '_').replace('-', '_')
+        # Remove any non-alphanumeric characters except underscores
+        import re
+        normalized = re.sub(r'[^a-z0-9_]', '', normalized)
+        # Remove multiple consecutive underscores
+        normalized = re.sub(r'_+', '_', normalized).strip('_')
+        
+        if not normalized:
+            raise ValueError(f"Tool name '{tool_name}' results in empty ID after normalization")
+            
+        return cls(f"tool_{normalized}")
+
+
 @dataclass
 class ParameterAnalysis:
     """Detailed analysis of a tool parameter."""
