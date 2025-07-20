@@ -61,6 +61,18 @@ uvicorn server:app --reload
 # Visit http://localhost:8000/docs for API documentation
 ```
 
+### Code Quality & Linting
+```bash
+# Format code with Black
+python -m black .
+
+# Sort imports with isort
+python -m isort .
+
+# Run both formatting and import sorting together
+python -m black . && python -m isort .
+```
+
 ### Troubleshooting
 
 **Apple Silicon MPS Compatibility Issue:**

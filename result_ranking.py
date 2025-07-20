@@ -21,10 +21,10 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from ranking_exceptions import InvalidRankingWeightsError, InvalidSearchResultError, RankingContextError, RankingError
+from ranking_scorers import ConstructTypeScorer, FileSizeScorer, FileTypeScorer, RecencyScorer
+from ranking_utils import ConfidenceScorer, MatchReasonGenerator, RankingContext, ResultDeduplicator
 from search_result_types import CodeSearchResult
-from ranking_scorers import FileTypeScorer, ConstructTypeScorer, RecencyScorer, FileSizeScorer
-from ranking_utils import MatchReasonGenerator, ConfidenceScorer, ResultDeduplicator, RankingContext
-from ranking_exceptions import InvalidRankingWeightsError, RankingError, InvalidSearchResultError, RankingContextError
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RankingWeights:
     """Configuration for ranking factor weights."""
+
     embedding_similarity: float = 0.4
     file_type_relevance: float = 0.2
     construct_type_matching: float = 0.2
@@ -47,11 +48,11 @@ class RankingWeights:
         """
         # Validate individual weights
         for field_name, value in [
-            ('embedding_similarity', self.embedding_similarity),
-            ('file_type_relevance', self.file_type_relevance),
-            ('construct_type_matching', self.construct_type_matching),
-            ('file_recency', self.file_recency),
-            ('file_size_optimization', self.file_size_optimization)
+            ("embedding_similarity", self.embedding_similarity),
+            ("file_type_relevance", self.file_type_relevance),
+            ("construct_type_matching", self.construct_type_matching),
+            ("file_recency", self.file_recency),
+            ("file_size_optimization", self.file_size_optimization),
         ]:
             if not isinstance(value, (int, float)):
                 raise InvalidRankingWeightsError(f"{field_name} must be a number, got {type(value)}")
@@ -86,11 +87,7 @@ class ResultRanker:
         """
         self.weights = weights or RankingWeights()
 
-    def rank_results(
-        self,
-        results: List[CodeSearchResult],
-        context: RankingContext
-    ) -> List[CodeSearchResult]:
+    def rank_results(self, results: List[CodeSearchResult], context: RankingContext) -> List[CodeSearchResult]:
         """
         Rank search results using multi-factor algorithm.
 
@@ -132,7 +129,7 @@ class ResultRanker:
                 query_type=context.query_type or ConstructTypeScorer.detect_query_type(context.query),
                 repo_path=context.repo_path,
                 git_info=context.git_info,
-                all_results=results
+                all_results=results,
             )
 
             # Calculate composite scores and enhance results
@@ -146,8 +143,9 @@ class ResultRanker:
             diverse_results = ResultDeduplicator.ensure_diversity(deduplicated)
 
             # Sort by composite score
-            diverse_results.sort(key=lambda r: float(r.file_metadata.get(
-                'composite_score', 0) if r.file_metadata else 0), reverse=True)
+            diverse_results.sort(
+                key=lambda r: float(r.file_metadata.get("composite_score", 0) if r.file_metadata else 0), reverse=True
+            )
 
             logger.info(f"Ranked results: {len(results)} → {len(diverse_results)} after deduplication/diversity")
             return diverse_results
@@ -189,34 +187,34 @@ class ResultRanker:
         match_reasons = MatchReasonGenerator.generate_reasons(result, context)
 
         # Calculate advanced confidence
-        advanced_confidence = ConfidenceScorer.calculate_advanced_confidence(
-            result, context, match_reasons
-        )
+        advanced_confidence = ConfidenceScorer.calculate_advanced_confidence(result, context, match_reasons)
 
         # Enhance result metadata
         if not result.file_metadata:
             result.file_metadata = {}
 
-        result.file_metadata.update({
-            'composite_score': composite_score,
-            'ranking_factors': {
-                'embedding_similarity': embedding_score,
-                'file_type_relevance': file_type_score,
-                'construct_type_matching': construct_score,
-                'file_recency': recency_score,
-                'file_size_optimization': size_score
-            },
-            'match_reasons': [
-                {
-                    'category': reason.category,
-                    'description': reason.description,
-                    'confidence': reason.confidence,
-                    'details': reason.details
-                }
-                for reason in match_reasons
-            ],
-            'advanced_confidence': advanced_confidence
-        })
+        result.file_metadata.update(
+            {
+                "composite_score": composite_score,
+                "ranking_factors": {
+                    "embedding_similarity": embedding_score,
+                    "file_type_relevance": file_type_score,
+                    "construct_type_matching": construct_score,
+                    "file_recency": recency_score,
+                    "file_size_optimization": size_score,
+                },
+                "match_reasons": [
+                    {
+                        "category": reason.category,
+                        "description": reason.description,
+                        "confidence": reason.confidence,
+                        "details": reason.details,
+                    }
+                    for reason in match_reasons
+                ],
+                "advanced_confidence": advanced_confidence,
+            }
+        )
 
         # Update the result's confidence level with advanced scoring
         result.confidence_level = advanced_confidence
@@ -226,21 +224,22 @@ class ResultRanker:
     def _extract_keywords(self, query: str) -> List[str]:
         """Extract meaningful keywords from query."""
         # Simple keyword extraction - could be enhanced with NLP
-        words = re.findall(r'\b\w+\b', query.lower())
+        words = re.findall(r"\b\w+\b", query.lower())
         # Filter out common stop words
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+        stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by"}
         keywords = [word for word in words if word not in stop_words and len(word) > 2]
         return keywords
 
 
 # Main API functions
 
+
 def rank_search_results(
     results: List[CodeSearchResult],
     query: str,
     repo_path: Optional[str] = None,
     git_info: Optional[Dict] = None,
-    ranking_weights: Optional[RankingWeights] = None
+    ranking_weights: Optional[RankingWeights] = None,
 ) -> List[CodeSearchResult]:
     """
     Main entry point for ranking search results.
@@ -268,10 +267,7 @@ def rank_search_results(
             raise RankingContextError("Query must be a non-empty string")
 
         context = RankingContext(
-            query=query,
-            query_keywords=[],  # Will be extracted by ranker
-            repo_path=repo_path,
-            git_info=git_info
+            query=query, query_keywords=[], repo_path=repo_path, git_info=git_info  # Will be extracted by ranker
         )
 
         ranker = ResultRanker(ranking_weights)
@@ -284,10 +280,7 @@ def rank_search_results(
         raise RankingError(f"Failed to rank search results: {e}") from e
 
 
-def generate_match_explanations(
-    results: List[CodeSearchResult],
-    query: str
-) -> Dict[str, List[str]]:
+def generate_match_explanations(results: List[CodeSearchResult], query: str) -> Dict[str, List[str]]:
     """
     Generate human-readable explanations for search matches.
 
@@ -302,9 +295,9 @@ def generate_match_explanations(
     explanations = {}
 
     for result in results:
-        if result.file_metadata and 'match_reasons' in result.file_metadata:
-            reasons = result.file_metadata['match_reasons']
-            explanations[result.file_path] = [reason['description'] for reason in reasons]
+        if result.file_metadata and "match_reasons" in result.file_metadata:
+            reasons = result.file_metadata["match_reasons"]
+            explanations[result.file_path] = [reason["description"] for reason in reasons]
         else:
             # Generate reasons on-the-fly if not already present
             reasons = MatchReasonGenerator.generate_reasons(result, context)
@@ -314,9 +307,7 @@ def generate_match_explanations(
 
 
 def calculate_advanced_confidence(
-    result: CodeSearchResult,
-    query: str,
-    all_results: Optional[List[CodeSearchResult]] = None
+    result: CodeSearchResult, query: str, all_results: Optional[List[CodeSearchResult]] = None
 ) -> str:
     """
     Calculate advanced confidence for a single result.
@@ -329,11 +320,7 @@ def calculate_advanced_confidence(
     Returns:
         Confidence level: 'high', 'medium', or 'low'
     """
-    context = RankingContext(
-        query=query,
-        query_keywords=[],
-        all_results=all_results
-    )
+    context = RankingContext(query=query, query_keywords=[], all_results=all_results)
 
     # Generate match reasons for confidence calculation
     reasons = MatchReasonGenerator.generate_reasons(result, context)

@@ -10,17 +10,18 @@ This module tests:
 - Data integrity and correctness validation
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from language_detection import LanguageDetector, detect_language_from_extension
+import numpy as np
+import pytest
+
 from code_construct_extractor import CodeConstructExtractor
 from code_index import init_db, reindex_all, search_index
+from config import config
 from construct_search import ConstructSearchOperations
 from hybrid_search import HybridSearchEngine, SearchMode
-from config import config
-import numpy as np
+from language_detection import LanguageDetector, detect_language_from_extension
 
 
 class TestLanguageDetectionAccuracy:
@@ -30,7 +31,7 @@ class TestLanguageDetectionAccuracy:
     def language_samples(self):
         """Code samples for different programming languages."""
         return {
-            'python': [
+            "python": [
                 """
 import os
 from typing import List, Dict
@@ -58,9 +59,9 @@ async def fetch_data(url: str) -> Dict:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             return await response.json()
-"""
+""",
             ],
-            'javascript': [
+            "javascript": [
                 """
 const express = require('express');
 const app = express();
@@ -101,9 +102,9 @@ export const UserProfile = ({ userId }) => {
 
     return user ? <div>{user.name}</div> : <div>Loading...</div>;
 };
-"""
+""",
             ],
-            'go': [
+            "go": [
                 """
 package main
 
@@ -142,9 +143,9 @@ func ProcessStrings(input []string) []string {
     }
     return result
 }
-"""
+""",
             ],
-            'rust': [
+            "rust": [
                 """
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
@@ -185,9 +186,9 @@ mod tests {
         assert_eq!(fibonacci(5), 5);
     }
 }
-"""
+""",
             ],
-            'java': [
+            "java": [
                 """
 package com.example.service;
 
@@ -218,8 +219,8 @@ public class Calculator {
         System.out.println(add(5, 3));
     }
 }
-"""
-            ]
+""",
+            ],
         }
 
     def test_language_detection_accuracy(self, language_samples):
@@ -245,26 +246,27 @@ public class Calculator {
     def test_extension_based_detection(self):
         """Test language detection from file extensions."""
         test_cases = [
-            ('file.py', 'python'),
-            ('script.js', 'javascript'),
-            ('component.jsx', 'javascript'),
-            ('server.ts', 'typescript'),
-            ('main.go', 'go'),
-            ('lib.rs', 'rust'),
-            ('App.java', 'java'),
-            ('style.css', 'css'),
-            ('page.html', 'html'),
-            ('config.json', 'json'),
-            ('data.xml', 'xml'),
-            ('script.sh', 'shell'),
-            ('Dockerfile', 'dockerfile'),
-            ('package.yaml', 'yaml'),
+            ("file.py", "python"),
+            ("script.js", "javascript"),
+            ("component.jsx", "javascript"),
+            ("server.ts", "typescript"),
+            ("main.go", "go"),
+            ("lib.rs", "rust"),
+            ("App.java", "java"),
+            ("style.css", "css"),
+            ("page.html", "html"),
+            ("config.json", "json"),
+            ("data.xml", "xml"),
+            ("script.sh", "shell"),
+            ("Dockerfile", "dockerfile"),
+            ("package.yaml", "yaml"),
         ]
 
         for filename, expected_lang in test_cases:
             detected_lang = detect_language_from_extension(filename)
-            assert detected_lang == expected_lang, \
-                f"Extension detection failed: {filename} -> expected {expected_lang}, got {detected_lang}"
+            assert (
+                detected_lang == expected_lang
+            ), f"Extension detection failed: {filename} -> expected {expected_lang}, got {detected_lang}"
 
     def test_ambiguous_content_detection(self):
         """Test language detection on ambiguous content."""
@@ -274,21 +276,19 @@ public class Calculator {
         ambiguous_samples = [
             # Could be Python or pseudocode
             ("x = 1\ny = 2\nprint(x + y)", ["python"]),
-
             # Could be JavaScript or TypeScript
             ("function test() { return true; }", ["javascript", "typescript"]),
-
             # Very generic code
             ("// This is a comment\nint x = 5;", ["c", "cpp", "java", "csharp"]),
-
             # JSON-like but could be JavaScript object
             ('{"key": "value", "num": 123}', ["json", "javascript"]),
         ]
 
         for content, possible_langs in ambiguous_samples:
             detected = detector.detect_from_content(content)
-            assert detected in possible_langs or detected == "unknown", \
-                f"Ambiguous content detection: got {detected}, expected one of {possible_langs}"
+            assert (
+                detected in possible_langs or detected == "unknown"
+            ), f"Ambiguous content detection: got {detected}, expected one of {possible_langs}"
 
     def test_detection_confidence_scores(self):
         """Test language detection confidence scoring."""
@@ -403,28 +403,28 @@ async def async_process(items: List[str]) -> List[Dict]:
         construct_names = [c.name for c in constructs]
 
         # Should extract imports
-        assert 'import' in construct_types
-        assert any('os' in name for name in construct_names)
-        assert any('typing.List' in name or 'List' in name for name in construct_names)
+        assert "import" in construct_types
+        assert any("os" in name for name in construct_names)
+        assert any("typing.List" in name or "List" in name for name in construct_names)
 
         # Should extract functions
-        assert 'function' in construct_types
-        assert 'load_config' in construct_names
-        assert 'async_process' in construct_names
+        assert "function" in construct_types
+        assert "load_config" in construct_names
+        assert "async_process" in construct_names
 
         # Should extract class
-        assert 'class' in construct_types
-        assert 'DataProcessor' in construct_names
+        assert "class" in construct_types
+        assert "DataProcessor" in construct_names
 
         # Should extract methods
-        assert 'method' in construct_types
-        assert 'process_item' in construct_names
-        assert 'validate_item' in construct_names
-        assert 'cache_size' in construct_names
+        assert "method" in construct_types
+        assert "process_item" in construct_names
+        assert "validate_item" in construct_names
+        assert "cache_size" in construct_names
 
         # Should extract variables/constants
-        assert 'variable' in construct_types or 'constant' in construct_types
-        assert 'CONFIG_PATH' in construct_names
+        assert "variable" in construct_types or "constant" in construct_types
+        assert "CONFIG_PATH" in construct_names
 
     def test_javascript_construct_extraction(self):
         """Test extraction of JavaScript constructs."""
@@ -501,25 +501,25 @@ module.exports = { UserService, initializeApp, validateEmail };
         construct_names = [c.name for c in constructs]
 
         # Should extract imports/requires
-        assert 'import' in construct_types
-        assert any('express' in name for name in construct_names)
-        assert any('User' in name for name in construct_names)
+        assert "import" in construct_types
+        assert any("express" in name for name in construct_names)
+        assert any("User" in name for name in construct_names)
 
         # Should extract class
-        assert 'class' in construct_types
-        assert 'UserService' in construct_names
+        assert "class" in construct_types
+        assert "UserService" in construct_names
 
         # Should extract functions
-        assert 'function' in construct_types
-        assert 'initializeApp' in construct_names
+        assert "function" in construct_types
+        assert "initializeApp" in construct_names
 
         # Should extract methods
-        assert 'method' in construct_types
-        assert 'getUser' in construct_names
-        assert 'createUser' in construct_names
+        assert "method" in construct_types
+        assert "getUser" in construct_names
+        assert "createUser" in construct_names
 
         # Should extract arrow functions as functions
-        assert 'validateEmail' in construct_names
+        assert "validateEmail" in construct_names
 
         # Note: Current extractor doesn't capture const declarations like PORT
         # This could be improved in the future, but for now we test what it actually extracts
@@ -579,15 +579,15 @@ def second_function():  # Line 11: Function
 
         # Find specific constructs and verify their line numbers
         for construct in constructs:
-            if construct.name == 'os' and construct.construct_type == 'import':
+            if construct.name == "os" and construct.construct_type == "import":
                 assert construct.start_line == 2
-            elif construct.name == 'first_function' and construct.construct_type == 'function':
+            elif construct.name == "first_function" and construct.construct_type == "function":
                 assert construct.start_line == 4
-            elif construct.name == 'TestClass' and construct.construct_type == 'class':
+            elif construct.name == "TestClass" and construct.construct_type == "class":
                 assert construct.start_line == 7
-            elif construct.name == 'method' and construct.construct_type == 'method':
+            elif construct.name == "method" and construct.construct_type == "method":
                 assert construct.start_line == 8
-            elif construct.name == 'second_function' and construct.construct_type == 'function':
+            elif construct.name == "second_function" and construct.construct_type == "function":
                 assert construct.start_line == 11
 
 
@@ -620,7 +620,7 @@ class TestSearchResultRelevance:
                 # Check relevance scores
                 scores = []
                 for result in results:
-                    if hasattr(result, 'similarity_score'):
+                    if hasattr(result, "similarity_score"):
                         score = result.similarity_score
                     elif isinstance(result, tuple) and len(result) >= 3:
                         score = result[2]  # Assuming tuple format (path, content, score)
@@ -640,7 +640,8 @@ class TestSearchResultRelevance:
                     score_diff = abs(scores[0] - sorted_scores[0])
                     if score_diff > 0.1:  # Only fail if significantly unsorted
                         print(
-                            f"Warning: Results not perfectly sorted by relevance. Actual: {scores}, Expected: {sorted_scores}")
+                            f"Warning: Results not perfectly sorted by relevance. Actual: {scores}, Expected: {sorted_scores}"
+                        )
                         # Don't fail the test for mock results, just warn
 
                 # Top results should have reasonable relevance
@@ -649,20 +650,20 @@ class TestSearchResultRelevance:
                     top_score = scores[0]
                     # Use lower threshold for mock embedder (real embedder would have higher scores)
                     mock_threshold = 0.1  # Lower threshold for mock results
-                    assert top_score >= mock_threshold, \
-                        f"Top result relevance {top_score} below mock threshold {mock_threshold}"
+                    assert (
+                        top_score >= mock_threshold
+                    ), f"Top result relevance {top_score} below mock threshold {mock_threshold}"
 
                 # Check if expected files are in results (if available)
                 result_files = []
                 for r in results:
-                    if hasattr(r, 'file_path'):
+                    if hasattr(r, "file_path"):
                         result_files.append(Path(r.file_path).name)
                     elif isinstance(r, tuple) and len(r) > 0:
                         result_files.append(Path(r[0]).name)  # Assuming first element is path
                 # Check if relevant files were found
                 any(
-                    any(expected in result_file for expected in expected_relevant_files)
-                    for result_file in result_files
+                    any(expected in result_file for expected in expected_relevant_files) for result_file in result_files
                 )
 
                 # Note: With mock embedder, this might not always pass
@@ -675,24 +676,24 @@ class TestSearchResultRelevance:
         """Test quality of hybrid search results."""
         # Mock both text and semantic search results
         fully_mock_db_manager.search_full_text.return_value = [
-            ('id1', str(sample_repo / 'auth.js'), 'function authenticate()', 0.9),
-            ('id2', str(sample_repo / 'data_processor.py'), 'authentication method', 0.7)
+            ("id1", str(sample_repo / "auth.js"), "function authenticate()", 0.9),
+            ("id2", str(sample_repo / "data_processor.py"), "authentication method", 0.7),
         ]
 
-        with patch('search_utils.search_index_enhanced') as mock_semantic:
+        with patch("search_utils.search_index_enhanced") as mock_semantic:
             from search_result_types import CodeSearchResult, CodeSnippet
 
             semantic_results = [
                 CodeSearchResult(
-                    file_path=str(sample_repo / 'auth.js'),
+                    file_path=str(sample_repo / "auth.js"),
                     snippet=CodeSnippet(text="async hashPassword(password)", start_line=15, end_line=20),
-                    similarity_score=0.85
+                    similarity_score=0.85,
                 ),
                 CodeSearchResult(
-                    file_path=str(sample_repo / 'server.go'),
+                    file_path=str(sample_repo / "server.go"),
                     snippet=CodeSnippet(text="user authentication", start_line=10, end_line=15),
-                    similarity_score=0.75
-                )
+                    similarity_score=0.75,
+                ),
             ]
             mock_semantic.return_value = semantic_results
 
@@ -707,16 +708,19 @@ class TestSearchResultRelevance:
                 if len(results) > 0:
                     # All results should have valid scores
                     for result in results:
-                        assert hasattr(result, 'fusion_score') or hasattr(
-                            result, 'semantic_score') or hasattr(result, 'text_score')
+                        assert (
+                            hasattr(result, "fusion_score")
+                            or hasattr(result, "semantic_score")
+                            or hasattr(result, "text_score")
+                        )
 
-                        if hasattr(result, 'fusion_score'):
+                        if hasattr(result, "fusion_score"):
                             assert 0 <= result.fusion_score <= 1
 
                     # Results should be ranked appropriately
                     if len(results) > 1:
                         # For hybrid results, check fusion scores
-                        fusion_scores = [r.fusion_score for r in results if hasattr(r, 'fusion_score')]
+                        fusion_scores = [r.fusion_score for r in results if hasattr(r, "fusion_score")]
                         if len(fusion_scores) > 1:
                             assert fusion_scores == sorted(fusion_scores, reverse=True)
 
@@ -726,14 +730,58 @@ class TestSearchResultRelevance:
 
         # Mock construct search with varied relevance scores (sorted by score descending)
         mock_results = [
-            ("func_1", "/test/auth.py", "function", "authenticate_user",
-             "def authenticate_user(credentials):", 10, 15, "Authenticate user", None, "file_1", 0.95),
-            ("func_2", "/test/auth.py", "function", "hash_password",
-             "def hash_password(password):", 20, 25, "Hash password", None, "file_1", 0.88),
-            ("class_1", "/test/auth.py", "class", "AuthService",
-             "class AuthService:", 1, 50, "Authentication service", None, "file_1", 0.82),
-            ("func_3", "/test/utils.py", "function", "parse_json",
-             "def parse_json(data):", 5, 10, "Parse JSON", None, "file_2", 0.45),
+            (
+                "func_1",
+                "/test/auth.py",
+                "function",
+                "authenticate_user",
+                "def authenticate_user(credentials):",
+                10,
+                15,
+                "Authenticate user",
+                None,
+                "file_1",
+                0.95,
+            ),
+            (
+                "func_2",
+                "/test/auth.py",
+                "function",
+                "hash_password",
+                "def hash_password(password):",
+                20,
+                25,
+                "Hash password",
+                None,
+                "file_1",
+                0.88,
+            ),
+            (
+                "class_1",
+                "/test/auth.py",
+                "class",
+                "AuthService",
+                "class AuthService:",
+                1,
+                50,
+                "Authentication service",
+                None,
+                "file_1",
+                0.82,
+            ),
+            (
+                "func_3",
+                "/test/utils.py",
+                "function",
+                "parse_json",
+                "def parse_json(data):",
+                5,
+                10,
+                "Parse JSON",
+                None,
+                "file_2",
+                0.45,
+            ),
         ]
 
         mock_connection = Mock()
@@ -758,7 +806,7 @@ class TestSearchResultRelevance:
             top_results = results[:2] if len(results) >= 2 else results
             for result in top_results:
                 # Authentication-related constructs should score higher
-                if 'auth' in result.name.lower() or 'user' in result.name.lower():
+                if "auth" in result.name.lower() or "user" in result.name.lower():
                     assert result.similarity_score > 0.7
 
 
@@ -771,7 +819,7 @@ class TestEmbeddingConsistency:
             "function authenticate(user)",
             "class DataProcessor",
             "import json from standard library",
-            "def process_data(input_data):"
+            "def process_data(input_data):",
         ]
 
         # Generate embeddings multiple times
@@ -789,8 +837,7 @@ class TestEmbeddingConsistency:
 
         # Embeddings should be identical for same inputs
         for emb1, emb2 in zip(embeddings_1, embeddings_2):
-            np.testing.assert_array_equal(emb1, emb2,
-                                          "Embeddings not consistent for identical inputs")
+            np.testing.assert_array_equal(emb1, emb2, "Embeddings not consistent for identical inputs")
 
     def test_embedding_similarity_relationships(self, mock_embedder):
         """Test that similar texts have higher embedding similarity."""
@@ -854,12 +901,14 @@ class TestEmbeddingConsistency:
         # All embeddings should have same dimension
         expected_dim = 384  # Standard dimension for the mock embedder
         for i, embedding in enumerate(embeddings):
-            assert len(embedding) == expected_dim, \
-                f"Embedding {i} has dimension {len(embedding)}, expected {expected_dim}"
+            assert (
+                len(embedding) == expected_dim
+            ), f"Embedding {i} has dimension {len(embedding)}, expected {expected_dim}"
 
             # All values should be valid numbers
-            assert all(isinstance(x, (int, float)) and not np.isnan(x) for x in embedding), \
-                f"Embedding {i} contains invalid values"
+            assert all(
+                isinstance(x, (int, float)) and not np.isnan(x) for x in embedding
+            ), f"Embedding {i} contains invalid values"
 
 
 class TestDataIntegrity:
@@ -869,9 +918,17 @@ class TestDataIntegrity:
         """Test database schema maintains integrity."""
         # Test that required columns exist
         expected_columns = [
-            'id', 'path', 'content', 'embedding', 'last_modified',
-            'file_mtime', 'file_type', 'language', 'size_bytes',
-            'line_count', 'category'
+            "id",
+            "path",
+            "content",
+            "embedding",
+            "last_modified",
+            "file_mtime",
+            "file_type",
+            "language",
+            "size_bytes",
+            "line_count",
+            "category",
         ]
 
         # Mock schema query
@@ -879,16 +936,13 @@ class TestDataIntegrity:
         fully_mock_db_manager.execute_with_retry.return_value = mock_columns
 
         # Query for table schema
-        columns = fully_mock_db_manager.execute_with_retry(
-            f"PRAGMA table_info({config.database.TABLE_NAME})"
-        )
+        columns = fully_mock_db_manager.execute_with_retry(f"PRAGMA table_info({config.database.TABLE_NAME})")
 
         column_names = [col[0] for col in columns]
 
         # Verify all expected columns are present
         for expected_col in expected_columns:
-            assert expected_col in column_names, \
-                f"Required column '{expected_col}' missing from schema"
+            assert expected_col in column_names, f"Required column '{expected_col}' missing from schema"
 
     def test_data_consistency_after_operations(self, sample_repo, mock_embedder):
         """Test data consistency after various operations."""
@@ -929,12 +983,45 @@ class TestDataIntegrity:
 
         # Mock construct data with parent-child relationships
         mock_constructs = [
-            ("class_1", "/test/file.py", "class", "TestClass",
-             "class TestClass:", 1, 30, "Test class", None, "file_1", 0.8),
-            ("method_1", "/test/file.py", "method", "test_method",
-             "def test_method(self):", 10, 15, "Test method", "class_1", "file_1", 0.8),
-            ("method_2", "/test/file.py", "method", "another_method",
-             "def another_method(self):", 20, 25, "Another method", "class_1", "file_1", 0.8),
+            (
+                "class_1",
+                "/test/file.py",
+                "class",
+                "TestClass",
+                "class TestClass:",
+                1,
+                30,
+                "Test class",
+                None,
+                "file_1",
+                0.8,
+            ),
+            (
+                "method_1",
+                "/test/file.py",
+                "method",
+                "test_method",
+                "def test_method(self):",
+                10,
+                15,
+                "Test method",
+                "class_1",
+                "file_1",
+                0.8,
+            ),
+            (
+                "method_2",
+                "/test/file.py",
+                "method",
+                "another_method",
+                "def another_method(self):",
+                20,
+                25,
+                "Another method",
+                "class_1",
+                "file_1",
+                0.8,
+            ),
         ]
 
         mock_connection = Mock()
@@ -969,10 +1056,32 @@ class TestDataIntegrity:
 
         # Test related constructs - mock the specific call for get_related_constructs
         mock_related_results = [
-            ("method_1", "/test/file.py", "method", "test_method",
-             "def test_method(self):", 10, 15, "Test method", "class_1", "file_1", 0.8),
-            ("method_2", "/test/file.py", "method", "another_method",
-             "def another_method(self):", 20, 25, "Another method", "class_1", "file_1", 0.8),
+            (
+                "method_1",
+                "/test/file.py",
+                "method",
+                "test_method",
+                "def test_method(self):",
+                10,
+                15,
+                "Test method",
+                "class_1",
+                "file_1",
+                0.8,
+            ),
+            (
+                "method_2",
+                "/test/file.py",
+                "method",
+                "another_method",
+                "def another_method(self):",
+                20,
+                25,
+                "Another method",
+                "class_1",
+                "file_1",
+                0.8,
+            ),
         ]
 
         # Set up additional mock for related constructs query

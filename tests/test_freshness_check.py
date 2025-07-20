@@ -12,13 +12,7 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from code_index import (
-    check_index_freshness,
-    embed_and_store,
-    get_last_index_time,
-    has_repository_changed,
-    init_db,
-)
+from code_index import check_index_freshness, embed_and_store, get_last_index_time, has_repository_changed, init_db
 from config import config
 
 # For backward compatibility in tests
@@ -248,7 +242,11 @@ class TestFreshnessCheck:
 
         assert not freshness["is_fresh"]
         # After database error, it tries to scan files and detects count mismatch
-        assert "File count changed" in freshness["reason"] or "No index found" in freshness["reason"] or "Index is empty" in freshness["reason"]
+        assert (
+            "File count changed" in freshness["reason"]
+            or "No index found" in freshness["reason"]
+            or "Index is empty" in freshness["reason"]
+        )
         # Don't assert on last_index_time since it may vary after database error
         assert freshness["changed_files"] >= 0
         assert freshness["total_files"] >= 0

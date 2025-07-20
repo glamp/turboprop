@@ -400,9 +400,7 @@ class TestMainConfig:
         from config import config as global_config
 
         # Check by class name to avoid isinstance issues with reloaded modules
-        assert (
-            type(global_config).__name__ == "Config"
-        ), f"Expected Config, got {type(global_config).__name__}"
+        assert type(global_config).__name__ == "Config", f"Expected Config, got {type(global_config).__name__}"
         assert global_config.validate() is True
 
 
@@ -455,10 +453,7 @@ class TestEnvironmentVariableHandling:
                 try:
                     importlib.reload(config)
                     # If we get here, the test should fail
-                    assert False, (
-                        f"Expected ConfigValidationError to be raised "
-                        f"for {env_var}={invalid_value}"
-                    )
+                    assert False, f"Expected ConfigValidationError to be raised " f"for {env_var}={invalid_value}"
                 except Exception as e:
                     # Check that it's the right type of exception by name
                     # (to avoid isinstance issues with reloaded modules)
@@ -529,10 +524,7 @@ class TestConfigurationIntegration:
         assert len(lines) > 10  # Should have multiple lines
 
         # Check for proper section headers
-        section_headers = [
-            line for line in lines
-            if line.endswith(":") and not line.startswith("  ")
-        ]
+        section_headers = [line for line in lines if line.endswith(":") and not line.startswith("  ")]
         assert len(section_headers) >= 6  # Should have at least 6 main sections
 
     def test_config_validation_with_mock_errors(self):

@@ -16,12 +16,12 @@ Classes:
 
 import json
 import time
-from dataclasses import dataclass, asdict, field
-from typing import Dict, List, Optional, Any
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from search_result_types import CodeSearchResult
 import response_config
+from search_result_types import CodeSearchResult
 
 
 @dataclass
@@ -32,6 +32,7 @@ class QueryAnalysis:
     Provides metadata about the search query to help users understand
     and refine their searches for better results.
     """
+
     original_query: str
     suggested_refinements: List[str] = field(default_factory=list)
     query_complexity: str = "medium"  # low, medium, high
@@ -51,6 +52,7 @@ class ResultCluster:
     Groups results to help users understand patterns and relationships
     in their search results.
     """
+
     cluster_name: str
     cluster_type: str  # language, directory, similarity, etc.
     results: List[CodeSearchResult] = field(default_factory=list)
@@ -60,12 +62,12 @@ class ResultCluster:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
-            'cluster_name': self.cluster_name,
-            'cluster_type': self.cluster_type,
-            'results': [result.to_dict() for result in self.results],
-            'cluster_score': self.cluster_score,
-            'cluster_description': self.cluster_description,
-            'result_count': len(self.results)
+            "cluster_name": self.cluster_name,
+            "cluster_type": self.cluster_type,
+            "results": [result.to_dict() for result in self.results],
+            "cluster_score": self.cluster_score,
+            "cluster_description": self.cluster_description,
+            "result_count": len(self.results),
         }
 
 
@@ -77,6 +79,7 @@ class SearchResponse:
     Provides rich metadata, suggestions, and organized results that Claude
     can process programmatically while maintaining human readability.
     """
+
     # Core search results
     query: str
     results: List[CodeSearchResult] = field(default_factory=list)
@@ -116,7 +119,7 @@ class SearchResponse:
 
     def _compute_confidence_distribution(self):
         """Compute confidence level distribution from results."""
-        self.confidence_distribution = {'high': 0, 'medium': 0, 'low': 0}
+        self.confidence_distribution = {"high": 0, "medium": 0, "low": 0}
         for result in self.results:
             if result.confidence_level:
                 self.confidence_distribution[result.confidence_level] += 1
@@ -125,8 +128,8 @@ class SearchResponse:
         """Compute language distribution from results."""
         self.language_breakdown = {}
         for result in self.results:
-            if result.file_metadata and 'language' in result.file_metadata:
-                lang = result.file_metadata['language']
+            if result.file_metadata and "language" in result.file_metadata:
+                lang = result.file_metadata["language"]
                 self.language_breakdown[lang] = self.language_breakdown.get(lang, 0) + 1
 
     def add_cluster(self, cluster: ResultCluster) -> None:
@@ -150,26 +153,26 @@ class SearchResponse:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result_dict = {
-            'query': self.query,
-            'results': [result.to_dict() for result in self.results],
-            'total_results': self.total_results,
-            'execution_time': self.execution_time,
-            'timestamp': self.timestamp,
-            'version': self.version,
-            'confidence_distribution': self.confidence_distribution,
-            'language_breakdown': self.language_breakdown,
-            'suggested_queries': self.suggested_queries,
-            'navigation_hints': self.navigation_hints,
-            'performance_notes': self.performance_notes
+            "query": self.query,
+            "results": [result.to_dict() for result in self.results],
+            "total_results": self.total_results,
+            "execution_time": self.execution_time,
+            "timestamp": self.timestamp,
+            "version": self.version,
+            "confidence_distribution": self.confidence_distribution,
+            "language_breakdown": self.language_breakdown,
+            "suggested_queries": self.suggested_queries,
+            "navigation_hints": self.navigation_hints,
+            "performance_notes": self.performance_notes,
         }
 
         # Include optional fields if present
         if self.query_analysis:
-            result_dict['query_analysis'] = self.query_analysis.to_dict()
+            result_dict["query_analysis"] = self.query_analysis.to_dict()
 
         if self.result_clusters:
-            result_dict['result_clusters'] = [cluster.to_dict() for cluster in self.result_clusters]
-            result_dict['cluster_count'] = len(self.result_clusters)
+            result_dict["result_clusters"] = [cluster.to_dict() for cluster in self.result_clusters]
+            result_dict["cluster_count"] = len(self.result_clusters)
 
         return result_dict
 
@@ -182,6 +185,7 @@ class IndexResponse:
     Provides detailed information about indexing operations including
     progress, statistics, and any issues encountered.
     """
+
     operation: str  # index, reindex, incremental_update
     status: str  # success, partial, failed, in_progress
     message: str
@@ -252,6 +256,7 @@ class StatusResponse:
     Provides comprehensive information about the current state of the
     code index including health metrics and recommendations.
     """
+
     # Index health
     status: str  # healthy, degraded, offline, building
     is_ready_for_search: bool
@@ -336,18 +341,19 @@ class StatusResponse:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result_dict = asdict(self)
-        result_dict['health_score'] = self.compute_health_score()
+        result_dict["health_score"] = self.compute_health_score()
         return result_dict
 
 
 # Utility functions for creating responses
+
 
 def create_search_response_from_results(
     query: str,
     results: List[CodeSearchResult],
     execution_time: Optional[float] = None,
     add_clusters: bool = True,
-    add_suggestions: bool = True
+    add_suggestions: bool = True,
 ) -> SearchResponse:
     """
     Create a comprehensive SearchResponse from search results.
@@ -362,11 +368,7 @@ def create_search_response_from_results(
     Returns:
         SearchResponse with enhanced metadata
     """
-    response = SearchResponse(
-        query=query,
-        results=results,
-        execution_time=execution_time
-    )
+    response = SearchResponse(query=query, results=results, execution_time=execution_time)
 
     # Add clustering if requested and we have results
     if add_clusters and results:
@@ -391,8 +393,8 @@ def _create_result_clusters(results: List[CodeSearchResult]) -> List[ResultClust
     # Cluster by language
     language_groups: Dict[str, List[CodeSearchResult]] = {}
     for result in results:
-        if result.file_metadata and 'language' in result.file_metadata:
-            lang = result.file_metadata['language']
+        if result.file_metadata and "language" in result.file_metadata:
+            lang = result.file_metadata["language"]
             if lang not in language_groups:
                 language_groups[lang] = []
             language_groups[lang].append(result)
@@ -404,7 +406,7 @@ def _create_result_clusters(results: List[CodeSearchResult]) -> List[ResultClust
                 cluster_type="language",
                 results=lang_results,
                 cluster_score=sum(r.similarity_score for r in lang_results) / len(lang_results),
-                cluster_description=f"Results from {lang} source files"
+                cluster_description=f"Results from {lang} source files",
             )
             clusters.append(cluster)
 
@@ -423,7 +425,7 @@ def _create_result_clusters(results: List[CodeSearchResult]) -> List[ResultClust
                 cluster_type="directory",
                 results=dir_results,
                 cluster_score=sum(r.similarity_score for r in dir_results) / len(dir_results),
-                cluster_description=f"Results from {directory} directory"
+                cluster_description=f"Results from {directory} directory",
             )
             clusters.append(cluster)
 
@@ -435,35 +437,41 @@ def _generate_query_suggestions(query: str, results: List[CodeSearchResult]) -> 
     suggestions = []
 
     if not results:
-        suggestions.extend([
-            f"Try broader terms related to '{query}'",
-            "Check if the repository has been indexed recently",
-            "Consider using synonyms or related technical terms"
-        ])
+        suggestions.extend(
+            [
+                f"Try broader terms related to '{query}'",
+                "Check if the repository has been indexed recently",
+                "Consider using synonyms or related technical terms",
+            ]
+        )
     elif len(results) < response_config.FEW_RESULTS_THRESHOLD:
-        suggestions.extend([
-            f"Try more specific terms to narrow down '{query}'",
-            "Add programming language or framework context",
-            "Include related function or class names"
-        ])
+        suggestions.extend(
+            [
+                f"Try more specific terms to narrow down '{query}'",
+                "Add programming language or framework context",
+                "Include related function or class names",
+            ]
+        )
     elif len(results) > response_config.MANY_RESULTS_THRESHOLD:
-        suggestions.extend([
-            f"Add more specific context to '{query}' to narrow results",
-            "Include file type or directory constraints",
-            "Focus on particular implementation patterns"
-        ])
+        suggestions.extend(
+            [
+                f"Add more specific context to '{query}' to narrow results",
+                "Include file type or directory constraints",
+                "Focus on particular implementation patterns",
+            ]
+        )
 
     # Add language-specific suggestions based on results
     languages = set()
     for result in results:
-        if result.file_metadata and 'language' in result.file_metadata:
-            languages.add(result.file_metadata['language'])
+        if result.file_metadata and "language" in result.file_metadata:
+            languages.add(result.file_metadata["language"])
 
     if len(languages) > 1:
         for lang in languages:
             suggestions.append(f"Search specifically in {lang} files: '{query} {lang.lower()}'")
 
-    return suggestions[:response_config.MAX_SUGGESTIONS]  # Limit to top suggestions
+    return suggestions[: response_config.MAX_SUGGESTIONS]  # Limit to top suggestions
 
 
 def _generate_navigation_hints(results: List[CodeSearchResult]) -> List[str]:

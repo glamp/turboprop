@@ -7,15 +7,14 @@ across the turboprop codebase, particularly for database and search operations.
 """
 
 import logging
-from typing import Any, Callable, TypeVar
 from functools import wraps
+from typing import Any, Callable, TypeVar
 
 from exceptions import DatabaseError, EmbeddingError, SearchError
 
-
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def handle_search_errors(operation_name: str, return_empty_list: bool = True):
@@ -26,6 +25,7 @@ def handle_search_errors(operation_name: str, return_empty_list: bool = True):
         operation_name: Name of the operation for logging
         return_empty_list: If True, returns empty list on error; otherwise returns None
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -37,7 +37,9 @@ def handle_search_errors(operation_name: str, return_empty_list: bool = True):
             except Exception as error:
                 logger.error("Unexpected error in %s: %s", operation_name, error)
                 raise SearchError(f"{operation_name} failed: {error}") from error
+
         return wrapper
+
     return decorator
 
 
@@ -49,6 +51,7 @@ def handle_database_errors(operation_name: str, return_value: Any = None):
         operation_name: Name of the operation for logging
         return_value: Value to return on error (default: None)
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -60,7 +63,9 @@ def handle_database_errors(operation_name: str, return_value: Any = None):
             except Exception as error:
                 logger.error("Unexpected error in %s: %s", operation_name, error)
                 raise SearchError(f"{operation_name} failed: {error}") from error
+
         return wrapper
+
     return decorator
 
 
@@ -71,6 +76,7 @@ def handle_statistics_errors(operation_name: str):
     Args:
         operation_name: Name of the operation for logging
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -78,20 +84,20 @@ def handle_statistics_errors(operation_name: str):
                 return func(*args, **kwargs)
             except DatabaseError as error:
                 logger.error("Error getting %s: %s", operation_name, error)
-                return {'error': str(error)}
+                return {"error": str(error)}
             except Exception as error:
                 logger.error("Unexpected error getting %s: %s", operation_name, error)
                 raise SearchError(f"{operation_name} retrieval failed: {error}") from error
+
         return wrapper
+
     return decorator
 
 
 class ErrorHandler:
     """Context manager and utility class for consistent error handling."""
 
-    def __init__(self, operation_name: str,
-                 return_value: Any = None,
-                 raise_on_unexpected: bool = True):
+    def __init__(self, operation_name: str, return_value: Any = None, raise_on_unexpected: bool = True):
         """
         Initialize error handler.
 
@@ -125,9 +131,7 @@ class ErrorHandler:
         return False  # Don't suppress other exceptions
 
 
-def log_and_handle_error(operation_name: str,
-                         error: Exception,
-                         return_value: Any = None) -> Any:
+def log_and_handle_error(operation_name: str, error: Exception, return_value: Any = None) -> Any:
     """
     Utility function to log and handle errors consistently.
 

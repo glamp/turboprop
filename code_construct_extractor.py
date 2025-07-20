@@ -36,6 +36,7 @@ class CodeConstruct:
     This class encapsulates all information about a programming construct
     (function, class, variable, import) extracted from source code.
     """
+
     construct_type: str  # 'function', 'class', 'method', 'variable', 'import'
     name: str
     start_line: int
@@ -92,7 +93,7 @@ class PythonConstructExtractor:
         """
         try:
             tree = ast.parse(content)
-            lines = content.split('\n')
+            lines = content.split("\n")
             constructs = []
             processed_classes = set()
             processed_functions = set()
@@ -129,8 +130,9 @@ class PythonConstructExtractor:
             logger.error("Error extracting Python constructs from %s: %s", file_path, error)
             return []
 
-    def _extract_function(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-                          lines: List[str]) -> Optional[CodeConstruct]:
+    def _extract_function(
+        self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef], lines: List[str]
+    ) -> Optional[CodeConstruct]:
         """Extract a function definition."""
         try:
             # Build function signature
@@ -171,11 +173,11 @@ class PythonConstructExtractor:
                 start_line=node.lineno,
                 end_line=node.end_lineno or node.lineno,
                 signature=signature,
-                docstring=docstring
+                docstring=docstring,
             )
 
         except Exception as error:
-            logger.debug("Error extracting function %s: %s", getattr(node, 'name', 'unknown'), error)
+            logger.debug("Error extracting function %s: %s", getattr(node, "name", "unknown"), error)
             return None
 
     def _extract_class(self, node: ast.ClassDef, lines: List[str]) -> Optional[CodeConstruct]:
@@ -200,11 +202,11 @@ class PythonConstructExtractor:
                 start_line=node.lineno,
                 end_line=node.end_lineno or node.lineno,
                 signature=signature,
-                docstring=docstring
+                docstring=docstring,
             )
 
         except Exception as error:
-            logger.debug("Error extracting class %s: %s", getattr(node, 'name', 'unknown'), error)
+            logger.debug("Error extracting class %s: %s", getattr(node, "name", "unknown"), error)
             return None
 
     def _extract_class_methods(self, class_node: ast.ClassDef, lines: List[str], parent_id: str) -> List[CodeConstruct]:
@@ -234,13 +236,15 @@ class PythonConstructExtractor:
                     if alias.asname:
                         signature += f" as {alias.asname}"
 
-                    constructs.append(CodeConstruct(
-                        construct_type="import",
-                        name=name,
-                        start_line=node.lineno,
-                        end_line=node.end_lineno or node.lineno,
-                        signature=signature
-                    ))
+                    constructs.append(
+                        CodeConstruct(
+                            construct_type="import",
+                            name=name,
+                            start_line=node.lineno,
+                            end_line=node.end_lineno or node.lineno,
+                            signature=signature,
+                        )
+                    )
 
             elif isinstance(node, ast.ImportFrom):
                 # For from imports, group multiple imports into one construct per statement
@@ -257,13 +261,15 @@ class PythonConstructExtractor:
                 name_for_import = f"{module}.{imported_names[0]}" if module else imported_names[0]
                 signature = f"from {module} import {', '.join(imported_names)}"
 
-                constructs.append(CodeConstruct(
-                    construct_type="import",
-                    name=name_for_import,
-                    start_line=node.lineno,
-                    end_line=node.end_lineno or node.lineno,
-                    signature=signature
-                ))
+                constructs.append(
+                    CodeConstruct(
+                        construct_type="import",
+                        name=name_for_import,
+                        start_line=node.lineno,
+                        end_line=node.end_lineno or node.lineno,
+                        signature=signature,
+                    )
+                )
 
         except Exception as error:
             logger.debug("Error extracting import: %s", error)
@@ -281,13 +287,15 @@ class PythonConstructExtractor:
                     value_str = ast.unparse(node.value)
                     signature = f"{target.id} = {value_str}"
 
-                    constructs.append(CodeConstruct(
-                        construct_type="variable",
-                        name=target.id,
-                        start_line=node.lineno,
-                        end_line=node.end_lineno or node.lineno,
-                        signature=signature
-                    ))
+                    constructs.append(
+                        CodeConstruct(
+                            construct_type="variable",
+                            name=target.id,
+                            start_line=node.lineno,
+                            end_line=node.end_lineno or node.lineno,
+                            signature=signature,
+                        )
+                    )
 
         except Exception as error:
             logger.debug("Error extracting variable assignment: %s", error)
@@ -311,14 +319,14 @@ class JavaScriptConstructExtractor:
     def __init__(self):
         """Initialize JavaScript pattern matchers."""
         self.function_patterns = [
-            re.compile(r'function\s+(\w+)\s*\([^)]*\)\s*\{', re.MULTILINE),
-            re.compile(r'const\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*\{', re.MULTILINE),
-            re.compile(r'const\s+(\w+)\s*=\s*(\w+)\s*=>\s*[^{;]+;?', re.MULTILINE),  # Single expression arrow functions
+            re.compile(r"function\s+(\w+)\s*\([^)]*\)\s*\{", re.MULTILINE),
+            re.compile(r"const\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*\{", re.MULTILINE),
+            re.compile(r"const\s+(\w+)\s*=\s*(\w+)\s*=>\s*[^{;]+;?", re.MULTILINE),  # Single expression arrow functions
         ]
 
-        self.class_pattern = re.compile(r'class\s+(\w+)(?:\s+extends\s+\w+)?\s*\{', re.MULTILINE)
+        self.class_pattern = re.compile(r"class\s+(\w+)(?:\s+extends\s+\w+)?\s*\{", re.MULTILINE)
 
-        self.method_pattern = re.compile(r'^\s*(\w+)\s*\([^)]*\)\s*\{', re.MULTILINE)
+        self.method_pattern = re.compile(r"^\s*(\w+)\s*\([^)]*\)\s*\{", re.MULTILINE)
 
     def extract_constructs(self, content: str, file_path: str) -> List[CodeConstruct]:
         """
@@ -332,7 +340,7 @@ class JavaScriptConstructExtractor:
             List of CodeConstruct objects
         """
         constructs = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         # Extract imports/requires
         constructs.extend(self._extract_imports_js(content, lines))
@@ -358,7 +366,7 @@ class JavaScriptConstructExtractor:
         for pattern in self.function_patterns:
             for match in pattern.finditer(content):
                 function_name = match.group(1)
-                start_line = content[:match.start()].count('\n') + 1
+                start_line = content[: match.start()].count("\n") + 1
 
                 # Extract signature from matched text
                 signature = self._extract_function_signature(match.group(0))
@@ -366,13 +374,15 @@ class JavaScriptConstructExtractor:
                 # Try to find the end of the function
                 end_line = self._find_function_end(content, match.start(), lines)
 
-                constructs.append(CodeConstruct(
-                    construct_type="function",
-                    name=function_name,
-                    start_line=start_line,
-                    end_line=end_line,
-                    signature=signature
-                ))
+                constructs.append(
+                    CodeConstruct(
+                        construct_type="function",
+                        name=function_name,
+                        start_line=start_line,
+                        end_line=end_line,
+                        signature=signature,
+                    )
+                )
 
         return constructs
 
@@ -382,27 +392,27 @@ class JavaScriptConstructExtractor:
 
         for match in self.class_pattern.finditer(content):
             class_name = match.group(1)
-            start_line = content[:match.start()].count('\n') + 1
+            start_line = content[: match.start()].count("\n") + 1
             signature = match.group(0)[:-1].strip()  # Remove the opening brace and strip whitespace
 
             # Try to find the end of the class
             end_line = self._find_brace_end(content, match.end() - 1, lines)
 
-            constructs.append(CodeConstruct(
-                construct_type="class",
-                name=class_name,
-                start_line=start_line,
-                end_line=end_line,
-                signature=signature
-            ))
+            constructs.append(
+                CodeConstruct(
+                    construct_type="class",
+                    name=class_name,
+                    start_line=start_line,
+                    end_line=end_line,
+                    signature=signature,
+                )
+            )
 
         return constructs
 
     def _extract_class_methods_js(
-            self,
-            content: str,
-            class_construct: CodeConstruct,
-            lines: List[str]) -> List[CodeConstruct]:
+        self, content: str, class_construct: CodeConstruct, lines: List[str]
+    ) -> List[CodeConstruct]:
         """Extract methods from a JavaScript class."""
         methods = []
 
@@ -410,37 +420,39 @@ class JavaScriptConstructExtractor:
         class_start_line = class_construct.start_line - 1  # Convert to 0-based
         class_end_line = class_construct.end_line - 1
 
-        class_content = '\n'.join(lines[class_start_line:class_end_line + 1])
+        class_content = "\n".join(lines[class_start_line : class_end_line + 1])
 
         # Look for method patterns within the class
         method_patterns = [
-            re.compile(r'^\s*(\w+)\s*\([^)]*\)\s*\{', re.MULTILINE),  # Regular methods
-            re.compile(r'^\s*async\s+(\w+)\s*\([^)]*\)\s*\{', re.MULTILINE),  # Async methods
-            re.compile(r'^\s*static\s+(\w+)\s*\([^)]*\)\s*\{', re.MULTILINE),  # Static methods
-            re.compile(r'^\s*(constructor)\s*\([^)]*\)\s*\{', re.MULTILINE),  # Constructor
+            re.compile(r"^\s*(\w+)\s*\([^)]*\)\s*\{", re.MULTILINE),  # Regular methods
+            re.compile(r"^\s*async\s+(\w+)\s*\([^)]*\)\s*\{", re.MULTILINE),  # Async methods
+            re.compile(r"^\s*static\s+(\w+)\s*\([^)]*\)\s*\{", re.MULTILINE),  # Static methods
+            re.compile(r"^\s*(constructor)\s*\([^)]*\)\s*\{", re.MULTILINE),  # Constructor
         ]
 
         for pattern in method_patterns:
             for match in pattern.finditer(class_content):
                 method_name = match.group(1)
                 # Calculate the actual line number in the full content
-                method_line_in_class = class_content[:match.start()].count('\n')
+                method_line_in_class = class_content[: match.start()].count("\n")
                 method_start_line = class_start_line + method_line_in_class + 1
 
                 # Extract method signature
-                signature = match.group(0).rstrip('{').strip()
+                signature = match.group(0).rstrip("{").strip()
 
                 # Try to find the end of the method
                 method_end_line = self._find_method_end_js(class_content, match.start(), method_start_line)
 
-                methods.append(CodeConstruct(
-                    construct_type="method",
-                    name=method_name,
-                    start_line=method_start_line,
-                    end_line=method_end_line,
-                    signature=signature,
-                    parent_construct_id=class_construct.compute_construct_id("")
-                ))
+                methods.append(
+                    CodeConstruct(
+                        construct_type="method",
+                        name=method_name,
+                        start_line=method_start_line,
+                        end_line=method_end_line,
+                        signature=signature,
+                        parent_construct_id=class_construct.compute_construct_id(""),
+                    )
+                )
 
         return methods
 
@@ -448,10 +460,10 @@ class JavaScriptConstructExtractor:
         """Find the end line of a JavaScript method."""
         # Simple heuristic: look for the matching brace
         brace_count = 0
-        lines = class_content[method_start_pos:].split('\n')
+        lines = class_content[method_start_pos:].split("\n")
 
         for i, line in enumerate(lines):
-            brace_count += line.count('{') - line.count('}')
+            brace_count += line.count("{") - line.count("}")
             if brace_count == 0 and i > 0:  # Found matching closing brace
                 return method_start_line + i
 
@@ -461,7 +473,7 @@ class JavaScriptConstructExtractor:
     def _extract_function_signature(self, matched_text: str) -> str:
         """Extract clean function signature from matched text."""
         # Remove the opening brace and clean up whitespace
-        return matched_text.rstrip('{').strip()
+        return matched_text.rstrip("{").strip()
 
     def _find_function_end(self, content: str, start_pos: int, lines: List[str]) -> int:
         """Find the end line of a function using brace matching."""
@@ -478,7 +490,7 @@ class JavaScriptConstructExtractor:
             char = content[i]
 
             # Handle string literals
-            if char in ['"', "'", '`'] and (i == 0 or content[i - 1] != '\\'):
+            if char in ['"', "'", "`"] and (i == 0 or content[i - 1] != "\\"):
                 if not in_string:
                     in_string = True
                     string_char = char
@@ -488,17 +500,17 @@ class JavaScriptConstructExtractor:
 
             # Count braces outside of strings
             if not in_string:
-                if char == '{':
+                if char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0:
-                        return content[:i].count('\n') + 1
+                        return content[:i].count("\n") + 1
 
             i += 1
 
         # If we didn't find the end, return a reasonable estimate
-        return content[:start_pos].count('\n') + FALLBACK_LINE_ESTIMATE
+        return content[:start_pos].count("\n") + FALLBACK_LINE_ESTIMATE
 
     def _extract_imports_js(self, content: str, lines: List[str]) -> List[CodeConstruct]:
         """Extract JavaScript import/require statements."""
@@ -520,19 +532,21 @@ class JavaScriptConstructExtractor:
 
         for pattern in patterns:
             for match in pattern.finditer(content):
-                start_line = content[:match.start()].count('\n') + 1
+                start_line = content[: match.start()].count("\n") + 1
                 imported_name = match.group(1).strip()
 
                 # Create signature from the matched text
                 signature = match.group(0)
 
-                constructs.append(CodeConstruct(
-                    construct_type="import",
-                    name=imported_name,
-                    start_line=start_line,
-                    end_line=start_line,
-                    signature=signature
-                ))
+                constructs.append(
+                    CodeConstruct(
+                        construct_type="import",
+                        name=imported_name,
+                        start_line=start_line,
+                        end_line=start_line,
+                        signature=signature,
+                    )
+                )
 
         return constructs
 

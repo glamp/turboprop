@@ -13,15 +13,20 @@ Classes:
 
 import logging
 import re
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Set
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
-from search_result_types import CodeSearchResult
+from ranking_config import FileTypeConstants, QueryTypeConstants, get_ranking_config
+from ranking_exceptions import (
+    InvalidSearchResultError,
+    MatchReasonGenerationError,
+    RankingContextError,
+    ResultDeduplicationError,
+)
 from ranking_scorers import ConstructTypeScorer
-from ranking_exceptions import MatchReasonGenerationError, ResultDeduplicationError, InvalidSearchResultError, RankingContextError
-from ranking_config import get_ranking_config, FileTypeConstants, QueryTypeConstants
+from search_result_types import CodeSearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +34,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MatchReason:
     """Represents a reason why a search result matches the query."""
+
     category: str  # 'name_match', 'content_match', 'context_match', 'structure_match'
     description: str
     confidence: float  # 0.0 to 1.0
@@ -42,6 +48,7 @@ class MatchReason:
 @dataclass
 class RankingContext:
     """Context information used for ranking decisions."""
+
     query: str
     query_keywords: List[str]
     query_type: Optional[str] = None  # 'function', 'class', 'variable', etc.
@@ -78,10 +85,10 @@ class MatchReasonGenerator:
             if not context:
                 raise RankingContextError("Ranking context cannot be None")
 
-            if not hasattr(result, 'file_path') or not result.file_path:
+            if not hasattr(result, "file_path") or not result.file_path:
                 raise InvalidSearchResultError("Search result must have a valid file_path")
 
-            if not hasattr(result, 'snippet') or not result.snippet:
+            if not hasattr(result, "snippet") or not result.snippet:
                 raise InvalidSearchResultError("Search result must have a valid snippet")
 
             if not context.query or not isinstance(context.query, str):
@@ -94,10 +101,12 @@ class MatchReasonGenerator:
             # If no keywords provided, extract them from the query
             if not keywords:
                 config = get_ranking_config()
-                words = re.findall(r'\b\w+\b', query_lower)
-                keywords = [word for word in words
-                            if word not in QueryTypeConstants.STOP_WORDS
-                            and len(word) > config.match_reasons.min_keyword_length]
+                words = re.findall(r"\b\w+\b", query_lower)
+                keywords = [
+                    word
+                    for word in words
+                    if word not in QueryTypeConstants.STOP_WORDS and len(word) > config.match_reasons.min_keyword_length
+                ]
 
             # Analyze filename and path matching
             path_obj = Path(result.file_path)
@@ -106,90 +115,106 @@ class MatchReasonGenerator:
             # Check for filename matches
             for keyword in keywords:
                 if keyword in filename_lower:
-                    reasons.append(MatchReason(
-                        category='name_match',
-                        description=f"Filename contains '{keyword}'",
-                        confidence=0.8,
-                        details={'matched_keyword': keyword, 'filename': path_obj.name}
-                    ))
+                    reasons.append(
+                        MatchReason(
+                            category="name_match",
+                            description=f"Filename contains '{keyword}'",
+                            confidence=0.8,
+                            details={"matched_keyword": keyword, "filename": path_obj.name},
+                        )
+                    )
 
             # Check for directory structure matches
             path_parts = [part.lower() for part in path_obj.parts]
             for keyword in keywords:
                 if any(keyword in part for part in path_parts):
-                    reasons.append(MatchReason(
-                        category='structure_match',
-                        description=f"File path contains '{keyword}' directory",
-                        confidence=0.6,
-                        details={'matched_keyword': keyword}
-                    ))
+                    reasons.append(
+                        MatchReason(
+                            category="structure_match",
+                            description=f"File path contains '{keyword}' directory",
+                            confidence=0.6,
+                            details={"matched_keyword": keyword},
+                        )
+                    )
 
             # Analyze snippet content
             snippet_text = result.snippet.text.lower()
 
             # Function/class name matching
-            if any(pattern in snippet_text for pattern in ['def ', 'class ', 'function ']):
+            if any(pattern in snippet_text for pattern in ["def ", "class ", "function "]):
                 for keyword in keywords:
-                    if re.search(rf'\b{re.escape(keyword)}\b', snippet_text):
-                        reasons.append(MatchReason(
-                            category='content_match',
-                            description=f"Code contains '{keyword}' identifier",
-                            confidence=0.9,
-                            details={'matched_keyword': keyword}
-                        ))
+                    if re.search(rf"\b{re.escape(keyword)}\b", snippet_text):
+                        reasons.append(
+                            MatchReason(
+                                category="content_match",
+                                description=f"Code contains '{keyword}' identifier",
+                                confidence=0.9,
+                                details={"matched_keyword": keyword},
+                            )
+                        )
 
                 # Comment and docstring analysis
                 if any(pattern in snippet_text for pattern in QueryTypeConstants.COMMENT_PATTERNS):
                     for keyword in keywords:
                         if keyword in snippet_text:
-                            reasons.append(MatchReason(
-                                category='content_match',
-                                description=f"Documentation mentions '{keyword}'",
-                                confidence=0.7,
-                                details={'matched_keyword': keyword}
-                            ))
+                            reasons.append(
+                                MatchReason(
+                                    category="content_match",
+                                    description=f"Documentation mentions '{keyword}'",
+                                    confidence=0.7,
+                                    details={"matched_keyword": keyword},
+                                )
+                            )
 
             # Import and library analysis
-            if 'import' in snippet_text or 'from' in snippet_text:
+            if "import" in snippet_text or "from" in snippet_text:
                 for keyword in keywords:
                     if keyword in snippet_text:
-                        reasons.append(MatchReason(
-                            category='context_match',
-                            description=f"Imports library related to '{keyword}'",
-                            confidence=0.6,
-                            details={'matched_keyword': keyword}
-                        ))
+                        reasons.append(
+                            MatchReason(
+                                category="context_match",
+                                description=f"Imports library related to '{keyword}'",
+                                confidence=0.6,
+                                details={"matched_keyword": keyword},
+                            )
+                        )
 
             # File type relevance
             extension = path_obj.suffix.lower()
             if extension in FileTypeConstants.SOURCE_CODE_TYPES:
-                reasons.append(MatchReason(
-                    category='structure_match',
-                    description=f"Source code file ({extension})",
-                    confidence=0.5,
-                    details={'file_type': extension}
-                ))
+                reasons.append(
+                    MatchReason(
+                        category="structure_match",
+                        description=f"Source code file ({extension})",
+                        confidence=0.5,
+                        details={"file_type": extension},
+                    )
+                )
 
             # Construct type matching
             query_type = ConstructTypeScorer.detect_query_type(context.query)
             if query_type:
                 construct_score = ConstructTypeScorer.score_construct_match(result, query_type)
                 if construct_score > 0.7:
-                    reasons.append(MatchReason(
-                        category='structure_match',
-                        description=f"Contains {query_type} construct matching query",
-                        confidence=construct_score,
-                        details={'construct_type': query_type}
-                    ))
+                    reasons.append(
+                        MatchReason(
+                            category="structure_match",
+                            description=f"Contains {query_type} construct matching query",
+                            confidence=construct_score,
+                            details={"construct_type": query_type},
+                        )
+                    )
 
             # High similarity score
             if result.similarity_score > 0.8:
-                reasons.append(MatchReason(
-                    category='content_match',
-                    description=f"High semantic similarity ({result.similarity_percentage:.1f}%)",
-                    confidence=result.similarity_score,
-                    details={'similarity_score': result.similarity_score}
-                ))
+                reasons.append(
+                    MatchReason(
+                        category="content_match",
+                        description=f"High semantic similarity ({result.similarity_percentage:.1f}%)",
+                        confidence=result.similarity_score,
+                        details={"similarity_score": result.similarity_score},
+                    )
+                )
 
             # Sort reasons by confidence (highest first)
             reasons.sort(key=lambda r: r.confidence, reverse=True)
@@ -209,10 +234,7 @@ class ConfidenceScorer:
 
     @classmethod
     def calculate_advanced_confidence(
-        cls,
-        result: CodeSearchResult,
-        context: RankingContext,
-        match_reasons: List[MatchReason]
+        cls, result: CodeSearchResult, context: RankingContext, match_reasons: List[MatchReason]
     ) -> str:
         """
         Calculate advanced confidence level using multiple factors.
@@ -246,7 +268,8 @@ class ConfidenceScorer:
         if context.all_results:
             # Check if this result is consistent with other high-scoring results
             similar_results = [
-                r for r in context.all_results
+                r
+                for r in context.all_results
                 if abs(r.similarity_score - result.similarity_score) < config.similarity.cross_validation_similarity
             ]
             consistency_score = min(len(similar_results) / 3, 1.0)  # More consistent = higher confidence
@@ -255,11 +278,11 @@ class ConfidenceScorer:
         # Convert to confidence levels using configurable thresholds
         confidence_thresholds = config.confidence
         if confidence_score >= confidence_thresholds.high_confidence:
-            return 'high'
+            return "high"
         elif confidence_score >= confidence_thresholds.medium_confidence:
-            return 'medium'
+            return "medium"
         else:
-            return 'low'
+            return "low"
 
 
 class ResultDeduplicator:
@@ -337,9 +360,8 @@ class ResultDeduplicator:
 
     @classmethod
     def ensure_diversity(
-            cls,
-            results: List[CodeSearchResult],
-            max_per_directory: Optional[int] = None) -> List[CodeSearchResult]:
+        cls, results: List[CodeSearchResult], max_per_directory: Optional[int] = None
+    ) -> List[CodeSearchResult]:
         """
         Ensure result diversity by limiting results per directory.
 
@@ -367,15 +389,13 @@ class ResultDeduplicator:
             else:
                 # Only add if it has significantly higher score than existing results from this dir
                 existing_scores = [
-                    r.similarity_score for r in diverse_results
-                    if str(Path(r.file_path).parent) == directory
+                    r.similarity_score for r in diverse_results if str(Path(r.file_path).parent) == directory
                 ]
                 if result.similarity_score > max(existing_scores) + config.deduplication.score_improvement_threshold:
                     # Replace lowest scoring result from this directory
                     min_idx = min(
-                        (i for i, r in enumerate(diverse_results)
-                         if str(Path(r.file_path).parent) == directory),
-                        key=lambda i: diverse_results[i].similarity_score
+                        (i for i, r in enumerate(diverse_results) if str(Path(r.file_path).parent) == directory),
+                        key=lambda i: diverse_results[i].similarity_score,
                     )
                     diverse_results[min_idx] = result
 

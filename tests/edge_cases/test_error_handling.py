@@ -11,21 +11,19 @@ This module tests:
 - Malformed input handling
 """
 
-import pytest
+import sqlite3
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from code_index import (
-    init_db, scan_repo, embed_and_store, search_index,
-    reindex_all
-)
+import duckdb
+import pytest
+
+from code_index import embed_and_store, init_db, reindex_all, scan_repo, search_index
+from config import config
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from exceptions import SearchError, DatabaseError, EmbeddingError, DatabaseTimeoutError
-from config import config
-import sqlite3
-import duckdb
+from exceptions import DatabaseError, DatabaseTimeoutError, EmbeddingError, SearchError
 
 
 class TestCorruptedFileHandling:
@@ -37,9 +35,7 @@ class TestCorruptedFileHandling:
 
         try:
             # Index repository with binary files
-            total_files, processed_files, elapsed = reindex_all(
-                corrupted_repo, 50.0, db_manager, mock_embedder
-            )
+            total_files, processed_files, elapsed = reindex_all(corrupted_repo, 50.0, db_manager, mock_embedder)
 
             # Should complete without crashing
             assert elapsed > 0
@@ -64,14 +60,13 @@ class TestCorruptedFileHandling:
 
             # Add to git
             import subprocess
+
             subprocess.run(["git", "add", "invalid_utf8.py"], cwd=corrupted_repo, capture_output=True)
             subprocess.run(["git", "commit", "-m", "Add invalid UTF-8"], cwd=corrupted_repo, capture_output=True)
 
             # Should handle gracefully
             files = scan_repo(corrupted_repo, max_bytes=int(10.0 * 1024 * 1024))
-            processed_count, skipped_count = embed_and_store(
-                db_manager, mock_embedder, files
-            )
+            processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
             # Should not crash, may skip invalid files
             assert processed_count + skipped_count == len(files)
@@ -88,9 +83,7 @@ class TestCorruptedFileHandling:
             files = scan_repo(corrupted_repo, max_bytes=int(10.0 * 1024 * 1024))
 
             # Should process without memory issues
-            processed_count, skipped_count = embed_and_store(
-                db_manager, mock_embedder, files
-            )
+            processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
             assert processed_count + skipped_count == len(files)
 
@@ -106,9 +99,7 @@ class TestCorruptedFileHandling:
             files = scan_repo(corrupted_repo, max_bytes=int(10.0 * 1024 * 1024))
 
             # Should handle empty files gracefully
-            processed_count, skipped_count = embed_and_store(
-                db_manager, mock_embedder, files
-            )
+            processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
             # Empty files might be skipped or processed with empty content
             assert processed_count + skipped_count == len(files)
@@ -127,14 +118,17 @@ class TestCorruptedFileHandling:
 
         # Initialize git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"],
-                       cwd=repo_path, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
 
         # Create files with malformed code
         malformed_python = repo_path / "malformed.py"
-        malformed_python.write_text("""
+        malformed_python.write_text(
+            """
 def incomplete_function(
     # Missing closing paren and body
 
@@ -154,10 +148,12 @@ return "wrong indentation"
 x = [1, 2, 3
 y = {"key": "value"
 z = "unclosed string
-""")
+"""
+        )
 
         malformed_js = repo_path / "malformed.js"
-        malformed_js.write_text("""
+        malformed_js.write_text(
+            """
 function missingBrace() {
     return "missing closing brace"
 
@@ -172,7 +168,8 @@ const unclosedObject = {
 // Syntax errors
 const x = [1, 2, 3
 const y = "unclosed string
-""")
+"""
+        )
 
         # Add to git
         subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True)
@@ -205,9 +202,11 @@ class TestLargeFileProcessing:
 
         # Initialize git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"],
-                       cwd=repo_path, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
 
         # Create large file (2MB of content)
@@ -237,9 +236,7 @@ class TestLargeFileProcessing:
             assert len(filtered_files) > 0, "Small file should still be included"
 
             # Process the filtered files
-            processed_count, failed_count = embed_and_store(
-                db_manager, mock_embedder, filtered_files
-            )
+            processed_count, failed_count = embed_and_store(db_manager, mock_embedder, filtered_files)
 
             # All filtered files should be processed successfully
             assert processed_count > 0, "Small file should have been processed"
@@ -254,9 +251,7 @@ class TestLargeFileProcessing:
 
         try:
             # Process large repository
-            total_files, processed_files, elapsed = reindex_all(
-                large_repo, 100.0, db_manager, mock_embedder
-            )
+            total_files, processed_files, elapsed = reindex_all(large_repo, 100.0, db_manager, mock_embedder)
 
             # Should complete successfully
             assert elapsed > 0
@@ -280,9 +275,7 @@ class TestLargeFileProcessing:
             # Test with various batch scenarios
             if len(files) > 0:
                 # Process files
-                processed_count, skipped_count = embed_and_store(
-                    db_manager, mock_embedder, files
-                )
+                processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
                 # Should handle batch processing correctly
                 assert processed_count + skipped_count == len(files)
@@ -366,8 +359,7 @@ class TestDatabaseErrorHandling:
 
             # Insert valid data
             db_manager.execute_with_retry(
-                f"INSERT INTO {config.database.TABLE_NAME} (id, content) VALUES (?, ?)",
-                ("valid_id", "valid content")
+                f"INSERT INTO {config.database.TABLE_NAME} (id, content) VALUES (?, ?)", ("valid_id", "valid content")
             )
 
             # Verify data exists
@@ -378,7 +370,7 @@ class TestDatabaseErrorHandling:
             try:
                 db_manager.execute_with_retry(
                     f"INSERT INTO {config.database.TABLE_NAME} (id, content) VALUES (?, ?)",
-                    ("valid_id", "duplicate content")  # Same ID should cause conflict
+                    ("valid_id", "duplicate content"),  # Same ID should cause conflict
                 )
             except Exception:
                 # Expected to fail due to duplicate primary key
@@ -402,9 +394,11 @@ class TestNetworkAndIOErrors:
 
         # Create git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"],
-                       cwd=repo_path, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
 
         # Create file
@@ -424,9 +418,7 @@ class TestNetworkAndIOErrors:
             db_manager = init_db(repo_path)
             try:
                 # Should handle permission errors gracefully
-                processed_count, skipped_count = embed_and_store(
-                    db_manager, mock_embedder, files
-                )
+                processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
                 # Files should be skipped due to permission errors
                 assert skipped_count > 0
@@ -456,9 +448,11 @@ class TestNetworkAndIOErrors:
 
         # Create git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"],
-                       cwd=repo_path, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
 
         # Create file
@@ -477,9 +471,7 @@ class TestNetworkAndIOErrors:
             db_manager = init_db(repo_path)
             try:
                 # Should handle missing files gracefully
-                processed_count, skipped_count = embed_and_store(
-                    db_manager, mock_embedder, files
-                )
+                processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
                 # Files should be skipped if they disappear
                 assert skipped_count > 0
@@ -534,9 +526,7 @@ class TestEmbeddingErrorHandling:
             # Should handle partial failures
             # In real implementation, this might process some files and skip others
             try:
-                processed_count, skipped_count = embed_and_store(
-                    db_manager, mock_embedder, files
-                )
+                processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
                 # Should have at least attempted processing
                 assert processed_count + skipped_count == len(files)
             except Exception:
@@ -619,10 +609,10 @@ class TestSearchErrorHandling:
             )
 
             # Insert record with corrupted embedding
-            corrupted_embedding = [float('nan')] * 384  # NaN values
+            corrupted_embedding = [float("nan")] * 384  # NaN values
             db_manager.execute_with_retry(
                 f"INSERT INTO {config.database.TABLE_NAME} (id, path, content, embedding) VALUES (?, ?, ?, ?)",
-                ("test_id", "/test/path.py", "test content", corrupted_embedding)
+                ("test_id", "/test/path.py", "test content", corrupted_embedding),
             )
 
             # Search should handle corrupted embeddings gracefully
@@ -649,7 +639,7 @@ class TestSearchErrorHandling:
                     time.sleep(10)  # Simulate slow query
                 return original_execute(*args, **kwargs)
 
-            with patch.object(db_manager, 'execute_with_retry', side_effect=slow_execute):
+            with patch.object(db_manager, "execute_with_retry", side_effect=slow_execute):
                 # Search should handle timeouts gracefully
                 # Note: Actual timeout handling would need to be implemented in the search functions
                 try:
@@ -680,12 +670,10 @@ class TestResourceExhaustionScenarios:
                     raise MemoryError("Not enough memory")
                 return original_generate(texts)
 
-            with patch.object(mock_embedder, 'generate_embeddings', side_effect=memory_limited_generate):
+            with patch.object(mock_embedder, "generate_embeddings", side_effect=memory_limited_generate):
                 # Should handle memory errors gracefully
                 try:
-                    total_files, processed_files, elapsed = reindex_all(
-                        large_repo, 100.0, db_manager, mock_embedder
-                    )
+                    total_files, processed_files, elapsed = reindex_all(large_repo, 100.0, db_manager, mock_embedder)
                     # May process some files before hitting memory limit
                     assert elapsed > 0
                 except (MemoryError, Exception):
@@ -714,9 +702,7 @@ class TestResourceExhaustionScenarios:
 
                 try:
                     # Try to perform indexing under CPU load
-                    total_files, processed_files, elapsed = reindex_all(
-                        sample_repo, 10.0, db_manager, mock_embedder
-                    )
+                    total_files, processed_files, elapsed = reindex_all(sample_repo, 10.0, db_manager, mock_embedder)
 
                     # Should still complete successfully
                     assert elapsed > 0
@@ -750,8 +736,9 @@ class TestResourceExhaustionScenarios:
 
             def reindex_worker():
                 try:
-                    total, processed, elapsed = reindex_all(sample_repo, int(
-                        10.0 * 1024 * 1024), db_manager, mock_embedder)
+                    total, processed, elapsed = reindex_all(
+                        sample_repo, int(10.0 * 1024 * 1024), db_manager, mock_embedder
+                    )
                     return processed
                 except Exception as e:
                     return str(e)
@@ -819,16 +806,12 @@ class TestRecoveryAndCleanup:
 
             if len(files) > 1:
                 # Process only first file, then simulate error
-                processed_count, skipped_count = embed_and_store(
-                    db_manager, mock_embedder, files[:1]
-                )
+                processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files[:1])
 
                 assert processed_count > 0
 
                 # Now process remaining files (should work correctly)
-                processed_count_2, skipped_count_2 = embed_and_store(
-                    db_manager, mock_embedder, files[1:]
-                )
+                processed_count_2, skipped_count_2 = embed_and_store(db_manager, mock_embedder, files[1:])
 
                 # Should be able to continue from partial state
                 assert processed_count_2 + skipped_count_2 == len(files) - 1

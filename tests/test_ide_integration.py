@@ -5,18 +5,18 @@ Tests for IDE integration functionality.
 Tests URL generation, cross-platform path handling, and syntax highlighting
 for various IDEs and development environments.
 """
+import subprocess
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import subprocess
+from unittest.mock import MagicMock, patch
 
 from ide_integration import (
     IDEIntegration,
-    IDEType,
     IDENavigationUrl,
+    IDEType,
     SyntaxHighlightingHint,
     get_ide_navigation_urls,
-    get_mcp_navigation_actions
+    get_mcp_navigation_actions,
 )
 
 
@@ -32,9 +32,7 @@ class TestIDEIntegration(unittest.TestCase):
 
     def test_generate_navigation_urls_basic(self):
         """Test basic navigation URL generation."""
-        urls = self.ide_integration.generate_navigation_urls(
-            self.test_file_path, self.test_line, self.test_column
-        )
+        urls = self.ide_integration.generate_navigation_urls(self.test_file_path, self.test_line, self.test_column)
 
         # Should always return at least the generic file:// URL
         self.assertGreater(len(urls), 0)
@@ -46,10 +44,8 @@ class TestIDEIntegration(unittest.TestCase):
 
     def test_vscode_url_generation(self):
         """Test VS Code URL generation."""
-        with patch.object(self.ide_integration, '_is_ide_available', return_value=True):
-            urls = self.ide_integration.generate_navigation_urls(
-                self.test_file_path, self.test_line, self.test_column
-            )
+        with patch.object(self.ide_integration, "_is_ide_available", return_value=True):
+            urls = self.ide_integration.generate_navigation_urls(self.test_file_path, self.test_line, self.test_column)
 
             vscode_urls = [url for url in urls if url.ide_type == IDEType.VSCODE]
             self.assertGreater(len(vscode_urls), 0)
@@ -61,10 +57,8 @@ class TestIDEIntegration(unittest.TestCase):
 
     def test_jetbrains_url_generation(self):
         """Test JetBrains IDE URL generation."""
-        with patch.object(self.ide_integration, '_is_ide_available', return_value=True):
-            urls = self.ide_integration.generate_navigation_urls(
-                self.test_file_path, self.test_line, self.test_column
-            )
+        with patch.object(self.ide_integration, "_is_ide_available", return_value=True):
+            urls = self.ide_integration.generate_navigation_urls(self.test_file_path, self.test_line, self.test_column)
 
             jetbrains_urls = [url for url in urls if url.ide_type == IDEType.JETBRAINS]
             if jetbrains_urls:  # Only test if JetBrains URLs are generated
@@ -76,10 +70,8 @@ class TestIDEIntegration(unittest.TestCase):
 
     def test_vim_url_generation(self):
         """Test Vim/Neovim URL generation."""
-        with patch.object(self.ide_integration, '_is_ide_available', return_value=True):
-            urls = self.ide_integration.generate_navigation_urls(
-                self.test_file_path, self.test_line
-            )
+        with patch.object(self.ide_integration, "_is_ide_available", return_value=True):
+            urls = self.ide_integration.generate_navigation_urls(self.test_file_path, self.test_line)
 
             vim_urls = [url for url in urls if url.ide_type in [IDEType.VIM, IDEType.NEOVIM]]
             if vim_urls:  # Only test if Vim URLs are generated
@@ -88,23 +80,23 @@ class TestIDEIntegration(unittest.TestCase):
                 self.assertIn(expected_path, vim_url.url)
                 self.assertIn(str(self.test_line), vim_url.url)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_ide_availability_detection_success(self, mock_subprocess):
         """Test successful IDE availability detection."""
         # Mock successful command execution
         mock_subprocess.return_value = MagicMock(returncode=0)
 
-        result = self.ide_integration._check_command_exists(['code'])
+        result = self.ide_integration._check_command_exists(["code"])
         self.assertTrue(result)
         mock_subprocess.assert_called()
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_ide_availability_detection_failure(self, mock_subprocess):
         """Test failed IDE availability detection."""
         # Mock failed command execution
-        mock_subprocess.side_effect = subprocess.CalledProcessError(1, 'which')
+        mock_subprocess.side_effect = subprocess.CalledProcessError(1, "which")
 
-        result = self.ide_integration._check_command_exists(['nonexistent-editor'])
+        result = self.ide_integration._check_command_exists(["nonexistent-editor"])
         self.assertFalse(result)
 
     def test_normalize_path_basic(self):
@@ -116,7 +108,7 @@ class TestIDEIntegration(unittest.TestCase):
         self.assertTrue(Path(normalized).is_absolute())
         self.assertIn("file.py", normalized)
 
-    @patch('platform.system')
+    @patch("platform.system")
     def test_normalize_path_wsl(self, mock_platform):
         """Test WSL path normalization on Windows."""
         mock_platform.return_value = "Windows"
@@ -158,9 +150,7 @@ class TestIDEIntegration(unittest.TestCase):
 class TestClass:
     pass'''
 
-        hints = self.ide_integration.generate_syntax_hints(
-            "test.py", python_code, target_line=1
-        )
+        hints = self.ide_integration.generate_syntax_hints("test.py", python_code, target_line=1)
 
         # Should detect at least some keywords
         self.assertGreater(len(hints), 0)
@@ -171,7 +161,7 @@ class TestClass:
 
     def test_generate_syntax_hints_javascript(self):
         """Test syntax highlighting hints for JavaScript code."""
-        js_code = '''function testFunction() {
+        js_code = """function testFunction() {
     // This is a comment
     const message = "hello world";
     return message;
@@ -179,11 +169,9 @@ class TestClass:
 
 class TestClass {
     constructor() {}
-}'''
+}"""
 
-        hints = self.ide_integration.generate_syntax_hints(
-            "test.js", js_code, target_line=1
-        )
+        hints = self.ide_integration.generate_syntax_hints("test.js", js_code, target_line=1)
 
         # Should detect keywords and comments
         self.assertGreater(len(hints), 0)
@@ -197,26 +185,18 @@ class TestClass {
 
     def test_create_mcp_navigation_actions(self):
         """Test MCP navigation actions creation."""
-        with patch.object(self.ide_integration, 'generate_navigation_urls') as mock_urls:
+        with patch.object(self.ide_integration, "generate_navigation_urls") as mock_urls:
             # Mock some navigation URLs
             mock_urls.return_value = [
                 IDENavigationUrl(
-                    ide_type=IDEType.VSCODE,
-                    url="vscode://file/test.py:42",
-                    display_name="VS Code",
-                    is_available=True
+                    ide_type=IDEType.VSCODE, url="vscode://file/test.py:42", display_name="VS Code", is_available=True
                 ),
                 IDENavigationUrl(
-                    ide_type=IDEType.GENERIC,
-                    url="file:///test.py",
-                    display_name="System Default",
-                    is_available=True
-                )
+                    ide_type=IDEType.GENERIC, url="file:///test.py", display_name="System Default", is_available=True
+                ),
             ]
 
-            actions = self.ide_integration.create_mcp_navigation_actions(
-                self.test_file_path, self.test_line
-            )
+            actions = self.ide_integration.create_mcp_navigation_actions(self.test_file_path, self.test_line)
 
             # Check structure
             self.assertIn("navigation_urls", actions)
@@ -238,13 +218,13 @@ class TestClass {
     def test_convenience_functions(self):
         """Test convenience functions."""
         # Test get_ide_navigation_urls
-        with patch.object(IDEIntegration, 'generate_navigation_urls') as mock_method:
+        with patch.object(IDEIntegration, "generate_navigation_urls") as mock_method:
             mock_method.return_value = []
             get_ide_navigation_urls(self.test_file_path, self.test_line)
             mock_method.assert_called_once_with(self.test_file_path, self.test_line)
 
         # Test get_mcp_navigation_actions
-        with patch.object(IDEIntegration, 'create_mcp_navigation_actions') as mock_method:
+        with patch.object(IDEIntegration, "create_mcp_navigation_actions") as mock_method:
             mock_method.return_value = {}
             get_mcp_navigation_actions(self.test_file_path, self.test_line)
             mock_method.assert_called_once_with(self.test_file_path, self.test_line)
@@ -256,12 +236,7 @@ class TestSyntaxHighlightingHint(unittest.TestCase):
     def test_syntax_highlighting_hint_creation(self):
         """Test SyntaxHighlightingHint creation and attributes."""
         hint = SyntaxHighlightingHint(
-            language="python",
-            token_type="keyword",
-            start_line=1,
-            end_line=1,
-            start_column=0,
-            end_column=3
+            language="python", token_type="keyword", start_line=1, end_line=1, start_column=0, end_column=3
         )
 
         self.assertEqual(hint.language, "python")
@@ -278,10 +253,7 @@ class TestIDENavigationUrl(unittest.TestCase):
     def test_ide_navigation_url_creation(self):
         """Test IDENavigationUrl creation and attributes."""
         url = IDENavigationUrl(
-            ide_type=IDEType.VSCODE,
-            url="vscode://file/test.py:42",
-            display_name="VS Code",
-            is_available=True
+            ide_type=IDEType.VSCODE, url="vscode://file/test.py:42", display_name="VS Code", is_available=True
         )
 
         self.assertEqual(url.ide_type, IDEType.VSCODE)
@@ -297,7 +269,7 @@ class TestCrossPlatformCompatibility(unittest.TestCase):
         """Set up test fixtures."""
         self.ide_integration = IDEIntegration()
 
-    @patch('platform.system')
+    @patch("platform.system")
     def test_platform_detection(self, mock_platform):
         """Test platform detection."""
         mock_platform.return_value = "Darwin"

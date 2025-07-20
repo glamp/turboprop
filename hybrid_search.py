@@ -19,17 +19,14 @@ from typing import List, Optional, Union
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from search_result_types import CodeSearchResult
-from search_utils import (
-    create_enhanced_snippet,
-    extract_file_metadata,
-    search_index_enhanced
-)
+from search_utils import create_enhanced_snippet, extract_file_metadata, search_index_enhanced
 
 logger = logging.getLogger(__name__)
 
 
 class SearchMode(Enum):
     """Search mode options for hybrid search."""
+
     SEMANTIC_ONLY = "semantic"
     TEXT_ONLY = "text"
     HYBRID = "hybrid"
@@ -39,6 +36,7 @@ class SearchMode(Enum):
 @dataclass
 class FusionWeights:
     """Configuration for fusion algorithm weights."""
+
     semantic_weight: float = 0.6
     text_weight: float = 0.4
     rrf_k: int = 60  # RRF parameter
@@ -49,6 +47,7 @@ class FusionWeights:
 @dataclass
 class QueryCharacteristics:
     """Analysis of query characteristics to guide search strategy."""
+
     has_quoted_phrases: bool = False
     has_boolean_operators: bool = False
     has_regex_patterns: bool = False
@@ -62,6 +61,7 @@ class QueryCharacteristics:
 @dataclass
 class HybridSearchResult:
     """Enhanced result container for hybrid search."""
+
     code_result: CodeSearchResult
     semantic_score: float = 0.0
     text_score: float = 0.0
@@ -77,17 +77,55 @@ class QueryAnalyzer:
 
     # Technical terms that suggest exact matching might be preferred
     TECHNICAL_INDICATORS = {
-        'function', 'class', 'method', 'variable', 'import', 'export',
-        'const', 'let', 'var', 'def', 'async', 'await', 'return',
-        'if', 'else', 'for', 'while', 'try', 'catch', 'throw',
-        'interface', 'type', 'struct', 'enum', 'union'
+        "function",
+        "class",
+        "method",
+        "variable",
+        "import",
+        "export",
+        "const",
+        "let",
+        "var",
+        "def",
+        "async",
+        "await",
+        "return",
+        "if",
+        "else",
+        "for",
+        "while",
+        "try",
+        "catch",
+        "throw",
+        "interface",
+        "type",
+        "struct",
+        "enum",
+        "union",
     }
 
     # Natural language indicators that suggest semantic search
     SEMANTIC_INDICATORS = {
-        'how', 'what', 'why', 'where', 'when', 'which', 'who',
-        'find', 'search', 'look', 'get', 'create', 'build', 'make',
-        'implement', 'handle', 'manage', 'process', 'parse', 'convert'
+        "how",
+        "what",
+        "why",
+        "where",
+        "when",
+        "which",
+        "who",
+        "find",
+        "search",
+        "look",
+        "get",
+        "create",
+        "build",
+        "make",
+        "implement",
+        "handle",
+        "manage",
+        "process",
+        "parse",
+        "convert",
     }
 
     def analyze_query(self, query: str) -> QueryCharacteristics:
@@ -105,37 +143,32 @@ class QueryAnalyzer:
         # Handle quoted phrases properly for word counting
         # Replace quoted phrases with placeholders to count them as single units
         import re
+
         quoted_phrases = re.findall(r'"[^"]*"', query_lower)
         temp_query = query_lower
 
         # Replace each quoted phrase with a placeholder
         for i, phrase in enumerate(quoted_phrases):
-            temp_query = temp_query.replace(phrase, f'__QUOTED_PHRASE_{i}__', 1)
+            temp_query = temp_query.replace(phrase, f"__QUOTED_PHRASE_{i}__", 1)
 
         # Now split and count words/units
         words = temp_query.split()
 
-        characteristics = QueryCharacteristics(
-            word_count=len(words)
-        )
+        characteristics = QueryCharacteristics(word_count=len(words))
 
         # Check for quoted phrases
         characteristics.has_quoted_phrases = bool(re.search(r'"[^"]*"', query))
 
         # Check for Boolean operators
-        boolean_ops = ['AND', 'OR', 'NOT', '&', '|', '-']
-        characteristics.has_boolean_operators = any(
-            op in query.upper() for op in boolean_ops
-        )
+        boolean_ops = ["AND", "OR", "NOT", "&", "|", "-"]
+        characteristics.has_boolean_operators = any(op in query.upper() for op in boolean_ops)
 
         # Check for regex patterns (basic detection)
-        regex_indicators = [r'\[', r'\]', r'\{', r'\}', r'\^', r'\$', r'\\']
-        characteristics.has_regex_patterns = any(
-            indicator in query for indicator in regex_indicators
-        )
+        regex_indicators = [r"\[", r"\]", r"\{", r"\}", r"\^", r"\$", r"\\"]
+        characteristics.has_regex_patterns = any(indicator in query for indicator in regex_indicators)
 
         # Check for wildcards
-        characteristics.has_wildcards = '*' in query or '?' in query
+        characteristics.has_wildcards = "*" in query or "?" in query
 
         # Check for technical terms
         technical_matches = sum(1 for word in words if word in self.TECHNICAL_INDICATORS)
@@ -164,10 +197,7 @@ class HybridSearchEngine:
     """Main hybrid search engine combining semantic and text search."""
 
     def __init__(
-        self,
-        db_manager: DatabaseManager,
-        embedder: EmbeddingGenerator,
-        default_weights: Optional[FusionWeights] = None
+        self, db_manager: DatabaseManager, embedder: EmbeddingGenerator, default_weights: Optional[FusionWeights] = None
     ):
         """
         Initialize the hybrid search engine.
@@ -194,7 +224,7 @@ class HybridSearchEngine:
         k: int = 10,
         mode: SearchMode = SearchMode.AUTO,
         fusion_weights: Optional[FusionWeights] = None,
-        enable_query_expansion: bool = True
+        enable_query_expansion: bool = True,
     ) -> List[HybridSearchResult]:
         """
         Perform hybrid search with automatic mode selection and result fusion.
@@ -235,7 +265,10 @@ class HybridSearchEngine:
             execution_time = time.time() - start_time
             logger.info(
                 "Hybrid search for '%s' returned %d results in %.3fs (mode: %s)",
-                query, len(results), execution_time, mode.value
+                query,
+                len(results),
+                execution_time,
+                mode.value,
             )
 
             return results
@@ -255,20 +288,23 @@ class HybridSearchEngine:
             Recommended search mode
         """
         # Prefer exact/text search for specific patterns
-        if (characteristics.has_quoted_phrases
+        if (
+            characteristics.has_quoted_phrases
             or characteristics.has_boolean_operators
-                or characteristics.has_regex_patterns):
+            or characteristics.has_regex_patterns
+        ):
             return SearchMode.TEXT_ONLY
 
         # Prefer semantic search for natural language queries
-        if (characteristics.is_natural_language
+        if (
+            characteristics.is_natural_language
             and characteristics.word_count >= 3
-                and not characteristics.is_technical_term):
+            and not characteristics.is_technical_term
+        ):
             return SearchMode.SEMANTIC_ONLY
 
         # Prefer text search for short technical queries
-        if (characteristics.is_technical_term
-                and characteristics.word_count <= 2):
+        if characteristics.is_technical_term and characteristics.word_count <= 2:
             return SearchMode.TEXT_ONLY
 
         # Default to hybrid for balanced results
@@ -289,7 +325,7 @@ class HybridSearchEngine:
             text_weight=self.default_weights.text_weight,
             rrf_k=self.default_weights.rrf_k,
             boost_exact_matches=self.default_weights.boost_exact_matches,
-            exact_match_boost=self.default_weights.exact_match_boost
+            exact_match_boost=self.default_weights.exact_match_boost,
         )
 
         # Boost text search for exact queries
@@ -311,12 +347,7 @@ class HybridSearchEngine:
 
         return weights
 
-    def _search_semantic_only(
-        self,
-        query: str,
-        k: int,
-        enable_expansion: bool
-    ) -> List[HybridSearchResult]:
+    def _search_semantic_only(self, query: str, k: int, enable_expansion: bool) -> List[HybridSearchResult]:
         """Execute semantic-only search."""
         try:
             # Expand query if enabled
@@ -326,9 +357,7 @@ class HybridSearchEngine:
                 logger.debug("Expanded query from '%s' to '%s'", query, expanded_query)
 
             # Perform semantic search
-            semantic_results = search_index_enhanced(
-                self.db_manager, self.embedder, expanded_query, k
-            )
+            semantic_results = search_index_enhanced(self.db_manager, self.embedder, expanded_query, k)
 
             # Convert to HybridSearchResult
             hybrid_results = []
@@ -341,7 +370,7 @@ class HybridSearchEngine:
                     semantic_rank=i + 1,
                     text_rank=-1,
                     fusion_method="semantic_only",
-                    match_type="semantic"
+                    match_type="semantic",
                 )
                 hybrid_results.append(hybrid_result)
 
@@ -356,20 +385,13 @@ class HybridSearchEngine:
         snippet = create_enhanced_snippet(content, path, query)
         file_metadata = extract_file_metadata(path, content)
 
-        return CodeSearchResult(
-            file_path=path,
-            snippet=snippet,
-            similarity_score=score,
-            file_metadata=file_metadata
-        )
+        return CodeSearchResult(file_path=path, snippet=snippet, similarity_score=score, file_metadata=file_metadata)
 
     def _search_text_only(self, query: str, k: int) -> List[HybridSearchResult]:
         """Execute text-only search using full-text search."""
         try:
             # Perform full-text search
-            text_results = self.db_manager.search_full_text(
-                query, limit=k, enable_fuzzy=True
-            )
+            text_results = self.db_manager.search_full_text(query, limit=k, enable_fuzzy=True)
 
             # Convert to HybridSearchResult
             hybrid_results = []
@@ -385,7 +407,7 @@ class HybridSearchEngine:
                     semantic_rank=-1,
                     text_rank=i + 1,
                     fusion_method="text_only",
-                    match_type="text"
+                    match_type="text",
                 )
                 hybrid_results.append(hybrid_result)
 
@@ -396,11 +418,7 @@ class HybridSearchEngine:
             return []
 
     def _search_hybrid(
-        self,
-        query: str,
-        k: int,
-        weights: FusionWeights,
-        enable_expansion: bool
+        self, query: str, k: int, weights: FusionWeights, enable_expansion: bool
     ) -> List[HybridSearchResult]:
         """Execute hybrid search with result fusion."""
         try:
@@ -412,14 +430,10 @@ class HybridSearchEngine:
             if enable_expansion:
                 expanded_query = self._expand_query(query)
 
-            semantic_results = search_index_enhanced(
-                self.db_manager, self.embedder, expanded_query, candidate_k
-            )
+            semantic_results = search_index_enhanced(self.db_manager, self.embedder, expanded_query, candidate_k)
 
             # Perform text search
-            text_results = self.db_manager.search_full_text(
-                query, limit=candidate_k, enable_fuzzy=True
-            )
+            text_results = self.db_manager.search_full_text(query, limit=candidate_k, enable_fuzzy=True)
 
             # Convert text results to CodeSearchResult format
             text_code_results = []
@@ -428,9 +442,7 @@ class HybridSearchEngine:
                 text_code_results.append(code_result)
 
             # Fuse results using RRF and weighted scoring
-            fused_results = self._fuse_results(
-                semantic_results, text_code_results, weights, query
-            )
+            fused_results = self._fuse_results(semantic_results, text_code_results, weights, query)
 
             # Return top k results
             return fused_results[:k]
@@ -444,7 +456,7 @@ class HybridSearchEngine:
         semantic_results: List[CodeSearchResult],
         text_results: List[CodeSearchResult],
         weights: FusionWeights,
-        query: str
+        query: str,
     ) -> List[HybridSearchResult]:
         """
         Fuse semantic and text search results using RRF and weighted scoring.
@@ -498,10 +510,7 @@ class HybridSearchEngine:
                 rrf_score += 1.0 / (weights.rrf_k + text_rank + 1)
 
             # Calculate weighted score
-            weighted_score = (
-                semantic_score * weights.semantic_weight
-                + text_score * weights.text_weight
-            )
+            weighted_score = semantic_score * weights.semantic_weight + text_score * weights.text_weight
 
             # Boost exact matches if enabled
             fusion_score = weighted_score
@@ -526,7 +535,7 @@ class HybridSearchEngine:
                 semantic_rank=semantic_rank + 1 if semantic_rank >= 0 else -1,
                 text_rank=text_rank + 1 if text_rank >= 0 else -1,
                 fusion_method="rrf_weighted",
-                match_type=match_type
+                match_type=match_type,
             )
             fused_results.append(hybrid_result)
 
@@ -549,7 +558,7 @@ class HybridSearchEngine:
         query_words = query_lower.split()
         if len(query_words) > 1:
             content_words = content_lower.split()
-            path_words = path_lower.split('/')[-1].split('.')  # filename
+            path_words = path_lower.split("/")[-1].split(".")  # filename
             all_words = content_words + path_words
 
             matches = sum(1 for word in query_words if word in all_words)
@@ -572,16 +581,16 @@ class HybridSearchEngine:
         """
         # Simple expansion mappings for common programming concepts
         expansions = {
-            'auth': 'authentication login signin user',
-            'db': 'database data storage',
-            'api': 'endpoint route http rest',
-            'test': 'unittest testing spec',
-            'config': 'configuration settings environment',
-            'error': 'exception handling try catch',
-            'parse': 'parsing parser decode',
-            'json': 'javascript object notation data',
-            'http': 'request response web api',
-            'async': 'asynchronous await promise'
+            "auth": "authentication login signin user",
+            "db": "database data storage",
+            "api": "endpoint route http rest",
+            "test": "unittest testing spec",
+            "config": "configuration settings environment",
+            "error": "exception handling try catch",
+            "parse": "parsing parser decode",
+            "json": "javascript object notation data",
+            "http": "request response web api",
+            "async": "asynchronous await promise",
         }
 
         query_lower = query.lower()
@@ -601,7 +610,7 @@ class HybridSearchFormatter:
         query: str,
         show_scores: bool = True,
         show_match_type: bool = True,
-        repo_path: Optional[str] = None
+        repo_path: Optional[str] = None,
     ) -> str:
         """
         Format hybrid search results for display.
@@ -627,14 +636,10 @@ class HybridSearchFormatter:
             # Format path
             display_path = result.code_result.file_path
             if repo_path and display_path.startswith(repo_path):
-                display_path = display_path[len(repo_path):].lstrip('/')
+                display_path = display_path[len(repo_path) :].lstrip("/")
 
             # Result header with match type indicator
-            match_emoji = {
-                'semantic': '🧠',
-                'text': '📝',
-                'hybrid': '🔀'
-            }.get(result.match_type, '❓')
+            match_emoji = {"semantic": "🧠", "text": "📝", "hybrid": "🔀"}.get(result.match_type, "❓")
 
             lines.append(f"{match_emoji} [{i}] {display_path}")
 
@@ -672,13 +677,14 @@ class HybridSearchFormatter:
 
 # Convenience functions for easy integration
 
+
 def search_hybrid(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
     query: str,
     k: int = 10,
     mode: Union[str, SearchMode] = SearchMode.AUTO,
-    **kwargs
+    **kwargs,
 ) -> List[CodeSearchResult]:
     """
     Convenience function for hybrid search that returns CodeSearchResult objects.
@@ -711,7 +717,7 @@ def search_hybrid_with_details(
     query: str,
     k: int = 10,
     mode: Union[str, SearchMode] = SearchMode.AUTO,
-    **kwargs
+    **kwargs,
 ) -> List[HybridSearchResult]:
     """
     Convenience function for hybrid search that returns detailed HybridSearchResult objects.

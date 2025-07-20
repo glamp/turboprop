@@ -11,19 +11,25 @@ This module tests complete workflows including:
 - API server integration tests
 """
 
-import pytest
-import time
 import subprocess
-from unittest.mock import patch, Mock
+import time
+from unittest.mock import Mock, patch
+
+import pytest
 
 from code_index import (
-    init_db, scan_repo, embed_and_store, build_full_index,
-    search_index, reindex_all, DebouncedHandler
+    DebouncedHandler,
+    build_full_index,
+    embed_and_store,
+    init_db,
+    reindex_all,
+    scan_repo,
+    search_index,
 )
-from hybrid_search import HybridSearchEngine, SearchMode
-from construct_search import ConstructSearchOperations
-from search_operations import search_with_construct_focus
 from config import config
+from construct_search import ConstructSearchOperations
+from hybrid_search import HybridSearchEngine, SearchMode
+from search_operations import search_with_construct_focus
 
 
 class TestFullIndexingWorkflow:
@@ -61,12 +67,12 @@ class TestFullIndexingWorkflow:
             # Verify results contain expected files
             result_paths = []
             for r in results:
-                if hasattr(r, 'file_path'):
+                if hasattr(r, "file_path"):
                     result_paths.append(r.file_path)
                 elif isinstance(r, tuple) and len(r) > 0:
                     result_paths.append(r[0])
-                elif isinstance(r, dict) and 'file_path' in r:
-                    result_paths.append(r['file_path'])
+                elif isinstance(r, dict) and "file_path" in r:
+                    result_paths.append(r["file_path"])
 
             if result_paths:  # Only assert if we have results
                 assert any("auth.js" in str(path) for path in result_paths)
@@ -105,9 +111,7 @@ def new_function():
             subprocess.run(["git", "commit", "-m", "Add new file"], cwd=sample_repo, capture_output=True)
 
             # Reindex
-            total_files_2, processed_files_2, _ = reindex_all(
-                sample_repo, 10 * 1024 * 1024, db_manager, mock_embedder
-            )
+            total_files_2, processed_files_2, _ = reindex_all(sample_repo, 10 * 1024 * 1024, db_manager, mock_embedder)
             assert total_files_2 > total_files  # Should find the new file
 
             # Verify new file is searchable
@@ -116,12 +120,12 @@ def new_function():
             # Check results in a flexible way
             result_paths = []
             for r in results:
-                if hasattr(r, 'file_path'):
+                if hasattr(r, "file_path"):
                     result_paths.append(r.file_path)
                 elif isinstance(r, tuple) and len(r) > 0:
                     result_paths.append(r[0])
-                elif isinstance(r, dict) and 'file_path' in r:
-                    result_paths.append(r['file_path'])
+                elif isinstance(r, dict) and "file_path" in r:
+                    result_paths.append(r["file_path"])
 
             if result_paths:  # Only assert if we have results
                 assert any("new_file.py" in str(path) for path in result_paths)
@@ -138,19 +142,20 @@ def new_function():
             reindex_all(sample_repo, 10 * 1024 * 1024, db_manager, mock_embedder)
 
             # Get initial file count
-            initial_count = db_manager.execute_with_retry(
-                f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}"
-            )[0][0]
+            initial_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}")[0][0]
 
             # Modify existing file
             data_processor_path = sample_repo / "data_processor.py"
             original_content = data_processor_path.read_text()
-            modified_content = original_content + """
+            modified_content = (
+                original_content
+                + """
 
 def additional_function():
     \"\"\"Additional function added later.\"\"\"
     return "additional functionality"
 """
+            )
             data_processor_path.write_text(modified_content)
 
             # Commit changes
@@ -161,9 +166,7 @@ def additional_function():
             reindex_all(sample_repo, 10 * 1024 * 1024, db_manager, mock_embedder)
 
             # File count should be close to initial (file updated, not added)
-            new_count = db_manager.execute_with_retry(
-                f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}"
-            )[0][0]
+            new_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}")[0][0]
             # Allow some variation due to temporary files or different indexing behavior
             assert abs(new_count - initial_count) <= 2
 
@@ -173,12 +176,12 @@ def additional_function():
             # Check results in a flexible way
             result_paths = []
             for r in results:
-                if hasattr(r, 'file_path'):
+                if hasattr(r, "file_path"):
                     result_paths.append(r.file_path)
                 elif isinstance(r, tuple) and len(r) > 0:
                     result_paths.append(r[0])
-                elif isinstance(r, dict) and 'file_path' in r:
-                    result_paths.append(r['file_path'])
+                elif isinstance(r, dict) and "file_path" in r:
+                    result_paths.append(r["file_path"])
 
             if result_paths:  # Only assert if we have results
                 assert any("data_processor.py" in str(path) for path in result_paths)
@@ -197,18 +200,18 @@ class TestHybridSearchIntegration:
 
         # Mock database responses
         fully_mock_db_manager.search_full_text.return_value = [
-            ('id1', str(sample_repo / 'auth.js'), 'function authenticate()', 0.9),
-            ('id2', str(sample_repo / 'data_processor.py'), 'class DataProcessor', 0.8)
+            ("id1", str(sample_repo / "auth.js"), "function authenticate()", 0.9),
+            ("id2", str(sample_repo / "data_processor.py"), "class DataProcessor", 0.8),
         ]
 
         # Mock semantic search results
-        with patch('hybrid_search.search_index_enhanced') as mock_search:
+        with patch("hybrid_search.search_index_enhanced") as mock_search:
             from search_result_types import CodeSearchResult, CodeSnippet
 
             mock_result = CodeSearchResult(
-                file_path=str(sample_repo / 'auth.js'),
+                file_path=str(sample_repo / "auth.js"),
                 snippet=CodeSnippet(text="async hashPassword(password)", start_line=15, end_line=20),
-                similarity_score=0.85
+                similarity_score=0.85,
             )
             mock_search.return_value = [mock_result]
 
@@ -216,25 +219,27 @@ class TestHybridSearchIntegration:
             for mode in [SearchMode.AUTO, SearchMode.HYBRID, SearchMode.SEMANTIC_ONLY, SearchMode.TEXT_ONLY]:
                 results = engine.search("authentication function", k=5, mode=mode)
                 assert len(results) > 0
-                assert all(hasattr(r, 'fusion_score') or hasattr(r, 'semantic_score')
-                           or hasattr(r, 'text_score') for r in results)
+                assert all(
+                    hasattr(r, "fusion_score") or hasattr(r, "semantic_score") or hasattr(r, "text_score")
+                    for r in results
+                )
 
     def test_search_with_construct_focus(self, sample_repo, mock_db_manager, mock_embedder):
         """Test search with construct focus integration."""
         # Mock construct search operations
-        with patch('search_operations.ConstructSearchOperations') as mock_construct_ops_class:
+        with patch("search_operations.ConstructSearchOperations") as mock_construct_ops_class:
             from construct_search import ConstructSearchResult
 
             # Mock construct search results
             mock_construct_result = ConstructSearchResult.create(
                 construct_id="test_1",
-                file_path=str(sample_repo / 'auth.js'),
+                file_path=str(sample_repo / "auth.js"),
                 construct_type="function",
                 name="hashPassword",
                 signature="async hashPassword(password)",
                 start_line=15,
                 end_line=25,
-                similarity_score=0.9
+                similarity_score=0.9,
             )
 
             mock_construct_ops = Mock()
@@ -242,26 +247,24 @@ class TestHybridSearchIntegration:
             mock_construct_ops_class.return_value = mock_construct_ops
 
             # Mock file search
-            with patch('search_operations.search_index_enhanced') as mock_search:
+            with patch("search_operations.search_index_enhanced") as mock_search:
                 from search_result_types import CodeSearchResult, CodeSnippet
 
                 mock_file_result = CodeSearchResult(
-                    file_path=str(sample_repo / 'data_processor.py'),
+                    file_path=str(sample_repo / "data_processor.py"),
                     snippet=CodeSnippet(text="def process_data(self, data)", start_line=10, end_line=15),
-                    similarity_score=0.8
+                    similarity_score=0.8,
                 )
                 mock_search.return_value = [mock_file_result]
 
                 # Execute hybrid search with construct focus
-                results = search_with_construct_focus(
-                    mock_db_manager, mock_embedder, "password hashing function", k=10
-                )
+                results = search_with_construct_focus(mock_db_manager, mock_embedder, "password hashing function", k=10)
 
                 assert len(results) > 0
                 # Should contain both construct and file results
                 result_paths = []
                 for r in results:
-                    if hasattr(r, 'file_path'):
+                    if hasattr(r, "file_path"):
                         result_paths.append(r.file_path)
                     elif isinstance(r, tuple) and len(r) > 0:
                         result_paths.append(r[0])
@@ -292,7 +295,7 @@ class TestFileWatchingIntegration:
             subprocess.run(["git", "add", "watched_file.py"], cwd=sample_repo, capture_output=True)
 
             # Simulate file system event
-            handler.on_created(type('MockEvent', (), {'src_path': str(new_file)})())
+            handler.on_created(type("MockEvent", (), {"src_path": str(new_file)})())
 
             # Wait for debouncing
             time.sleep(0.2)
@@ -379,7 +382,7 @@ class TestFileWatchingIntegration:
 class TestConstructSearchIntegration:
     """Test construct-level search integration."""
 
-    @patch('construct_search.ConstructSearchOperations')
+    @patch("construct_search.ConstructSearchOperations")
     def test_construct_search_operations(self, mock_construct_ops_class, mock_db_manager, mock_embedder):
         """Test construct search operations integration."""
         mock_construct_ops = Mock()
@@ -388,15 +391,15 @@ class TestConstructSearchIntegration:
         # Mock search results
         mock_results = [
             {
-                'construct_id': 'func_1',
-                'path': '/test/file.py',
-                'construct_type': 'function',
-                'name': 'test_func',
-                'code': 'def test_func():',
-                'start_line': 10,
-                'end_line': 15,
-                'docstring': 'Test function',
-                'score': 0.85
+                "construct_id": "func_1",
+                "path": "/test/file.py",
+                "construct_type": "function",
+                "name": "test_func",
+                "code": "def test_func():",
+                "start_line": 10,
+                "end_line": 15,
+                "docstring": "Test function",
+                "score": 0.85,
             }
         ]
 
@@ -422,7 +425,7 @@ class TestConstructSearchIntegration:
         imports = construct_ops.search_imports("import statement", k=5)
         assert isinstance(imports, list)
 
-    @patch('construct_search.ConstructSearchOperations')
+    @patch("construct_search.ConstructSearchOperations")
     def test_construct_statistics_integration(self, mock_construct_ops_class, mock_db_manager, mock_embedder):
         """Test construct statistics gathering."""
         mock_construct_ops = Mock()
@@ -430,9 +433,9 @@ class TestConstructSearchIntegration:
 
         # Mock statistics result
         mock_stats = {
-            'total_constructs': 100,
-            'constructs_by_type': {'function': 50, 'class': 30},
-            'embedded_constructs': 95
+            "total_constructs": 100,
+            "constructs_by_type": {"function": 50, "class": 30},
+            "embedded_constructs": 95,
         }
         mock_construct_ops.get_construct_statistics.return_value = mock_stats
 
@@ -441,9 +444,9 @@ class TestConstructSearchIntegration:
 
         # Check that we get a valid stats dictionary
         assert isinstance(stats, dict)
-        assert 'total_constructs' in stats
-        assert isinstance(stats['total_constructs'], int)
-        assert stats['total_constructs'] >= 0
+        assert "total_constructs" in stats
+        assert isinstance(stats["total_constructs"], int)
+        assert stats["total_constructs"] >= 0
 
 
 class TestCrossComponentIntegration:
@@ -458,18 +461,16 @@ class TestCrossComponentIntegration:
 
         # Mock consistent database responses
         mock_search_full_text = Mock()
-        mock_search_full_text.return_value = [
-            ('id1', str(sample_repo / 'auth.js'), 'authenticate function', 0.9)
-        ]
+        mock_search_full_text.return_value = [("id1", str(sample_repo / "auth.js"), "authenticate function", 0.9)]
         mock_db_manager.search_full_text = mock_search_full_text
 
-        with patch('search_utils.search_index_enhanced') as mock_semantic:
+        with patch("search_utils.search_index_enhanced") as mock_semantic:
             from search_result_types import CodeSearchResult, CodeSnippet
 
             mock_result = CodeSearchResult(
-                file_path=str(sample_repo / 'auth.js'),
+                file_path=str(sample_repo / "auth.js"),
                 snippet=CodeSnippet(text="function authenticate()", start_line=10, end_line=15),
-                similarity_score=0.85
+                similarity_score=0.85,
             )
             mock_semantic.return_value = [mock_result]
 
@@ -481,9 +482,9 @@ class TestCrossComponentIntegration:
             if len(hybrid_results) > 0:
                 result_paths = []
                 for r in hybrid_results:
-                    if hasattr(r, 'code_result') and hasattr(r.code_result, 'file_path'):
+                    if hasattr(r, "code_result") and hasattr(r.code_result, "file_path"):
                         result_paths.append(r.code_result.file_path)
-                    elif hasattr(r, 'file_path'):
+                    elif hasattr(r, "file_path"):
                         result_paths.append(r.file_path)
 
                 if result_paths:
@@ -498,9 +499,7 @@ class TestCrossComponentIntegration:
             reindex_all(sample_repo, 10 * 1024 * 1024, db_manager, mock_embedder)
 
             # Verify database state is consistent
-            file_count = db_manager.execute_with_retry(
-                f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}"
-            )[0][0]
+            file_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}")[0][0]
             assert file_count > 0
 
             # Verify all records have embeddings
@@ -527,9 +526,7 @@ class TestCrossComponentIntegration:
                 assert isinstance(results, list)
 
             # Verify database is still responsive
-            file_count = db_manager.execute_with_retry(
-                f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}"
-            )[0][0]
+            file_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}")[0][0]
             assert file_count > 0
 
         finally:

@@ -10,17 +10,18 @@ This module tests:
 - Scalability tests with large repositories
 """
 
-import pytest
-import time
-import psutil
 import gc
+import time
 from typing import Dict
 from unittest.mock import Mock, patch
 
-from code_index import init_db, reindex_all, search_index, scan_repo
-from hybrid_search import HybridSearchEngine, SearchMode
-from construct_search import ConstructSearchOperations
+import psutil
+import pytest
+
+from code_index import init_db, reindex_all, scan_repo, search_index
 from config import config
+from construct_search import ConstructSearchOperations
+from hybrid_search import HybridSearchEngine, SearchMode
 
 
 class PerformanceMetrics:
@@ -54,12 +55,12 @@ class PerformanceMetrics:
         end_memory = self.process.memory_info().rss / (1024 * 1024)  # MB
 
         return {
-            'elapsed_time': end_time - self.start_time,
-            'start_memory_mb': self.start_memory,
-            'end_memory_mb': end_memory,
-            'peak_memory_mb': self.peak_memory,
-            'memory_delta_mb': end_memory - self.start_memory,
-            'cpu_percent': self.process.cpu_percent()
+            "elapsed_time": end_time - self.start_time,
+            "start_memory_mb": self.start_memory,
+            "end_memory_mb": end_memory,
+            "peak_memory_mb": self.peak_memory,
+            "memory_delta_mb": end_memory - self.start_memory,
+            "cpu_percent": self.process.cpu_percent(),
         }
 
 
@@ -80,7 +81,7 @@ class TestSearchPerformance:
                 "function",
                 "authentication method",
                 "data processing pipeline with error handling",
-                "async function with jwt token validation"
+                "async function with jwt token validation",
             ]
 
             search_times = []
@@ -91,17 +92,17 @@ class TestSearchPerformance:
                 results = search_index(db_manager, mock_embedder, query, k=10)
 
                 performance_metrics = metrics.get_metrics()
-                search_times.append(performance_metrics['elapsed_time'])
+                search_times.append(performance_metrics["elapsed_time"])
 
                 # Assert search completes within acceptable time
-                assert performance_metrics['elapsed_time'] < performance_baseline['search_timeout']
+                assert performance_metrics["elapsed_time"] < performance_baseline["search_timeout"]
 
                 # Verify results are returned
                 assert isinstance(results, list)
 
             # Calculate average search time
             avg_search_time = sum(search_times) / len(search_times)
-            assert avg_search_time < performance_baseline['search_timeout'] / 2
+            assert avg_search_time < performance_baseline["search_timeout"] / 2
 
         finally:
             db_manager.cleanup()
@@ -125,10 +126,10 @@ class TestSearchPerformance:
                 results = search_index(db_manager, mock_embedder, "function definition", k=k)
 
                 performance_metrics = metrics.get_metrics()
-                search_times[k] = performance_metrics['elapsed_time']
+                search_times[k] = performance_metrics["elapsed_time"]
 
                 # Should complete within timeout
-                assert performance_metrics['elapsed_time'] < performance_baseline['search_timeout']
+                assert performance_metrics["elapsed_time"] < performance_baseline["search_timeout"]
 
                 # Should return up to k results
                 assert len(results) <= k
@@ -147,11 +148,11 @@ class TestSearchPerformance:
 
         # Mock database responses for consistency
         fully_mock_db_manager.search_full_text.return_value = [
-            ('id1', str(sample_repo / 'auth.js'), 'function authenticate()', 0.9),
-            ('id2', str(sample_repo / 'data_processor.py'), 'class DataProcessor', 0.8)
+            ("id1", str(sample_repo / "auth.js"), "function authenticate()", 0.9),
+            ("id2", str(sample_repo / "data_processor.py"), "class DataProcessor", 0.8),
         ]
 
-        with patch('hybrid_search.search_index_enhanced') as mock_search:
+        with patch("hybrid_search.search_index_enhanced") as mock_search:
             from search_result_types import CodeSearchResult, CodeSnippet
 
             # Create multiple mock results for performance testing
@@ -160,7 +161,7 @@ class TestSearchPerformance:
                 mock_result = CodeSearchResult(
                     file_path=f"/test/file_{i}.py",
                     snippet=CodeSnippet(text=f"def function_{i}():", start_line=1, end_line=3),
-                    similarity_score=0.9 - (i * 0.01)
+                    similarity_score=0.9 - (i * 0.01),
                 )
                 mock_results.append(mock_result)
 
@@ -179,7 +180,7 @@ class TestSearchPerformance:
                 performance_metrics = metrics.get_metrics()
 
                 # Should complete within timeout
-                assert performance_metrics['elapsed_time'] < performance_baseline['search_timeout']
+                assert performance_metrics["elapsed_time"] < performance_baseline["search_timeout"]
 
                 # Should return results
                 assert len(results) > 0
@@ -226,7 +227,7 @@ class TestSearchPerformance:
             performance_metrics = metrics.get_metrics()
 
             # Should complete all searches within timeout
-            assert performance_metrics['elapsed_time'] < performance_baseline['search_timeout'] * 2
+            assert performance_metrics["elapsed_time"] < performance_baseline["search_timeout"] * 2
 
             # All searches should succeed
             assert len(search_errors) == 0, f"Search errors: {search_errors}"
@@ -254,16 +255,16 @@ class TestIndexingPerformance:
             performance_metrics = metrics.get_metrics()
 
             # Should complete within timeout
-            assert performance_metrics['elapsed_time'] < performance_baseline['indexing_timeout']
+            assert performance_metrics["elapsed_time"] < performance_baseline["indexing_timeout"]
             # Elapsed time should be approximately equal (allow some variance)
-            assert abs(performance_metrics['elapsed_time'] - elapsed) < 0.1
+            assert abs(performance_metrics["elapsed_time"] - elapsed) < 0.1
 
             # Should process all files (using force_all=True)
             assert processed_files == total_files
             assert total_files > 0
 
             # Memory usage should be reasonable (allow some variance in test environment)
-            assert performance_metrics['peak_memory_mb'] < performance_baseline['max_memory_mb'] * 1.1  # 10% tolerance
+            assert performance_metrics["peak_memory_mb"] < performance_baseline["max_memory_mb"] * 1.1  # 10% tolerance
 
             # Calculate indexing rate
             if elapsed > 0:
@@ -283,11 +284,12 @@ class TestIndexingPerformance:
 
             # Monitor memory during indexing
             def memory_monitor():
-                while hasattr(memory_monitor, 'running') and memory_monitor.running:
+                while hasattr(memory_monitor, "running") and memory_monitor.running:
                     metrics.update_peak_memory()
                     time.sleep(0.1)
 
             import threading
+
             memory_monitor.running = True
             monitor_thread = threading.Thread(target=memory_monitor)
             monitor_thread.start()
@@ -304,11 +306,11 @@ class TestIndexingPerformance:
 
             # Should complete within timeout
             # Larger timeout for large repo
-            assert performance_metrics['elapsed_time'] < performance_baseline['indexing_timeout'] * 5
+            assert performance_metrics["elapsed_time"] < performance_baseline["indexing_timeout"] * 5
 
             # Memory usage should not exceed limit
             # Allow 2x for large repo
-            assert performance_metrics['peak_memory_mb'] < performance_baseline['max_memory_mb'] * 2
+            assert performance_metrics["peak_memory_mb"] < performance_baseline["max_memory_mb"] * 2
 
             # Should process files efficiently
             assert processed_files > 0
@@ -326,7 +328,7 @@ class TestIndexingPerformance:
         texts = []
         for file_path in files:
             try:
-                content = file_path.read_text(encoding='utf-8', errors='ignore')
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
                 texts.append(content)
             except Exception:
                 continue
@@ -345,12 +347,12 @@ class TestIndexingPerformance:
         assert len(embeddings) == len(texts)
 
         # Calculate generation rate
-        if performance_metrics['elapsed_time'] > 0:
-            embeddings_per_second = len(embeddings) / performance_metrics['elapsed_time']
+        if performance_metrics["elapsed_time"] > 0:
+            embeddings_per_second = len(embeddings) / performance_metrics["elapsed_time"]
 
             # Should meet minimum performance baseline
             # Note: This is for mock embedder, real embedder would be much slower
-            assert embeddings_per_second > performance_baseline['embedding_generation_rate']
+            assert embeddings_per_second > performance_baseline["embedding_generation_rate"]
 
     def test_database_write_performance(self, sample_repo, mock_embedder, performance_baseline):
         """Test database write performance during indexing."""
@@ -367,19 +369,17 @@ class TestIndexingPerformance:
             # Simulate the embed_and_store process focusing on DB writes
             from code_index import embed_and_store
 
-            processed_count, skipped_count = embed_and_store(
-                db_manager, mock_embedder, files
-            )
+            processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 
             performance_metrics = metrics.get_metrics()
 
             # Should complete database writes efficiently
-            assert performance_metrics['elapsed_time'] < performance_baseline['indexing_timeout']
+            assert performance_metrics["elapsed_time"] < performance_baseline["indexing_timeout"]
             assert processed_count > 0
 
             # Calculate write rate
-            if performance_metrics['elapsed_time'] > 0:
-                writes_per_second = processed_count / performance_metrics['elapsed_time']
+            if performance_metrics["elapsed_time"] > 0:
+                writes_per_second = processed_count / performance_metrics["elapsed_time"]
                 assert writes_per_second > 0
 
         finally:
@@ -415,21 +415,21 @@ class TestDatabasePerformance:
             ORDER BY similarity DESC
             LIMIT 50
             """,
-            [query_embedding.tolist()]
+            [query_embedding.tolist()],
         )
 
         performance_metrics = metrics.get_metrics()
 
         # Should complete quickly even with large dataset
-        assert performance_metrics['elapsed_time'] < 1.0
+        assert performance_metrics["elapsed_time"] < 1.0
         assert len(results) > 0
 
     def test_full_text_search_performance(self, fully_mock_db_manager):
         """Test full-text search performance."""
         # Mock FTS results
         fts_results = [
-            ('id1', '/test/file1.py', 'function test_func()', 0.9),
-            ('id2', '/test/file2.py', 'class TestClass', 0.8)
+            ("id1", "/test/file1.py", "function test_func()", 0.9),
+            ("id2", "/test/file2.py", "class TestClass", 0.8),
         ]
         fully_mock_db_manager.search_full_text.return_value = fts_results
 
@@ -442,7 +442,7 @@ class TestDatabasePerformance:
         performance_metrics = metrics.get_metrics()
 
         # Should complete quickly
-        assert performance_metrics['elapsed_time'] < 0.5
+        assert performance_metrics["elapsed_time"] < 0.5
         assert len(results) > 0
 
     def test_construct_search_performance(self, fully_mock_db_manager, mock_embedder):
@@ -452,10 +452,21 @@ class TestDatabasePerformance:
         # Mock construct search results
         mock_results = []
         for i in range(100):
-            mock_results.append((
-                f"construct_{i}", f"/test/file_{i}.py", "function", f"func_{i}",
-                f"def func_{i}():", i * 10, i * 10 + 5, f"Doc {i}", None, f"file_{i}", 0.8
-            ))
+            mock_results.append(
+                (
+                    f"construct_{i}",
+                    f"/test/file_{i}.py",
+                    "function",
+                    f"func_{i}",
+                    f"def func_{i}():",
+                    i * 10,
+                    i * 10 + 5,
+                    f"Doc {i}",
+                    None,
+                    f"file_{i}",
+                    0.8,
+                )
+            )
 
         mock_connection = Mock()
         mock_connection.execute.return_value.fetchall.return_value = mock_results
@@ -477,7 +488,7 @@ class TestDatabasePerformance:
         performance_metrics = metrics.get_metrics()
 
         # Should complete efficiently
-        assert performance_metrics['elapsed_time'] < 2.0
+        assert performance_metrics["elapsed_time"] < 2.0
         assert len(results) > 0 or mock_connection.execute.called
 
 
@@ -507,7 +518,7 @@ class TestMemoryEfficiency:
 
             # Memory growth should be limited
             memory_growth = max_memory - baseline_memory
-            assert memory_growth < performance_baseline['max_memory_mb'] / 10  # Less than 10% of max allowed
+            assert memory_growth < performance_baseline["max_memory_mb"] / 10  # Less than 10% of max allowed
 
         finally:
             db_manager.cleanup()
@@ -556,6 +567,7 @@ class TestRegressionBenchmarks:
 
         def store_benchmark(name: str, metrics: Dict[str, float]):
             import json
+
             if benchmark_file.exists():
                 data = json.loads(benchmark_file.read_text())
             else:
@@ -566,6 +578,7 @@ class TestRegressionBenchmarks:
 
         def get_baseline(name: str) -> Dict[str, float]:
             import json
+
             if not benchmark_file.exists():
                 return {}
 
@@ -596,9 +609,9 @@ class TestRegressionBenchmarks:
             # Store current benchmark
             benchmark_name = "search_performance_small_repo"
             current_metrics = {
-                'search_time': performance_metrics['elapsed_time'],
-                'memory_usage': performance_metrics['peak_memory_mb'],
-                'result_count': len(results)
+                "search_time": performance_metrics["elapsed_time"],
+                "memory_usage": performance_metrics["peak_memory_mb"],
+                "result_count": len(results),
             }
 
             # Get baseline for comparison
@@ -606,11 +619,13 @@ class TestRegressionBenchmarks:
 
             if baseline:
                 # Check for regression (allowing 20% tolerance)
-                assert current_metrics['search_time'] <= baseline['search_time'] * 1.2, \
-                    f"Search time regression: {current_metrics['search_time']} > {baseline['search_time']} * 1.2"
+                assert (
+                    current_metrics["search_time"] <= baseline["search_time"] * 1.2
+                ), f"Search time regression: {current_metrics['search_time']} > {baseline['search_time']} * 1.2"
 
-                assert current_metrics['memory_usage'] <= baseline['memory_usage'] * 1.2, \
-                    f"Memory usage regression: {current_metrics['memory_usage']} > {baseline['memory_usage']} * 1.2"
+                assert (
+                    current_metrics["memory_usage"] <= baseline["memory_usage"] * 1.2
+                ), f"Memory usage regression: {current_metrics['memory_usage']} > {baseline['memory_usage']} * 1.2"
 
             # Store current metrics as new baseline
             store_benchmark(benchmark_name, current_metrics)
@@ -638,10 +653,10 @@ class TestRegressionBenchmarks:
             # Store current benchmark
             benchmark_name = "indexing_performance_small_repo"
             current_metrics = {
-                'indexing_time': performance_metrics['elapsed_time'],
-                'memory_peak': performance_metrics['peak_memory_mb'],
-                'files_processed': processed_files,
-                'files_per_second': processed_files / elapsed if elapsed > 0 else 0
+                "indexing_time": performance_metrics["elapsed_time"],
+                "memory_peak": performance_metrics["peak_memory_mb"],
+                "files_processed": processed_files,
+                "files_per_second": processed_files / elapsed if elapsed > 0 else 0,
             }
 
             # Get baseline for comparison
@@ -649,11 +664,13 @@ class TestRegressionBenchmarks:
 
             if baseline:
                 # Check for regression (allowing 20% tolerance)
-                assert current_metrics['indexing_time'] <= baseline['indexing_time'] * 1.2, \
-                    f"Indexing time regression: {current_metrics['indexing_time']} > {baseline['indexing_time']} * 1.2"
+                assert (
+                    current_metrics["indexing_time"] <= baseline["indexing_time"] * 1.2
+                ), f"Indexing time regression: {current_metrics['indexing_time']} > {baseline['indexing_time']} * 1.2"
 
-                assert current_metrics['files_per_second'] >= baseline['files_per_second'] * 0.8, \
-                    f"Indexing rate regression: {current_metrics['files_per_second']} < {baseline['files_per_second']} * 0.8"
+                assert (
+                    current_metrics["files_per_second"] >= baseline["files_per_second"] * 0.8
+                ), f"Indexing rate regression: {current_metrics['files_per_second']} < {baseline['files_per_second']} * 0.8"
 
             # Store current metrics
             store_benchmark(benchmark_name, current_metrics)

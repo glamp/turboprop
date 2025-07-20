@@ -7,22 +7,24 @@ system including multi-factor ranking, match reason generation, deduplication,
 and confidence assessment.
 """
 
-import pytest
-import tempfile
 import os
+import tempfile
 from typing import List
 from unittest.mock import Mock, patch
 
-from result_ranking import (
-    RankingWeights, ResultRanker,
-    rank_search_results, generate_match_explanations, calculate_advanced_confidence
-)
-from ranking_utils import (
-    MatchReason, RankingContext, MatchReasonGenerator, ConfidenceScorer, ResultDeduplicator
-)
-from ranking_scorers import FileTypeScorer, ConstructTypeScorer, RecencyScorer, FileSizeScorer
-from search_result_types import CodeSnippet, CodeSearchResult
+import pytest
+
 from ranking_exceptions import InvalidRankingWeightsError
+from ranking_scorers import ConstructTypeScorer, FileSizeScorer, FileTypeScorer, RecencyScorer
+from ranking_utils import ConfidenceScorer, MatchReason, MatchReasonGenerator, RankingContext, ResultDeduplicator
+from result_ranking import (
+    RankingWeights,
+    ResultRanker,
+    calculate_advanced_confidence,
+    generate_match_explanations,
+    rank_search_results,
+)
+from search_result_types import CodeSearchResult, CodeSnippet
 
 
 class TestRankingWeights:
@@ -40,23 +42,25 @@ class TestRankingWeights:
     def test_weights_validation(self):
         """Test that weights are validated during initialization."""
         # Test that invalid weights (sum > 1.1) raise an exception
-        with pytest.raises(InvalidRankingWeightsError, match="Ranking weights must sum to approximately 1.0, got 1.500"):
+        with pytest.raises(
+            InvalidRankingWeightsError, match="Ranking weights must sum to approximately 1.0, got 1.500"
+        ):
             RankingWeights(
                 embedding_similarity=0.5,
                 file_type_relevance=0.5,
                 construct_type_matching=0.3,  # Total = 1.5 > 1.0
                 file_recency=0.1,
-                file_size_optimization=0.1
+                file_size_optimization=0.1,
             )
 
         # Test that slightly off weights (sum within 0.1 of 1.0) only log a warning
-        with patch('result_ranking.logger') as mock_logger:
+        with patch("result_ranking.logger") as mock_logger:
             RankingWeights(
                 embedding_similarity=0.36,
                 file_type_relevance=0.25,
                 construct_type_matching=0.25,  # Total = 1.06, outside tolerance but within 0.1
                 file_recency=0.1,
-                file_size_optimization=0.1
+                file_size_optimization=0.1,
             )
             # Should log a warning about weights not summing exactly to 1.0
             mock_logger.warning.assert_called_once()
@@ -116,12 +120,12 @@ class TestConstructTypeScorer:
 
     def test_query_type_detection(self):
         """Test detection of construct types from queries."""
-        assert ConstructTypeScorer.detect_query_type("find function that") == 'function'
-        assert ConstructTypeScorer.detect_query_type("show me the class") == 'class'
-        assert ConstructTypeScorer.detect_query_type("search for variable") == 'variable'
-        assert ConstructTypeScorer.detect_query_type("import statement") == 'import'
-        assert ConstructTypeScorer.detect_query_type("error handling") == 'exception'
-        assert ConstructTypeScorer.detect_query_type("module definition") == 'module'
+        assert ConstructTypeScorer.detect_query_type("find function that") == "function"
+        assert ConstructTypeScorer.detect_query_type("show me the class") == "class"
+        assert ConstructTypeScorer.detect_query_type("search for variable") == "variable"
+        assert ConstructTypeScorer.detect_query_type("import statement") == "import"
+        assert ConstructTypeScorer.detect_query_type("error handling") == "exception"
+        assert ConstructTypeScorer.detect_query_type("module definition") == "module"
         assert ConstructTypeScorer.detect_query_type("random search") is None
 
     def test_construct_matching_with_metadata(self):
@@ -131,20 +135,16 @@ class TestConstructTypeScorer:
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="def example():", start_line=1, end_line=1),
             similarity_score=0.8,
-            file_metadata={
-                'construct_context': {
-                    'construct_types': ['function', 'variable']
-                }
-            }
+            file_metadata={"construct_context": {"construct_types": ["function", "variable"]}},
         )
 
         # Perfect match
-        score = ConstructTypeScorer.score_construct_match(result, 'function')
+        score = ConstructTypeScorer.score_construct_match(result, "function")
         assert score == 1.0
 
         # Related match (function/method)
-        result.file_metadata['construct_context']['construct_types'] = ['method']
-        score = ConstructTypeScorer.score_construct_match(result, 'function')
+        result.file_metadata["construct_context"]["construct_types"] = ["method"]
+        score = ConstructTypeScorer.score_construct_match(result, "function")
         assert score == 0.8
 
     def test_construct_matching_without_metadata(self):
@@ -153,18 +153,18 @@ class TestConstructTypeScorer:
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="def example_function():", start_line=1, end_line=1),
-            similarity_score=0.8
+            similarity_score=0.8,
         )
-        score = ConstructTypeScorer.score_construct_match(result, 'function')
+        score = ConstructTypeScorer.score_construct_match(result, "function")
         assert score == 0.9
 
         # Class in snippet
         result.snippet.text = "class ExampleClass:"
-        score = ConstructTypeScorer.score_construct_match(result, 'class')
+        score = ConstructTypeScorer.score_construct_match(result, "class")
         assert score == 0.9
 
         # Mismatch
-        score = ConstructTypeScorer.score_construct_match(result, 'variable')
+        score = ConstructTypeScorer.score_construct_match(result, "variable")
         assert score == 0.3
 
 
@@ -173,24 +173,24 @@ class TestRecencyScorer:
 
     def test_recent_files_get_high_scores(self):
         """Test that recent files get higher scores."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         with tempfile.NamedTemporaryFile() as temp_file:
             # Mock recent modification time
             recent_time = datetime.now(tz=timezone.utc) - timedelta(days=1)
-            with patch('os.stat') as mock_stat:
+            with patch("os.stat") as mock_stat:
                 mock_stat.return_value = Mock(st_mtime=recent_time.timestamp())
                 score = RecencyScorer.score_recency(temp_file.name)
                 assert score == 1.0
 
     def test_old_files_get_low_scores(self):
         """Test that old files get lower scores."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         with tempfile.NamedTemporaryFile() as temp_file:
             # Mock old modification time
             old_time = datetime.now(tz=timezone.utc) - timedelta(days=500)
-            with patch('os.stat') as mock_stat:
+            with patch("os.stat") as mock_stat:
                 mock_stat.return_value = Mock(st_mtime=old_time.timestamp())
                 score = RecencyScorer.score_recency(temp_file.name)
                 assert score == 0.1
@@ -210,7 +210,7 @@ class TestFileSizeScorer:
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="code", start_line=1, end_line=1),
             similarity_score=0.8,
-            file_metadata={'size': 5000}  # 5KB - in optimal range
+            file_metadata={"size": 5000},  # 5KB - in optimal range
         )
         score = FileSizeScorer.score_file_size(result)
         assert score == 1.0
@@ -221,7 +221,7 @@ class TestFileSizeScorer:
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="code", start_line=1, end_line=1),
             similarity_score=0.8,
-            file_metadata={'size': 50}  # Very small
+            file_metadata={"size": 50},  # Very small
         )
         score = FileSizeScorer.score_file_size(result)
         assert score == 0.2
@@ -232,7 +232,7 @@ class TestFileSizeScorer:
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="code", start_line=1, end_line=1),
             similarity_score=0.8,
-            file_metadata={'size': 1000000}  # 1MB - very large
+            file_metadata={"size": 1000000},  # 1MB - very large
         )
         score = FileSizeScorer.score_file_size(result)
         assert score == 0.2
@@ -242,7 +242,7 @@ class TestFileSizeScorer:
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="code", start_line=1, end_line=1),
-            similarity_score=0.8
+            similarity_score=0.8,
         )
         score = FileSizeScorer.score_file_size(result)
         assert score == 0.5
@@ -256,39 +256,32 @@ class TestMatchReasonGenerator:
         result = CodeSearchResult(
             file_path="/path/to/authentication.py",
             snippet=CodeSnippet(text="def login():", start_line=1, end_line=1),
-            similarity_score=0.8
+            similarity_score=0.8,
         )
-        context = RankingContext(
-            query="authentication system",
-            query_keywords=['authentication', 'system']
-        )
+        context = RankingContext(query="authentication system", query_keywords=["authentication", "system"])
 
         reasons = MatchReasonGenerator.generate_reasons(result, context)
 
         # Should find filename match
-        filename_reasons = [r for r in reasons if r.category == 'name_match']
+        filename_reasons = [r for r in reasons if r.category == "name_match"]
         assert len(filename_reasons) > 0
-        assert any('authentication' in r.description for r in filename_reasons)
+        assert any("authentication" in r.description for r in filename_reasons)
 
     def test_content_matching(self):
         """Test generation of content matching reasons."""
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(
-                text="def authenticate_user():\n    # User authentication logic",
-                start_line=1, end_line=2
+                text="def authenticate_user():\n    # User authentication logic", start_line=1, end_line=2
             ),
-            similarity_score=0.9
+            similarity_score=0.9,
         )
-        context = RankingContext(
-            query="authentication function",
-            query_keywords=['authentication', 'function']
-        )
+        context = RankingContext(query="authentication function", query_keywords=["authentication", "function"])
 
         reasons = MatchReasonGenerator.generate_reasons(result, context)
 
         # Should find content matches
-        content_reasons = [r for r in reasons if r.category == 'content_match']
+        content_reasons = [r for r in reasons if r.category == "content_match"]
         assert len(content_reasons) > 0
 
     def test_high_similarity_reason(self):
@@ -296,17 +289,14 @@ class TestMatchReasonGenerator:
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="some code", start_line=1, end_line=1),
-            similarity_score=0.9  # High similarity
+            similarity_score=0.9,  # High similarity
         )
-        context = RankingContext(
-            query="test query",
-            query_keywords=['test', 'query']
-        )
+        context = RankingContext(query="test query", query_keywords=["test", "query"])
 
         reasons = MatchReasonGenerator.generate_reasons(result, context)
 
         # Should include high similarity reason
-        similarity_reasons = [r for r in reasons if 'semantic similarity' in r.description]
+        similarity_reasons = [r for r in reasons if "semantic similarity" in r.description]
         assert len(similarity_reasons) > 0
 
 
@@ -319,11 +309,7 @@ class TestConfidenceScorer:
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="def authenticate():", start_line=1, end_line=1),
             similarity_score=0.95,  # Higher similarity
-            file_metadata={
-                'construct_context': {
-                    'construct_types': ['function']  # Perfect construct match
-                }
-            }
+            file_metadata={"construct_context": {"construct_types": ["function"]}},  # Perfect construct match
         )
 
         # Create similar results for cross-validation
@@ -331,40 +317,36 @@ class TestConfidenceScorer:
 
         context = RankingContext(
             query="authentication function",
-            query_keywords=['authentication', 'function'],
-            query_type='function',
-            all_results=similar_results
+            query_keywords=["authentication", "function"],
+            query_type="function",
+            all_results=similar_results,
         )
 
         # Create high-confidence match reasons
         match_reasons = [
-            MatchReason(category='content_match', description='Function name matches', confidence=0.95),
-            MatchReason(category='structure_match', description='Function construct', confidence=0.9)
+            MatchReason(category="content_match", description="Function name matches", confidence=0.95),
+            MatchReason(category="structure_match", description="Function construct", confidence=0.9),
         ]
 
         confidence = ConfidenceScorer.calculate_advanced_confidence(result, context, match_reasons)
-        assert confidence == 'high'
+        assert confidence == "high"
 
     def test_low_confidence_calculation(self):
         """Test calculation of low confidence results."""
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="some unrelated code", start_line=1, end_line=1),
-            similarity_score=0.3  # Low similarity
+            similarity_score=0.3,  # Low similarity
         )
         context = RankingContext(
-            query="authentication function",
-            query_keywords=['authentication', 'function'],
-            query_type='function'
+            query="authentication function", query_keywords=["authentication", "function"], query_type="function"
         )
 
         # Create low-confidence match reasons
-        match_reasons = [
-            MatchReason(category='structure_match', description='Generic match', confidence=0.2)
-        ]
+        match_reasons = [MatchReason(category="structure_match", description="Generic match", confidence=0.2)]
 
         confidence = ConfidenceScorer.calculate_advanced_confidence(result, context, match_reasons)
-        assert confidence == 'low'
+        assert confidence == "low"
 
 
 class TestResultDeduplicator:
@@ -376,17 +358,17 @@ class TestResultDeduplicator:
         result1 = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="def example(): pass", start_line=1, end_line=1),
-            similarity_score=0.8
+            similarity_score=0.8,
         )
         result2 = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="def example(): pass", start_line=1, end_line=1),
-            similarity_score=0.7
+            similarity_score=0.7,
         )
         result3 = CodeSearchResult(
             file_path="/path/to/other.py",
             snippet=CodeSnippet(text="completely different code", start_line=1, end_line=1),
-            similarity_score=0.6
+            similarity_score=0.6,
         )
 
         results = [result1, result2, result3]
@@ -403,7 +385,7 @@ class TestResultDeduplicator:
             result = CodeSearchResult(
                 file_path=f"/same/directory/file{i}.py",
                 snippet=CodeSnippet(text=f"code {i}", start_line=1, end_line=1),
-                similarity_score=0.8 - i * 0.1
+                similarity_score=0.8 - i * 0.1,
             )
             results.append(result)
 
@@ -425,20 +407,20 @@ class TestResultRanker:
                 file_path="/project/auth/login.py",
                 snippet=CodeSnippet(text="def authenticate_user():", start_line=1, end_line=1),
                 similarity_score=0.7,
-                file_metadata={'size': 3000, 'language': 'python'}
+                file_metadata={"size": 3000, "language": "python"},
             ),
             CodeSearchResult(
                 file_path="/project/docs/readme.md",
                 snippet=CodeSnippet(text="Authentication guide", start_line=1, end_line=1),
                 similarity_score=0.8,
-                file_metadata={'size': 1500, 'language': 'markdown'}
+                file_metadata={"size": 1500, "language": "markdown"},
             ),
             CodeSearchResult(
                 file_path="/project/config/auth.json",
                 snippet=CodeSnippet(text='{"auth_method": "oauth"}', start_line=1, end_line=1),
                 similarity_score=0.6,
-                file_metadata={'size': 500, 'language': 'json'}
-            )
+                file_metadata={"size": 500, "language": "json"},
+            ),
         ]
 
     def test_ranking_integration(self):
@@ -446,9 +428,7 @@ class TestResultRanker:
         ranker = ResultRanker()
         results = self.create_test_results()
         context = RankingContext(
-            query="authentication function",
-            query_keywords=['authentication', 'function'],
-            query_type='function'
+            query="authentication function", query_keywords=["authentication", "function"], query_type="function"
         )
 
         ranked = ranker.rank_results(results, context)
@@ -458,10 +438,10 @@ class TestResultRanker:
 
         # Results should have enhanced metadata
         for result in ranked:
-            assert 'composite_score' in result.file_metadata
-            assert 'ranking_factors' in result.file_metadata
-            assert 'match_reasons' in result.file_metadata
-            assert result.confidence_level in ['high', 'medium', 'low']
+            assert "composite_score" in result.file_metadata
+            assert "ranking_factors" in result.file_metadata
+            assert "match_reasons" in result.file_metadata
+            assert result.confidence_level in ["high", "medium", "low"]
 
     def test_custom_weights(self):
         """Test ranking with custom weights."""
@@ -470,20 +450,17 @@ class TestResultRanker:
             file_type_relevance=0.6,  # Heavily weight file type
             construct_type_matching=0.1,
             file_recency=0.05,
-            file_size_optimization=0.05
+            file_size_optimization=0.05,
         )
 
         ranker = ResultRanker(custom_weights)
         results = self.create_test_results()
-        context = RankingContext(
-            query="authentication function",
-            query_keywords=['authentication', 'function']
-        )
+        context = RankingContext(query="authentication function", query_keywords=["authentication", "function"])
 
         ranked = ranker.rank_results(results, context)
 
         # Python source file should rank higher due to file type weight
-        python_results = [r for r in ranked if r.file_path.endswith('.py')]
+        python_results = [r for r in ranked if r.file_path.endswith(".py")]
         assert len(python_results) > 0
         assert python_results[0] == ranked[0]  # Should be first
 
@@ -498,15 +475,15 @@ class TestMainAPI:
                 file_path="/path/to/file.py",
                 snippet=CodeSnippet(text="def example():", start_line=1, end_line=1),
                 similarity_score=0.8,
-                file_metadata={'size': 2000}
+                file_metadata={"size": 2000},
             )
         ]
 
         ranked = rank_search_results(results, "search query")
 
         assert len(ranked) == 1
-        assert 'composite_score' in ranked[0].file_metadata
-        assert 'match_reasons' in ranked[0].file_metadata
+        assert "composite_score" in ranked[0].file_metadata
+        assert "match_reasons" in ranked[0].file_metadata
 
     def test_generate_match_explanations(self):
         """Test match explanation generation."""
@@ -514,7 +491,7 @@ class TestMainAPI:
             CodeSearchResult(
                 file_path="/path/to/authentication.py",
                 snippet=CodeSnippet(text="def login():", start_line=1, end_line=1),
-                similarity_score=0.8
+                similarity_score=0.8,
             )
         ]
 
@@ -528,12 +505,12 @@ class TestMainAPI:
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="def authenticate():", start_line=1, end_line=1),
-            similarity_score=0.9
+            similarity_score=0.9,
         )
 
         confidence = calculate_advanced_confidence(result, "authentication function")
 
-        assert confidence in ['high', 'medium', 'low']
+        assert confidence in ["high", "medium", "low"]
 
 
 class TestEdgeCases:
@@ -549,7 +526,7 @@ class TestEdgeCases:
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="code", start_line=1, end_line=1),
-            similarity_score=0.8
+            similarity_score=0.8,
         )
 
         ranked = rank_search_results([result], "query")
@@ -562,7 +539,7 @@ class TestEdgeCases:
             file_path="/path/to/file.py",
             snippet=CodeSnippet(text="code", start_line=1, end_line=1),
             similarity_score=0.8,
-            file_metadata=None  # Missing metadata
+            file_metadata=None,  # Missing metadata
         )
 
         ranked = rank_search_results([result], "query")

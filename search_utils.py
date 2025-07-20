@@ -12,11 +12,11 @@ import sys
 from pathlib import Path
 from typing import List
 
-from search_result_types import CodeSnippet, CodeSearchResult
-from snippet_extractor import SnippetExtractor
+from config import config
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from config import config
+from search_result_types import CodeSearchResult, CodeSnippet
+from snippet_extractor import SnippetExtractor
 
 # Constants
 TABLE_NAME = "code_files"
@@ -36,7 +36,7 @@ def detect_file_language(file_path: str) -> str:
         Programming language name or 'unknown'
     """
     ext = Path(file_path).suffix.lower()
-    return config.file_processing.EXTENSION_TO_LANGUAGE_MAP.get(ext, 'unknown')
+    return config.file_processing.EXTENSION_TO_LANGUAGE_MAP.get(ext, "unknown")
 
 
 def create_enhanced_snippet(content: str, file_path: str, query: str = "") -> CodeSnippet:
@@ -61,7 +61,7 @@ def create_enhanced_snippet(content: str, file_path: str, query: str = "") -> Co
             file_path=file_path,
             query=query,
             max_snippets=1,  # For compatibility, return only the best snippet
-            max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH
+            max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH,
         )
 
         if extracted_snippets:
@@ -73,32 +73,22 @@ def create_enhanced_snippet(content: str, file_path: str, query: str = "") -> Co
         # Fall back to simple extraction
 
     # Fallback to simple truncation if intelligent extraction fails
-    lines = content.split('\n')
+    lines = content.split("\n")
 
     if len(content) <= config.search.SNIPPET_CONTENT_MAX_LENGTH:
         # Short content - include all lines
-        return CodeSnippet(
-            text=content,
-            start_line=1,
-            end_line=len(lines)
-        )
+        return CodeSnippet(text=content, start_line=1, end_line=len(lines))
     else:
         # Truncated content - use first configured characters
-        snippet_text = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..."
+        snippet_text = content[: config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..."
 
         # Calculate how many lines the snippet covers
-        snippet_lines = snippet_text.count('\n') + 1
+        snippet_lines = snippet_text.count("\n") + 1
 
-        return CodeSnippet(
-            text=snippet_text,
-            start_line=1,
-            end_line=min(snippet_lines, len(lines))
-        )
+        return CodeSnippet(text=snippet_text, start_line=1, end_line=min(snippet_lines, len(lines)))
 
 
-def create_multi_snippets(
-    content: str, file_path: str, query: str, max_snippets: int = 3
-) -> List[CodeSnippet]:
+def create_multi_snippets(content: str, file_path: str, query: str, max_snippets: int = 3) -> List[CodeSnippet]:
     """
     Create multiple intelligent code snippets from content.
 
@@ -120,7 +110,7 @@ def create_multi_snippets(
             file_path=file_path,
             query=query,
             max_snippets=max_snippets,
-            max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH
+            max_snippet_length=config.search.SNIPPET_CONTENT_MAX_LENGTH,
         )
 
         # Convert ExtractedSnippet objects to CodeSnippet objects
@@ -146,14 +136,12 @@ def extract_file_metadata(file_path: str, content: str) -> dict:
     path_obj = Path(file_path)
 
     return {
-        'language': detect_file_language(file_path),
-        'extension': path_obj.suffix,
-        'size': len(content.encode('utf-8')),  # Size in bytes
-        'type': 'source' if path_obj.suffix in {
-            '.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs'
-        } else 'other',
-        'filename': path_obj.name,
-        'directory': str(path_obj.parent)
+        "language": detect_file_language(file_path),
+        "extension": path_obj.suffix,
+        "size": len(content.encode("utf-8")),  # Size in bytes
+        "type": "source" if path_obj.suffix in {".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs"} else "other",
+        "filename": path_obj.name,
+        "directory": str(path_obj.parent),
     }
 
 
@@ -232,10 +220,7 @@ def search_index_enhanced(
 
             # Create CodeSearchResult
             search_result = CodeSearchResult(
-                file_path=path,
-                snippet=snippet,
-                similarity_score=similarity_score,
-                file_metadata=file_metadata
+                file_path=path, snippet=snippet, similarity_score=similarity_score, file_metadata=file_metadata
             )
 
             structured_results.append(search_result)
@@ -248,7 +233,7 @@ def search_index_enhanced(
             f"Database connection: {db_manager is not None}. "
             f"Embedder: {embedder is not None}. "
             f"Error: {e}",
-            exc_info=True
+            exc_info=True,
         )
         print(f"❌ Search failed for query '{query}': {e}", file=sys.stderr)
         return []

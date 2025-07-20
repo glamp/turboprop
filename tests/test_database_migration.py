@@ -58,7 +58,7 @@ class TestDatabaseMigration:
                     "language",
                     "size_bytes",
                     "line_count",
-                    "category"
+                    "category",
                 ]
 
                 for col in expected_columns:
@@ -93,17 +93,11 @@ class TestDatabaseMigration:
             # Check that all expected columns exist
             with db_manager.get_connection() as conn:
                 result = conn.execute(
-                    "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_name = 'code_files'"
+                    "SELECT column_name FROM information_schema.columns " "WHERE table_name = 'code_files'"
                 ).fetchall()
 
                 column_names = [row[0] for row in result]
-                expected_new_columns = [
-                    "file_mtime",
-                    "language",
-                    "size_bytes",
-                    "line_count"
-                ]
+                expected_new_columns = ["file_mtime", "language", "size_bytes", "line_count"]
 
                 for col in expected_new_columns:
                     assert col in column_names, f"New column {col} should be added during migration"
@@ -142,8 +136,7 @@ class TestDatabaseMigration:
             # Verify all columns still exist and no duplicates were created
             with db_manager.get_connection() as conn:
                 result = conn.execute(
-                    "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_name = 'code_files'"
+                    "SELECT column_name FROM information_schema.columns " "WHERE table_name = 'code_files'"
                 ).fetchall()
 
                 column_names = [row[0] for row in result]
@@ -158,7 +151,7 @@ class TestDatabaseMigration:
                     "language",
                     "size_bytes",
                     "line_count",
-                    "category"
+                    "category",
                 ]
 
                 assert len(column_names) == len(expected_columns), "Should not have duplicate columns"
@@ -201,7 +194,7 @@ class TestDatabaseMigration:
                 test_embedding = [0.1] * 384
                 conn.execute(
                     "INSERT INTO code_files (id, path, content, embedding) VALUES (?, ?, ?, ?)",
-                    ("test_id", "/test/path.py", "print('hello')", test_embedding)
+                    ("test_id", "/test/path.py", "print('hello')", test_embedding),
                 )
 
             # Run migration

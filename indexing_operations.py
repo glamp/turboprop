@@ -20,11 +20,11 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from tqdm import tqdm
 
+from code_construct_extractor import CodeConstructExtractor
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from language_detection import LanguageDetector
-from code_construct_extractor import CodeConstructExtractor
 from git_integration import RepositoryContext, RepositoryContextExtractor
+from language_detection import LanguageDetector
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -69,9 +69,7 @@ def get_construct_extractor() -> CodeConstructExtractor:
     return _instance_cache.get_construct_extractor()
 
 
-def extract_and_store_repository_context(
-    db_manager: DatabaseManager, repo_path: Path
-) -> Optional[str]:
+def extract_and_store_repository_context(db_manager: DatabaseManager, repo_path: Path) -> Optional[str]:
     """
     Extract repository context and store it in the database.
 
@@ -98,7 +96,9 @@ def extract_and_store_repository_context(
             db_manager.store_repository_context(context)
             logger.info(
                 "Stored repository context: type=%s, branch=%s, deps=%d",
-                context.project_type, context.git_branch, len(context.dependencies)
+                context.project_type,
+                context.git_branch,
+                len(context.dependencies),
             )
             return context.repository_id
         else:
@@ -110,9 +110,7 @@ def extract_and_store_repository_context(
         return None
 
 
-def update_repository_context_if_needed(
-    db_manager: DatabaseManager, repo_path: Path
-) -> Optional[str]:
+def update_repository_context_if_needed(db_manager: DatabaseManager, repo_path: Path) -> Optional[str]:
     """
     Update repository context if it's outdated or doesn't exist.
 
@@ -180,10 +178,10 @@ def extract_file_metadata(file_path: Path, content: str) -> Dict[str, any]:
     # Count lines - handle edge cases properly
     if not content:
         line_count = 0
-    elif content.endswith('\n'):
-        line_count = content.count('\n')
+    elif content.endswith("\n"):
+        line_count = content.count("\n")
     else:
-        line_count = content.count('\n') + 1
+        line_count = content.count("\n") + 1
 
     return {
         "file_type": detection_result.file_type,
@@ -300,8 +298,7 @@ def filter_changed_files(files: List[Path], existing_hashes: Dict[str, str]) -> 
 
             # Check if file is new or changed
             file_path_str = str(file_path)
-            if (file_path_str not in existing_hashes
-                    or existing_hashes[file_path_str] != current_hash):
+            if file_path_str not in existing_hashes or existing_hashes[file_path_str] != current_hash:
                 changed_files.append(file_path)
 
         except (OSError, UnicodeDecodeError) as error:
@@ -331,9 +328,16 @@ def _process_single_file(embedder: EmbeddingGenerator, path: Path) -> Optional[T
         metadata = extract_file_metadata(path, text)
 
         return (
-            uid, str(path), text, emb.tolist(), file_mtime,
-            metadata["file_type"], metadata["language"],
-            metadata["size_bytes"], metadata["line_count"], metadata["category"]
+            uid,
+            str(path),
+            text,
+            emb.tolist(),
+            file_mtime,
+            metadata["file_type"],
+            metadata["language"],
+            metadata["size_bytes"],
+            metadata["line_count"],
+            metadata["category"],
         )
     except (OSError, UnicodeDecodeError, RuntimeError) as error:
         print(f"⚠️  Failed to process {path}: {error}", file=sys.stderr)
@@ -362,11 +366,7 @@ def _batch_insert_rows(db_manager: DatabaseManager, rows: List[Tuple]) -> None:
 
 
 def _extract_and_store_constructs(
-    db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator,
-    file_path: Path,
-    file_content: str,
-    file_id: str
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, file_path: Path, file_content: str, file_id: str
 ) -> int:
     """
     Extract constructs from a file and store them in the database.
@@ -407,20 +407,12 @@ def _extract_and_store_constructs(
                 construct_id = construct.compute_construct_id(file_id)
 
                 # Store the construct
-                db_manager.store_construct(
-                    construct,
-                    file_id,
-                    construct_id,
-                    construct_embedding.tolist()
-                )
+                db_manager.store_construct(construct, file_id, construct_id, construct_embedding.tolist())
                 stored_count += 1
 
             except (OSError, RuntimeError) as error:
                 # Specific catch for database operations that can fail in various ways
-                logger.warning(
-                    "Failed to store construct %s from %s: %s",
-                    construct.name, file_path, error
-                )
+                logger.warning("Failed to store construct %s from %s: %s", construct.name, file_path, error)
                 continue
 
         logger.debug("Extracted and stored %d constructs from %s", stored_count, file_path)
@@ -429,9 +421,7 @@ def _extract_and_store_constructs(
     except (OSError, RuntimeError, UnicodeDecodeError) as error:
         # Specific catch for overall extraction process that involves file I/O,
         # AST parsing, and DB operations
-        logger.error(
-            "Failed to extract constructs from %s: %s", file_path, error
-        )
+        logger.error("Failed to extract constructs from %s: %s", file_path, error)
         return 0
 
 
@@ -468,7 +458,7 @@ def embed_and_store(
                 capture_output=True,
                 text=True,
                 timeout=10,
-                check=False
+                check=False,
             )
             if result.returncode == 0:
                 repo_path = Path(result.stdout.strip())
@@ -514,10 +504,7 @@ def embed_and_store(
 
     # Report processing results
     if failed_count > 0:
-        print(
-            f"⚠️  Failed to process {failed_count} files out of {len(files)} total",
-            file=sys.stderr
-        )
+        print(f"⚠️  Failed to process {failed_count} files out of {len(files)} total", file=sys.stderr)
 
     # Insert all rows in a single batch operation for better performance
     if rows:
@@ -525,10 +512,7 @@ def embed_and_store(
 
     # Report construct extraction results
     if extract_constructs and total_constructs > 0:
-        print(
-            f"🔧 Extracted {total_constructs} code constructs from {len(files)} files",
-            file=sys.stderr
-        )
+        print(f"🔧 Extracted {total_constructs} code constructs from {len(files)} files", file=sys.stderr)
 
 
 def build_full_index(db_manager: DatabaseManager) -> int:
@@ -551,10 +535,7 @@ def build_full_index(db_manager: DatabaseManager) -> int:
 
 
 def embed_and_store_single(
-    db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator,
-    path: Path,
-    extract_constructs: bool = True
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, path: Path, extract_constructs: bool = True
 ) -> bool:
     """
     Process a single file by generating embeddings and storing them in the database.
@@ -584,17 +565,24 @@ def embed_and_store_single(
             f"INSERT OR REPLACE INTO {TABLE_NAME} "
             f"(id, path, content, embedding, file_mtime, file_type, language, "
             f"size_bytes, line_count, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (uid, str(path), text, emb.tolist(), file_mtime,
-             metadata["file_type"], metadata["language"],
-             metadata["size_bytes"], metadata["line_count"], metadata["category"]),
+            (
+                uid,
+                str(path),
+                text,
+                emb.tolist(),
+                file_mtime,
+                metadata["file_type"],
+                metadata["language"],
+                metadata["size_bytes"],
+                metadata["line_count"],
+                metadata["category"],
+            ),
         )
 
         # Extract constructs if requested
         if extract_constructs:
             try:
-                construct_count = _extract_and_store_constructs(
-                    db_manager, embedder, path, text, uid
-                )
+                construct_count = _extract_and_store_constructs(db_manager, embedder, path, text, uid)
                 if construct_count > 0:
                     logger.debug("Extracted %d constructs from %s", construct_count, path)
             except (OSError, UnicodeDecodeError, RuntimeError) as error:

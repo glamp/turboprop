@@ -24,7 +24,7 @@ class TestConnectionLifecycle:
             db_path = Path(tmp_dir) / "test.duckdb"
 
             # Patch the config values to have short timeouts for testing
-            with patch('config.config.database.CONNECTION_MAX_AGE', 0.1):
+            with patch("config.config.database.CONNECTION_MAX_AGE", 0.1):
                 db_manager = DatabaseManager(db_path)
 
                 # Get initial connection and record time
@@ -52,7 +52,7 @@ class TestConnectionLifecycle:
             db_path = Path(tmp_dir) / "test.duckdb"
 
             # Patch config for short idle timeout
-            with patch('config.config.database.CONNECTION_IDLE_TIMEOUT', 0.1):
+            with patch("config.config.database.CONNECTION_IDLE_TIMEOUT", 0.1):
                 db_manager = DatabaseManager(db_path)
 
                 # Create connection
@@ -284,11 +284,7 @@ class TestErrorRecovery:
 
             # Test with custom parameters
             db_manager = DatabaseManager(
-                db_path=db_path,
-                max_retries=5,
-                retry_delay=0.5,
-                connection_timeout=30.0,
-                lock_timeout=10.0
+                db_path=db_path, max_retries=5, retry_delay=0.5, connection_timeout=30.0, lock_timeout=10.0
             )
 
             # Check that parameters were set

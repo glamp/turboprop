@@ -200,9 +200,7 @@ def scan_repo(repo_path: Path, max_bytes: int):
             text=True,
             check=True,
         )
-        tracked_files = {
-            line.strip() for line in tracked_result.stdout.splitlines() if line.strip()
-        }
+        tracked_files = {line.strip() for line in tracked_result.stdout.splitlines() if line.strip()}
 
         # Get all untracked files that are not ignored
         untracked_result = subprocess.run(
@@ -213,9 +211,7 @@ def scan_repo(repo_path: Path, max_bytes: int):
             text=True,
             check=True,
         )
-        untracked_files = {
-            line.strip() for line in untracked_result.stdout.splitlines() if line.strip()
-        }
+        untracked_files = {line.strip() for line in untracked_result.stdout.splitlines() if line.strip()}
 
         # Combine tracked and untracked files
         all_files = tracked_files | untracked_files
@@ -233,7 +229,7 @@ def scan_repo(repo_path: Path, max_bytes: int):
         p = repo_path / file_path_str
 
         # Skip .turboprop directory and its contents
-        if '.turboprop' in p.parts:
+        if ".turboprop" in p.parts:
             continue
 
         try:
@@ -581,7 +577,7 @@ class DebouncedHandler(FileSystemEventHandler):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
-                check=False
+                check=False,
             )
             # If git check-ignore returns 0, the file is ignored
             if result.returncode == 0:
@@ -622,9 +618,7 @@ class DebouncedHandler(FileSystemEventHandler):
                     pass
         elif ev_type == "deleted":
             # Remove deleted file from database
-            self.db_manager.execute_with_retry(
-                f"DELETE FROM {config.database.TABLE_NAME} WHERE path = ?", (str(p),)
-            )
+            self.db_manager.execute_with_retry(f"DELETE FROM {config.database.TABLE_NAME} WHERE path = ?", (str(p),))
             logger.debug(f"[debounce] {p} deleted from database")
 
 
@@ -1025,6 +1019,7 @@ def reindex_all(
     if files_to_process:
         # Use the enhanced function from indexing_operations which includes construct extraction
         from indexing_operations import embed_and_store as embed_and_store_enhanced
+
         embed_and_store_enhanced(db_manager, embedder, files_to_process, extract_constructs=True)
 
     # Build the search index from all stored embeddings
@@ -1104,10 +1099,7 @@ Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, et
         type=float,
         default=1.0,
         metavar="SIZE",
-        help=(
-            "Maximum file size in MB to include (default: 1.0). "
-            "Larger files are skipped to avoid memory issues."
-        ),
+        help=("Maximum file size in MB to include (default: 1.0). " "Larger files are skipped to avoid memory issues."),
     )
     p_i.add_argument(
         "--workers",
@@ -1171,26 +1163,26 @@ Query Examples:
         choices=["auto", "hybrid", "semantic", "text"],
         default="auto",
         help="Search mode: 'auto' (intelligent routing), 'hybrid' (semantic+text), "
-             "'semantic' (embeddings only), 'text' (exact matching only)",
+        "'semantic' (embeddings only), 'text' (exact matching only)",
     )
     p_s.add_argument(
         "--enable-advanced",
         action="store_true",
-        help="Enable advanced features like regex search, wildcards, and file type filtering"
+        help="Enable advanced features like regex search, wildcards, and file type filtering",
     )
     p_s.add_argument(
         "--semantic-weight",
         type=float,
         default=0.6,
         metavar="WEIGHT",
-        help="Weight for semantic search in hybrid mode (0.0-1.0, default: 0.6)"
+        help="Weight for semantic search in hybrid mode (0.0-1.0, default: 0.6)",
     )
     p_s.add_argument(
         "--text-weight",
         type=float,
         default=0.4,
         metavar="WEIGHT",
-        help="Weight for text search in hybrid mode (0.0-1.0, default: 0.4)"
+        help="Weight for text search in hybrid mode (0.0-1.0, default: 0.4)",
     )
 
 
@@ -1414,28 +1406,25 @@ def handle_search_command(args, embedder):
 
     try:
         # Import hybrid search functions
-        from search_operations import search_with_intelligent_routing, search_with_hybrid_fusion
+        from search_operations import search_with_hybrid_fusion, search_with_intelligent_routing
 
         # Create fusion weights if using hybrid mode
         fusion_weights = None
         if args.mode == "hybrid":
             fusion_weights = {
-                'semantic_weight': args.semantic_weight,
-                'text_weight': args.text_weight,
-                'rrf_k': 60,
-                'boost_exact_matches': True,
-                'exact_match_boost': 1.5
+                "semantic_weight": args.semantic_weight,
+                "text_weight": args.text_weight,
+                "rrf_k": 60,
+                "boost_exact_matches": True,
+                "exact_match_boost": 1.5,
             }
 
         # Use intelligent routing for auto mode, hybrid fusion for others
         if args.mode == "auto":
-            results = search_with_intelligent_routing(
-                db_manager, embedder, args.query, args.k, args.enable_advanced
-            )
+            results = search_with_intelligent_routing(db_manager, embedder, args.query, args.k, args.enable_advanced)
         else:
             results = search_with_hybrid_fusion(
-                db_manager, embedder, args.query, args.k, args.mode,
-                fusion_weights, enable_query_expansion=True
+                db_manager, embedder, args.query, args.k, args.mode, fusion_weights, enable_query_expansion=True
             )
 
     except Exception as e:
@@ -1457,9 +1446,9 @@ def handle_search_command(args, embedder):
 
     # Use hybrid search result formatting for enhanced display
     from search_operations import format_hybrid_search_results
+
     formatted_results = format_hybrid_search_results(
-        results, args.query, show_fusion_details=(args.mode == "hybrid"),
-        repo_path=str(repo_path)
+        results, args.query, show_fusion_details=(args.mode == "hybrid"), repo_path=str(repo_path)
     )
     print(formatted_results)
 

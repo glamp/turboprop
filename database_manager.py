@@ -86,8 +86,7 @@ class ConnectionManager:
             conn.execute(f"SET threads = {config.database.THREADS}")
 
             # Configure timeout settings
-            if (hasattr(conn, "execute")
-                    and config.database.STATEMENT_TIMEOUT > 0):
+            if hasattr(conn, "execute") and config.database.STATEMENT_TIMEOUT > 0:
                 # Note: DuckDB doesn't have a direct statement timeout,
                 # but we can use this for logging
                 pass
@@ -103,14 +102,10 @@ class ConnectionManager:
 
             return conn
         except PermissionError as e:
-            raise DatabasePermissionError(
-                f"Permission denied when creating database connection: {e}"
-            ) from e
+            raise DatabasePermissionError(f"Permission denied when creating database connection: {e}") from e
         except OSError as e:
             if "no space left" in str(e).lower():
-                raise DatabaseDiskSpaceError(
-                    f"Insufficient disk space when creating database connection: {e}"
-                ) from e
+                raise DatabaseDiskSpaceError(f"Insufficient disk space when creating database connection: {e}") from e
             raise DatabaseConnectionTimeoutError(f"Failed to create database connection: {e}") from e
         except duckdb.Error as e:
             if "corrupt" in str(e).lower():
@@ -250,10 +245,7 @@ class DatabaseManager:
                     lock_acquired = True
                 except (IOError, OSError) as e:
                     error_str = str(e)
-                    if (
-                        "Resource temporarily unavailable" in error_str
-                        or "temporarily unavailable" in error_str
-                    ):
+                    if "Resource temporarily unavailable" in error_str or "temporarily unavailable" in error_str:
                         # Lock is held by another process, wait and retry
                         time.sleep(config.database.LOCK_RETRY_INTERVAL)
                         continue
@@ -265,22 +257,16 @@ class DatabaseManager:
                 if self._file_lock:
                     self._file_lock.close()
                     self._file_lock = None
-                raise DatabaseTimeoutError(
-                    f"Could not acquire database lock within {self.lock_timeout} seconds"
-                )
+                raise DatabaseTimeoutError(f"Could not acquire database lock within {self.lock_timeout} seconds")
 
         except (IOError, OSError) as e:
             if self._file_lock:
                 self._file_lock.close()
                 self._file_lock = None
             if "permission denied" in str(e).lower():
-                raise DatabasePermissionError(
-                    f"Permission denied when acquiring database lock: {e}"
-                )
+                raise DatabasePermissionError(f"Permission denied when acquiring database lock: {e}")
             elif "no space left" in str(e).lower():
-                raise DatabaseDiskSpaceError(
-                    f"Insufficient disk space when acquiring database lock: {e}"
-                )
+                raise DatabaseDiskSpaceError(f"Insufficient disk space when acquiring database lock: {e}")
             else:
                 raise DatabaseLockError(f"Could not acquire database lock: {e}")
 
@@ -337,7 +323,8 @@ class DatabaseManager:
                 if "database is locked" in str(e).lower() and attempt < self.max_retries - 1:
                     logger.warning(
                         "Database locked on attempt %d, retrying in %.1fs",
-                        attempt + 1, self.retry_delay * (2**attempt)
+                        attempt + 1,
+                        self.retry_delay * (2**attempt),
                     )
                     time.sleep(self.retry_delay * (2**attempt))  # Exponential backoff
                     continue
@@ -428,13 +415,13 @@ class DatabaseManager:
 
         # Define all columns to add (includes legacy columns for backward compatibility)
         new_columns = {
-            'last_modified': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
-            'file_mtime': 'TIMESTAMP',
-            'file_type': 'VARCHAR',
-            'language': 'VARCHAR',
-            'size_bytes': 'INTEGER',
-            'line_count': 'INTEGER',
-            'category': 'VARCHAR'
+            "last_modified": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "file_mtime": "TIMESTAMP",
+            "file_type": "VARCHAR",
+            "language": "VARCHAR",
+            "size_bytes": "INTEGER",
+            "line_count": "INTEGER",
+            "category": "VARCHAR",
         }
 
         try:
@@ -443,7 +430,7 @@ class DatabaseManager:
                 result = conn.execute(
                     "SELECT column_name FROM information_schema.columns "
                     "WHERE table_name = ? ORDER BY ordinal_position",
-                    (table_name,)
+                    (table_name,),
                 ).fetchall()
 
                 existing_columns = [row[0].lower() for row in result]
@@ -458,23 +445,17 @@ class DatabaseManager:
                 for column_name, column_type in new_columns.items():
                     if column_name.lower() not in existing_columns:
                         try:
-                            alter_query = (
-                                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
-                            )
+                            alter_query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
                             conn.execute(alter_query)
                             columns_added.append(column_name)
                             logger.info("Added column: %s %s", column_name, column_type)
                         except (duckdb.Error, OSError) as e:
-                            logger.warning(
-                                "Failed to add column %s: %s", column_name, e
-                            )
+                            logger.warning("Failed to add column %s: %s", column_name, e)
                     else:
                         logger.debug("Column %s already exists, skipping", column_name)
 
                 if columns_added:
-                    logger.info(
-                        "Schema migration completed successfully. Added columns: %s", columns_added
-                    )
+                    logger.info("Schema migration completed successfully. Added columns: %s", columns_added)
                 else:
                     logger.info("Schema migration completed - no columns needed to be added")
         except Exception as e:
@@ -510,7 +491,7 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_file_id ON code_constructs(file_id)",
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_type ON code_constructs(construct_type)",
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_name ON code_constructs(name)",
-            "CREATE INDEX IF NOT EXISTS idx_code_constructs_parent ON code_constructs(parent_construct_id)"
+            "CREATE INDEX IF NOT EXISTS idx_code_constructs_parent ON code_constructs(parent_construct_id)",
         ]
 
         try:
@@ -584,7 +565,8 @@ class DatabaseManager:
 
                     # Create indexes for text search on the FTS table
                     conn.execute(
-                        f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content ON {fts_table_name} USING gin(to_tsvector('english', content))")
+                        f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content ON {fts_table_name} USING gin(to_tsvector('english', content))"
+                    )
 
                     logger.info("Created alternative FTS table %s with text indexes", fts_table_name)
 
@@ -635,7 +617,7 @@ class DatabaseManager:
         limit: int = 10,
         enable_stemming: bool = True,
         enable_fuzzy: bool = False,
-        fuzzy_distance: int = 2
+        fuzzy_distance: int = 2,
     ) -> list:
         """
         Perform full-text search on file content.
@@ -695,8 +677,7 @@ class DatabaseManager:
                 word_pattern = f"%{query.replace(' ', '%')}%"
 
                 results = conn.execute(
-                    search_sql,
-                    (exact_pattern, exact_pattern, word_pattern, word_pattern, limit)
+                    search_sql, (exact_pattern, exact_pattern, word_pattern, word_pattern, limit)
                 ).fetchall()
 
                 logger.debug("FTS search for '%s' returned %d results", query, len(results))
@@ -731,23 +712,23 @@ class DatabaseManager:
             processed = processed.replace(f'"{phrase}"', placeholder)
 
         # Handle Boolean operators (convert to appropriate syntax)
-        processed = processed.replace(' AND ', ' & ')
-        processed = processed.replace(' OR ', ' | ')
-        processed = processed.replace(' NOT ', ' -')
+        processed = processed.replace(" AND ", " & ")
+        processed = processed.replace(" OR ", " | ")
+        processed = processed.replace(" NOT ", " -")
 
         # Handle wildcards (already supported with *)
 
         # Handle fuzzy matching if enabled
-        if enable_fuzzy and '~' not in processed:
+        if enable_fuzzy and "~" not in processed:
             # Add fuzzy matching to individual terms
             words = processed.split()
             fuzzy_words = []
             for word in words:
-                if word not in ['&', '|', '-'] and not word.startswith('__PHRASE_'):
+                if word not in ["&", "|", "-"] and not word.startswith("__PHRASE_"):
                     fuzzy_words.append(f"{word}~{fuzzy_distance}")
                 else:
                     fuzzy_words.append(word)
-            processed = ' '.join(fuzzy_words)
+            processed = " ".join(fuzzy_words)
 
         # Restore quoted phrases
         for i, phrase in enumerate(quoted_phrases):
@@ -756,12 +737,7 @@ class DatabaseManager:
 
         return processed
 
-    def search_by_file_type_fts(
-        self,
-        query: str,
-        file_extensions: list,
-        limit: int = 10
-    ) -> list:
+    def search_by_file_type_fts(self, query: str, file_extensions: list, limit: int = 10) -> list:
         """
         Perform full-text search filtered by file types.
 
@@ -873,8 +849,8 @@ class DatabaseManager:
                         construct.signature,
                         construct.docstring,
                         construct.parent_construct_id,
-                        embedding
-                    )
+                        embedding,
+                    ),
                 )
                 logger.debug("Stored construct %s for file %s", construct.name, file_id)
 
@@ -895,8 +871,7 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 result = conn.execute(
-                    "SELECT * FROM code_constructs WHERE file_id = ? ORDER BY start_line",
-                    (file_id,)
+                    "SELECT * FROM code_constructs WHERE file_id = ? ORDER BY start_line", (file_id,)
                 ).fetchall()
                 return result
 
@@ -918,16 +893,12 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 # First, count the constructs that will be removed
                 count_result = conn.execute(
-                    "SELECT COUNT(*) FROM code_constructs WHERE file_id = ?",
-                    (file_id,)
+                    "SELECT COUNT(*) FROM code_constructs WHERE file_id = ?", (file_id,)
                 ).fetchone()
                 construct_count = count_result[0] if count_result else 0
 
                 # Then delete them
-                conn.execute(
-                    "DELETE FROM code_constructs WHERE file_id = ?",
-                    (file_id,)
-                )
+                conn.execute("DELETE FROM code_constructs WHERE file_id = ?", (file_id,))
                 return construct_count
 
         except (duckdb.Error, DatabaseError) as e:
@@ -975,7 +946,7 @@ class DatabaseManager:
         create_indexes_sql = [
             "CREATE INDEX IF NOT EXISTS idx_repository_context_path ON repository_context(repository_path)",
             "CREATE INDEX IF NOT EXISTS idx_repository_context_type ON repository_context(project_type)",
-            "CREATE INDEX IF NOT EXISTS idx_repository_context_indexed ON repository_context(indexed_at)"
+            "CREATE INDEX IF NOT EXISTS idx_repository_context_indexed ON repository_context(indexed_at)",
         ]
 
         try:
@@ -1011,17 +982,17 @@ class DatabaseManager:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        context_dict['repository_id'],
-                        context_dict['repository_path'],
-                        context_dict['git_branch'],
-                        context_dict['git_commit'],
-                        context_dict['git_remote_url'],
-                        context_dict['project_type'],
-                        context_dict['dependencies'],
-                        context_dict['package_managers'],
-                        context_dict['indexed_at'],
-                        context_dict['created_at']
-                    )
+                        context_dict["repository_id"],
+                        context_dict["repository_path"],
+                        context_dict["git_branch"],
+                        context_dict["git_commit"],
+                        context_dict["git_remote_url"],
+                        context_dict["project_type"],
+                        context_dict["dependencies"],
+                        context_dict["package_managers"],
+                        context_dict["indexed_at"],
+                        context_dict["created_at"],
+                    ),
                 )
                 logger.debug("Stored repository context for %s", context.repository_path)
 
@@ -1042,8 +1013,7 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 result = conn.execute(
-                    "SELECT * FROM repository_context WHERE repository_id = ?",
-                    (repository_id,)
+                    "SELECT * FROM repository_context WHERE repository_id = ?", (repository_id,)
                 ).fetchone()
 
                 if result:
@@ -1069,8 +1039,7 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 result = conn.execute(
-                    "SELECT * FROM repository_context WHERE repository_path = ?",
-                    (repository_path,)
+                    "SELECT * FROM repository_context WHERE repository_path = ?", (repository_path,)
                 ).fetchone()
 
                 if result:
@@ -1094,7 +1063,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 conn.execute(
                     "UPDATE repository_context SET indexed_at = CURRENT_TIMESTAMP WHERE repository_id = ?",
-                    (repository_id,)
+                    (repository_id,),
                 )
                 logger.debug("Updated indexed time for repository %s", repository_id)
 

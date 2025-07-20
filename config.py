@@ -73,9 +73,7 @@ def validate_memory_limit(value: str, var_name: str) -> str:
     """Validate memory limit string format (e.g., '1GB', '512MB')."""
     pattern = r"^(\d+(?:\.\d+)?)\s*(GB|MB|KB|B)$"
     if not re.match(pattern, value.upper()):
-        raise ConfigValidationError(
-            f"{var_name} must be in format like '1GB', '512MB', '1024KB', got '{value}'"
-        )
+        raise ConfigValidationError(f"{var_name} must be in format like '1GB', '512MB', '1024KB', got '{value}'")
     return value
 
 
@@ -88,8 +86,7 @@ def validate_boolean(value: str, var_name: str) -> bool:
         return False
     else:
         raise ConfigValidationError(
-            f"{var_name} must be 'true', 'false', '1', '0', 'yes', 'no', "
-            f"'on', or 'off', got '{value}'"
+            f"{var_name} must be 'true', 'false', '1', '0', 'yes', 'no', " f"'on', or 'off', got '{value}'"
         )
 
 
@@ -117,9 +114,7 @@ def validate_range_float(value: str, var_name: str, min_val: float, max_val: flo
         raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'") from e
 
     if result < min_val or result > max_val:
-        raise ConfigValidationError(
-            f"{var_name} must be between {min_val} and {max_val}, got {result}"
-        )
+        raise ConfigValidationError(f"{var_name} must be between {min_val} and {max_val}, got {result}")
     return result
 
 
@@ -130,26 +125,20 @@ class DatabaseConfig:
     MEMORY_LIMIT: str = validate_memory_limit(
         os.getenv("TURBOPROP_DB_MEMORY_LIMIT", "1GB"), "TURBOPROP_DB_MEMORY_LIMIT"
     )
-    THREADS: int = validate_positive_int(
-        os.getenv("TURBOPROP_DB_THREADS", "4"), "TURBOPROP_DB_THREADS", 4
-    )
+    THREADS: int = validate_positive_int(os.getenv("TURBOPROP_DB_THREADS", "4"), "TURBOPROP_DB_THREADS", 4)
 
     # Database connection and retry settings
-    MAX_RETRIES: int = validate_positive_int(
-        os.getenv("TURBOPROP_DB_MAX_RETRIES", "3"), "TURBOPROP_DB_MAX_RETRIES", 3
-    )
+    MAX_RETRIES: int = validate_positive_int(os.getenv("TURBOPROP_DB_MAX_RETRIES", "3"), "TURBOPROP_DB_MAX_RETRIES", 3)
     RETRY_DELAY: float = validate_positive_float(
         os.getenv("TURBOPROP_DB_RETRY_DELAY", "0.1"), "TURBOPROP_DB_RETRY_DELAY", 0.1
     )
 
     # Connection pool and timeout settings
     MAX_CONNECTIONS_PER_THREAD: int = validate_positive_int(
-        os.getenv("TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", "1"),
-        "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", 1
+        os.getenv("TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", "1"), "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", 1
     )
     CONNECTION_TIMEOUT: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_TIMEOUT", "30.0"),
-        "TURBOPROP_DB_CONNECTION_TIMEOUT", 30.0
+        os.getenv("TURBOPROP_DB_CONNECTION_TIMEOUT", "30.0"), "TURBOPROP_DB_CONNECTION_TIMEOUT", 30.0
     )
     STATEMENT_TIMEOUT: float = validate_positive_float(
         os.getenv("TURBOPROP_DB_STATEMENT_TIMEOUT", "60.0"), "TURBOPROP_DB_STATEMENT_TIMEOUT", 60.0
@@ -160,8 +149,7 @@ class DatabaseConfig:
         os.getenv("TURBOPROP_DB_LOCK_TIMEOUT", "10.0"), "TURBOPROP_DB_LOCK_TIMEOUT", 10.0
     )
     LOCK_RETRY_INTERVAL: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_LOCK_RETRY_INTERVAL", "0.1"),
-        "TURBOPROP_DB_LOCK_RETRY_INTERVAL", 0.1
+        os.getenv("TURBOPROP_DB_LOCK_RETRY_INTERVAL", "0.1"), "TURBOPROP_DB_LOCK_RETRY_INTERVAL", 0.1
     )
 
     # Database file configuration
@@ -171,22 +159,17 @@ class DatabaseConfig:
 
     # Database optimization settings
     CHECKPOINT_INTERVAL: int = validate_positive_int(
-        os.getenv("TURBOPROP_DB_CHECKPOINT_INTERVAL", "1000"),
-        "TURBOPROP_DB_CHECKPOINT_INTERVAL", 1000
+        os.getenv("TURBOPROP_DB_CHECKPOINT_INTERVAL", "1000"), "TURBOPROP_DB_CHECKPOINT_INTERVAL", 1000
     )
-    AUTO_VACUUM: bool = validate_boolean(
-        os.getenv("TURBOPROP_DB_AUTO_VACUUM", "true"), "TURBOPROP_DB_AUTO_VACUUM"
-    )
+    AUTO_VACUUM: bool = validate_boolean(os.getenv("TURBOPROP_DB_AUTO_VACUUM", "true"), "TURBOPROP_DB_AUTO_VACUUM")
     TEMP_DIRECTORY: Optional[str] = os.getenv("TURBOPROP_DB_TEMP_DIRECTORY")
 
     # Connection management settings
     CONNECTION_MAX_AGE: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_MAX_AGE", "3600.0"),
-        "TURBOPROP_DB_CONNECTION_MAX_AGE", 3600.0
+        os.getenv("TURBOPROP_DB_CONNECTION_MAX_AGE", "3600.0"), "TURBOPROP_DB_CONNECTION_MAX_AGE", 3600.0
     )  # 1 hour
     CONNECTION_IDLE_TIMEOUT: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", "300.0"),
-        "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", 300.0
+        os.getenv("TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", "300.0"), "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", 300.0
     )  # 5 minutes
     CONNECTION_HEALTH_CHECK_INTERVAL: float = validate_positive_float(
         os.getenv("TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", "60.0"),
@@ -224,23 +207,18 @@ class FileProcessingConfig:
     )
 
     # Batch processing settings
-    BATCH_SIZE: int = validate_positive_int(
-        os.getenv("TURBOPROP_BATCH_SIZE", "100"), "TURBOPROP_BATCH_SIZE", 100
-    )
+    BATCH_SIZE: int = validate_positive_int(os.getenv("TURBOPROP_BATCH_SIZE", "100"), "TURBOPROP_BATCH_SIZE", 100)
 
     # File watching cleanup and health check intervals
     CLEANUP_INTERVAL: int = validate_positive_int(
         os.getenv("TURBOPROP_CLEANUP_INTERVAL", "300"), "TURBOPROP_CLEANUP_INTERVAL", 300
     )  # 5 minutes
     HEALTH_CHECK_INTERVAL: int = validate_positive_int(
-        os.getenv("TURBOPROP_HEALTH_CHECK_INTERVAL", "3600"),
-        "TURBOPROP_HEALTH_CHECK_INTERVAL", 3600
+        os.getenv("TURBOPROP_HEALTH_CHECK_INTERVAL", "3600"), "TURBOPROP_HEALTH_CHECK_INTERVAL", 3600
     )  # 1 hour
 
     # Parallel processing settings
-    MAX_WORKERS: int = validate_positive_int(
-        os.getenv("TURBOPROP_MAX_WORKERS", "4"), "TURBOPROP_MAX_WORKERS", 4
-    )
+    MAX_WORKERS: int = validate_positive_int(os.getenv("TURBOPROP_MAX_WORKERS", "4"), "TURBOPROP_MAX_WORKERS", 4)
     MIN_FILES_FOR_PARALLEL: int = validate_positive_int(
         os.getenv("TURBOPROP_MIN_FILES_FOR_PARALLEL", "10"), "TURBOPROP_MIN_FILES_FOR_PARALLEL", 10
     )
@@ -250,15 +228,35 @@ class FileProcessingConfig:
 
     # Language detection settings
     ENABLE_LANGUAGE_DETECTION: bool = validate_boolean(
-        os.getenv("TURBOPROP_ENABLE_LANGUAGE_DETECTION", "true"),
-        "TURBOPROP_ENABLE_LANGUAGE_DETECTION"
+        os.getenv("TURBOPROP_ENABLE_LANGUAGE_DETECTION", "true"), "TURBOPROP_ENABLE_LANGUAGE_DETECTION"
     )
 
     # File extensions that we consider to be code files worth indexing
     CODE_EXTENSIONS = {
-        ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".c", ".cpp", ".h", ".cs",
-        ".go", ".rs", ".swift", ".kt", ".m", ".rb", ".php", ".sh", ".html", ".css",
-        ".json", ".yaml", ".yml", ".xml"
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".cs",
+        ".go",
+        ".rs",
+        ".swift",
+        ".kt",
+        ".m",
+        ".rb",
+        ".php",
+        ".sh",
+        ".html",
+        ".css",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".xml",
     }
 
     # Language detection fallback map for file extensions
@@ -381,9 +379,7 @@ class EmbeddingConfig:
     )
 
     # Processing settings
-    DEVICE: str = validate_device(
-        os.getenv("TURBOPROP_DEVICE", "cpu"), "TURBOPROP_DEVICE"
-    )  # or "cuda", "mps"
+    DEVICE: str = validate_device(os.getenv("TURBOPROP_DEVICE", "cpu"), "TURBOPROP_DEVICE")  # or "cuda", "mps"
     BATCH_SIZE: int = validate_positive_int(
         os.getenv("TURBOPROP_EMBEDDING_BATCH_SIZE", "32"), "TURBOPROP_EMBEDDING_BATCH_SIZE", 32
     )
@@ -393,8 +389,7 @@ class EmbeddingConfig:
         os.getenv("TURBOPROP_EMBEDDING_MAX_RETRIES", "3"), "TURBOPROP_EMBEDDING_MAX_RETRIES", 3
     )
     RETRY_BASE_DELAY: float = validate_positive_float(
-        os.getenv("TURBOPROP_EMBEDDING_RETRY_BASE_DELAY", "1.0"),
-        "TURBOPROP_EMBEDDING_RETRY_BASE_DELAY", 1.0
+        os.getenv("TURBOPROP_EMBEDDING_RETRY_BASE_DELAY", "1.0"), "TURBOPROP_EMBEDDING_RETRY_BASE_DELAY", 1.0
     )
 
 
@@ -408,12 +403,10 @@ class ServerConfig:
     # Watcher settings for server mode
     WATCH_DIRECTORY: str = os.getenv("TURBOPROP_WATCH_DIR", ".")
     WATCH_MAX_FILE_SIZE_MB: float = validate_positive_float(
-        os.getenv("TURBOPROP_WATCH_MAX_FILE_SIZE_MB", "1.0"),
-        "TURBOPROP_WATCH_MAX_FILE_SIZE_MB", 1.0
+        os.getenv("TURBOPROP_WATCH_MAX_FILE_SIZE_MB", "1.0"), "TURBOPROP_WATCH_MAX_FILE_SIZE_MB", 1.0
     )
     WATCH_DEBOUNCE_SECONDS: float = validate_positive_float(
-        os.getenv("TURBOPROP_WATCH_DEBOUNCE_SECONDS", "5.0"),
-        "TURBOPROP_WATCH_DEBOUNCE_SECONDS", 5.0
+        os.getenv("TURBOPROP_WATCH_DEBOUNCE_SECONDS", "5.0"), "TURBOPROP_WATCH_DEBOUNCE_SECONDS", 5.0
     )
 
     # API rate limiting and timeouts
@@ -421,8 +414,7 @@ class ServerConfig:
         os.getenv("TURBOPROP_REQUEST_TIMEOUT", "30.0"), "TURBOPROP_REQUEST_TIMEOUT", 30.0
     )
     MAX_CONCURRENT_REQUESTS: int = validate_positive_int(
-        os.getenv("TURBOPROP_MAX_CONCURRENT_REQUESTS", "10"),
-        "TURBOPROP_MAX_CONCURRENT_REQUESTS", 10
+        os.getenv("TURBOPROP_MAX_CONCURRENT_REQUESTS", "10"), "TURBOPROP_MAX_CONCURRENT_REQUESTS", 10
     )
 
 
@@ -430,14 +422,10 @@ class LoggingConfig:
     """Logging configuration."""
 
     # Log levels
-    LOG_LEVEL: str = validate_log_level(
-        os.getenv("TURBOPROP_LOG_LEVEL", "INFO"), "TURBOPROP_LOG_LEVEL"
-    )
+    LOG_LEVEL: str = validate_log_level(os.getenv("TURBOPROP_LOG_LEVEL", "INFO"), "TURBOPROP_LOG_LEVEL")
 
     # Log formatting
-    LOG_FORMAT: str = os.getenv(
-        "TURBOPROP_LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    LOG_FORMAT: str = os.getenv("TURBOPROP_LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # File logging
     LOG_FILE: Optional[str] = os.getenv("TURBOPROP_LOG_FILE")

@@ -8,11 +8,7 @@ import pytest
 
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from indexing_operations import (
-    embed_and_store,
-    embed_and_store_single,
-    extract_file_metadata,
-)
+from indexing_operations import embed_and_store, embed_and_store_single, extract_file_metadata
 from language_detection import LanguageDetectionResult
 
 
@@ -110,17 +106,14 @@ class TestMetadataExtraction:
         assert metadata["line_count"] == 3
         assert metadata["category"] == "build"
 
-    @patch('indexing_operations.LanguageDetector')
+    @patch("indexing_operations.LanguageDetector")
     def test_embed_and_store_with_metadata(self, mock_detector_class):
         """Test that embed_and_store includes metadata in database operations."""
         # Setup mocks
         mock_detector = Mock()
         mock_detector_class.return_value = mock_detector
         mock_detector.detect_language.return_value = LanguageDetectionResult(
-            language="Python",
-            file_type=".py",
-            confidence=1.0,
-            category="source"
+            language="Python", file_type=".py", confidence=1.0, category="source"
         )
 
         mock_db_manager = Mock(spec=DatabaseManager)
@@ -129,7 +122,7 @@ class TestMetadataExtraction:
         mock_embedder.encode.return_value.tolist.return_value = [0.1, 0.2, 0.3]
 
         # Create a temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write('print("hello")\n')
             temp_path = Path(f.name)
 
@@ -158,17 +151,14 @@ class TestMetadataExtraction:
             # Clean up
             temp_path.unlink(missing_ok=True)
 
-    @patch('indexing_operations.LanguageDetector')
+    @patch("indexing_operations.LanguageDetector")
     def test_embed_and_store_single_with_metadata(self, mock_detector_class):
         """Test that embed_and_store_single includes metadata."""
         # Setup mocks
         mock_detector = Mock()
         mock_detector_class.return_value = mock_detector
         mock_detector.detect_language.return_value = LanguageDetectionResult(
-            language="JavaScript",
-            file_type=".js",
-            confidence=1.0,
-            category="source"
+            language="JavaScript", file_type=".js", confidence=1.0, category="source"
         )
 
         mock_db_manager = Mock(spec=DatabaseManager)
@@ -177,7 +167,7 @@ class TestMetadataExtraction:
         mock_embedder.encode.return_value.tolist.return_value = [0.1, 0.2, 0.3]
 
         # Create a temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
             f.write('console.log("hello");\n')
             temp_path = Path(f.name)
 

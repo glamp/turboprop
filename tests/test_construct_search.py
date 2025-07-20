@@ -10,21 +10,15 @@ This module tests all aspects of the construct search implementation including:
 - Error handling and edge cases
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
-from construct_search import (
-    ConstructSearchOperations,
-    ConstructSearchResult,
-    format_construct_search_results
-)
-from exceptions import SearchError
-from search_operations import (
-    search_hybrid,
-    format_hybrid_search_results
-)
+import pytest
+
+from construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
+from exceptions import SearchError
+from search_operations import format_hybrid_search_results, search_hybrid
 from search_result_types import CodeSearchResult, CodeSnippet
 
 
@@ -42,7 +36,7 @@ class TestConstructSearchResult:
             start_line=10,
             end_line=15,
             similarity_score=0.85,
-            docstring="Test function docstring"
+            docstring="Test function docstring",
         )
 
         assert result.construct_id == "test_id"
@@ -56,25 +50,40 @@ class TestConstructSearchResult:
         """Test automatic confidence level calculation based on similarity score."""
         # High confidence
         high_result = ConstructSearchResult.create(
-            construct_id="high", file_path="test.py", construct_type="function",
-            name="test", signature="def test():", start_line=1, end_line=1,
-            similarity_score=0.9
+            construct_id="high",
+            file_path="test.py",
+            construct_type="function",
+            name="test",
+            signature="def test():",
+            start_line=1,
+            end_line=1,
+            similarity_score=0.9,
         )
         assert high_result.confidence_level == "high"
 
         # Medium confidence
         med_result = ConstructSearchResult.create(
-            construct_id="med", file_path="test.py", construct_type="function",
-            name="test", signature="def test():", start_line=1, end_line=1,
-            similarity_score=0.6
+            construct_id="med",
+            file_path="test.py",
+            construct_type="function",
+            name="test",
+            signature="def test():",
+            start_line=1,
+            end_line=1,
+            similarity_score=0.6,
         )
         assert med_result.confidence_level == "medium"
 
         # Low confidence
         low_result = ConstructSearchResult.create(
-            construct_id="low", file_path="test.py", construct_type="function",
-            name="test", signature="def test():", start_line=1, end_line=1,
-            similarity_score=0.3
+            construct_id="low",
+            file_path="test.py",
+            construct_type="function",
+            name="test",
+            signature="def test():",
+            start_line=1,
+            end_line=1,
+            similarity_score=0.3,
         )
         assert low_result.confidence_level == "low"
 
@@ -89,7 +98,7 @@ class TestConstructSearchResult:
             start_line=10,
             end_line=15,
             similarity_score=0.85,
-            docstring="Test function docstring"
+            docstring="Test function docstring",
         )
 
         code_result = construct_result.to_code_search_result()
@@ -99,8 +108,8 @@ class TestConstructSearchResult:
         assert code_result.similarity_score == 0.85
         assert code_result.confidence_level == "high"
         assert "test_function" in code_result.snippet.text
-        assert code_result.file_metadata['construct_type'] == "function"
-        assert code_result.file_metadata['construct_name'] == "test_function"
+        assert code_result.file_metadata["construct_type"] == "function"
+        assert code_result.file_metadata["construct_name"] == "test_function"
 
     def test_to_dict_serialization(self):
         """Test dictionary serialization for JSON output."""
@@ -112,16 +121,16 @@ class TestConstructSearchResult:
             signature="def test_function():",
             start_line=10,
             end_line=15,
-            similarity_score=0.85
+            similarity_score=0.85,
         )
 
         result_dict = result.to_dict()
 
         assert isinstance(result_dict, dict)
-        assert result_dict['construct_id'] == "test_id"
-        assert result_dict['construct_type'] == "function"
-        assert result_dict['name'] == "test_function"
-        assert result_dict['similarity_score'] == 0.85
+        assert result_dict["construct_id"] == "test_id"
+        assert result_dict["construct_type"] == "function"
+        assert result_dict["name"] == "test_function"
+        assert result_dict["similarity_score"] == 0.85
 
 
 class TestConstructSearchOperations:
@@ -145,10 +154,32 @@ class TestConstructSearchOperations:
 
         # Mock database results
         mock_results = [
-            ("construct_1", "/test/file.py", "function", "test_func",
-             "def test_func():", 10, 15, "Test docstring", None, "file_1", 0.85),
-            ("construct_2", "/test/file2.py", "class", "TestClass",
-             "class TestClass:", 1, 20, "Test class", None, "file_2", 0.75)
+            (
+                "construct_1",
+                "/test/file.py",
+                "function",
+                "test_func",
+                "def test_func():",
+                10,
+                15,
+                "Test docstring",
+                None,
+                "file_1",
+                0.85,
+            ),
+            (
+                "construct_2",
+                "/test/file2.py",
+                "class",
+                "TestClass",
+                "class TestClass:",
+                1,
+                20,
+                "Test class",
+                None,
+                "file_2",
+                0.75,
+            ),
         ]
 
         mock_connection = Mock()
@@ -176,8 +207,19 @@ class TestConstructSearchOperations:
         self.mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
 
         mock_results = [
-            ("construct_1", "/test/file.py", "function", "test_func",
-             "def test_func():", 10, 15, None, None, "file_1", 0.85)
+            (
+                "construct_1",
+                "/test/file.py",
+                "function",
+                "test_func",
+                "def test_func():",
+                10,
+                15,
+                None,
+                None,
+                "file_1",
+                0.85,
+            )
         ]
 
         mock_connection = Mock()
@@ -190,9 +232,7 @@ class TestConstructSearchOperations:
         self.mock_db_manager.get_connection.return_value = context_manager
 
         # Execute search with type filter
-        results = self.construct_ops.search_constructs(
-            "test query", k=10, construct_types=["function"]
-        )
+        results = self.construct_ops.search_constructs("test query", k=10, construct_types=["function"])
 
         # Verify the SQL query was called with type filtering
         mock_connection.execute.assert_called()
@@ -209,10 +249,32 @@ class TestConstructSearchOperations:
         self.mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
 
         mock_results = [
-            ("func_1", "/test/file.py", "function", "test_func",
-             "def test_func():", 10, 15, None, None, "file_1", 0.85),
-            ("method_1", "/test/file.py", "method", "test_method",
-             "def test_method(self):", 20, 25, None, "class_1", "file_1", 0.75)
+            (
+                "func_1",
+                "/test/file.py",
+                "function",
+                "test_func",
+                "def test_func():",
+                10,
+                15,
+                None,
+                None,
+                "file_1",
+                0.85,
+            ),
+            (
+                "method_1",
+                "/test/file.py",
+                "method",
+                "test_method",
+                "def test_method(self):",
+                20,
+                25,
+                None,
+                "class_1",
+                "file_1",
+                0.75,
+            ),
         ]
 
         mock_connection = Mock()
@@ -236,8 +298,19 @@ class TestConstructSearchOperations:
         self.mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
 
         mock_results = [
-            ("class_1", "/test/file.py", "class", "TestClass",
-             "class TestClass:", 1, 30, "Test class docstring", None, "file_1", 0.85)
+            (
+                "class_1",
+                "/test/file.py",
+                "class",
+                "TestClass",
+                "class TestClass:",
+                1,
+                30,
+                "Test class docstring",
+                None,
+                "file_1",
+                0.85,
+            )
         ]
 
         mock_connection = Mock()
@@ -262,10 +335,20 @@ class TestConstructSearchOperations:
         self.mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
 
         mock_results = [
-            ("import_1", "/test/file.py", "import", "requests",
-             "import requests", 1, 1, None, None, "file_1", 0.85),
-            ("import_2", "/test/file.py", "import", "json.loads",
-             "from json import loads", 2, 2, None, None, "file_1", 0.75)
+            ("import_1", "/test/file.py", "import", "requests", "import requests", 1, 1, None, None, "file_1", 0.85),
+            (
+                "import_2",
+                "/test/file.py",
+                "import",
+                "json.loads",
+                "from json import loads",
+                2,
+                2,
+                None,
+                None,
+                "file_1",
+                0.75,
+            ),
         ]
 
         mock_connection = Mock()
@@ -291,10 +374,32 @@ class TestConstructSearchOperations:
 
         # Mock related constructs results
         related_results = [
-            ("method_1", "/test/file.py", "method", "method1",
-             "def method1(self):", 10, 15, None, "class_1", "file_1", 0.8),
-            ("method_2", "/test/file.py", "method", "method2",
-             "def method2(self):", 20, 25, None, "class_1", "file_1", 0.8)
+            (
+                "method_1",
+                "/test/file.py",
+                "method",
+                "method1",
+                "def method1(self):",
+                10,
+                15,
+                None,
+                "class_1",
+                "file_1",
+                0.8,
+            ),
+            (
+                "method_2",
+                "/test/file.py",
+                "method",
+                "method2",
+                "def method2(self):",
+                20,
+                25,
+                None,
+                "class_1",
+                "file_1",
+                0.8,
+            ),
         ]
 
         mock_connection = Mock()
@@ -325,8 +430,8 @@ class TestConstructSearchOperations:
         mock_connection = Mock()
         mock_connection.execute.side_effect = [
             Mock(fetchone=Mock(return_value=[total_count])),  # Total count
-            Mock(fetchall=Mock(return_value=type_counts)),    # Type counts
-            Mock(fetchone=Mock(return_value=[embedded_count]))  # Embedded count
+            Mock(fetchall=Mock(return_value=type_counts)),  # Type counts
+            Mock(fetchone=Mock(return_value=[embedded_count])),  # Embedded count
         ]
 
         # Configure context manager behavior
@@ -339,11 +444,11 @@ class TestConstructSearchOperations:
         stats = self.construct_ops.get_construct_statistics()
 
         # Verify statistics
-        assert stats['total_constructs'] == 100
-        assert stats['embedded_constructs'] == 95
-        assert stats['embedding_coverage'] == 0.95
-        assert stats['construct_types']['function'] == 50
-        assert stats['construct_types']['class'] == 30
+        assert stats["total_constructs"] == 100
+        assert stats["embedded_constructs"] == 95
+        assert stats["embedding_coverage"] == 0.95
+        assert stats["construct_types"]["function"] == 50
+        assert stats["construct_types"]["class"] == 30
 
     def test_error_handling(self):
         """Test error handling in construct search."""
@@ -366,6 +471,7 @@ class TestHybridSearch:
 
         # Mock embedder methods
         import numpy as np
+
         self.mock_embedder.encode.return_value = np.array([0.1, 0.2, 0.3] * 128)  # 384-dimensional vector
         self.mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
 
@@ -378,17 +484,21 @@ class TestHybridSearch:
         ]
         self.mock_db_manager.create_fts_index.return_value = True
 
-    @patch('search_operations.ConstructSearchOperations')
-    @patch('search_operations.search_index_enhanced')
+    @patch("search_operations.ConstructSearchOperations")
+    @patch("search_operations.search_index_enhanced")
     def test_search_hybrid_basic(self, mock_search_enhanced, mock_construct_ops_class):
         """Test basic hybrid search functionality."""
         # Mock construct search results
         mock_construct_results = [
             ConstructSearchResult.create(
-                construct_id="func_1", file_path="/test/file1.py",
-                construct_type="function", name="test_func",
-                signature="def test_func():", start_line=10, end_line=15,
-                similarity_score=0.85
+                construct_id="func_1",
+                file_path="/test/file1.py",
+                construct_type="function",
+                name="test_func",
+                signature="def test_func():",
+                start_line=10,
+                end_line=15,
+                similarity_score=0.85,
             )
         ]
 
@@ -397,7 +507,7 @@ class TestHybridSearch:
             CodeSearchResult(
                 file_path="/test/file2.py",
                 snippet=CodeSnippet(text="test content", start_line=1, end_line=5),
-                similarity_score=0.75
+                similarity_score=0.75,
             )
         ]
 
@@ -408,9 +518,7 @@ class TestHybridSearch:
         mock_search_enhanced.return_value = mock_file_results
 
         # Execute hybrid search
-        results = search_hybrid(
-            self.mock_db_manager, self.mock_embedder, "test query", k=10
-        )
+        results = search_hybrid(self.mock_db_manager, self.mock_embedder, "test query", k=10)
 
         # Verify results
         assert len(results) == 2  # Should have both construct and file results
@@ -426,15 +534,15 @@ class TestHybridSearch:
                 snippet=CodeSnippet(text="def test_function():", start_line=10, end_line=15),
                 similarity_score=0.85,
                 file_metadata={
-                    'construct_context': {
-                        'related_constructs': 2,
-                        'construct_types': ['function', 'class'],
-                        'top_constructs': [
-                            {'name': 'test_func', 'type': 'function', 'line': 10, 'signature': 'def test_func():'},
-                            {'name': 'TestClass', 'type': 'class', 'line': 1, 'signature': 'class TestClass:'}
-                        ]
+                    "construct_context": {
+                        "related_constructs": 2,
+                        "construct_types": ["function", "class"],
+                        "top_constructs": [
+                            {"name": "test_func", "type": "function", "line": 10, "signature": "def test_func():"},
+                            {"name": "TestClass", "type": "class", "line": 1, "signature": "class TestClass:"},
+                        ],
                     }
-                }
+                },
             )
         ]
 
@@ -456,19 +564,27 @@ class TestResultFormatting:
         """Test basic construct search result formatting."""
         results = [
             ConstructSearchResult.create(
-                construct_id="test_1", file_path="/test/file.py",
-                construct_type="function", name="test_function",
+                construct_id="test_1",
+                file_path="/test/file.py",
+                construct_type="function",
+                name="test_function",
                 signature="def test_function(param: str) -> bool:",
-                start_line=10, end_line=15, similarity_score=0.85,
-                docstring="Test function docstring"
+                start_line=10,
+                end_line=15,
+                similarity_score=0.85,
+                docstring="Test function docstring",
             ),
             ConstructSearchResult.create(
-                construct_id="test_2", file_path="/test/file.py",
-                construct_type="class", name="TestClass",
+                construct_id="test_2",
+                file_path="/test/file.py",
+                construct_type="class",
+                name="TestClass",
                 signature="class TestClass(BaseClass):",
-                start_line=1, end_line=30, similarity_score=0.75,
-                docstring="Test class docstring"
-            )
+                start_line=1,
+                end_line=30,
+                similarity_score=0.75,
+                docstring="Test class docstring",
+            ),
         ]
 
         formatted = format_construct_search_results(results, "test query")
@@ -487,16 +603,19 @@ class TestResultFormatting:
         """Test formatting construct results without showing docstrings."""
         results = [
             ConstructSearchResult.create(
-                construct_id="test_1", file_path="/test/file.py",
-                construct_type="function", name="test_function",
-                signature="def test_function():", start_line=10, end_line=15,
-                similarity_score=0.85, docstring="This should not appear"
+                construct_id="test_1",
+                file_path="/test/file.py",
+                construct_type="function",
+                name="test_function",
+                signature="def test_function():",
+                start_line=10,
+                end_line=15,
+                similarity_score=0.85,
+                docstring="This should not appear",
             )
         ]
 
-        formatted = format_construct_search_results(
-            results, "test query", show_docstrings=False
-        )
+        formatted = format_construct_search_results(results, "test query", show_docstrings=False)
 
         # Verify docstring is not included
         assert "This should not appear" not in formatted
@@ -560,8 +679,19 @@ class TestIntegration:
 
         # Mock successful database query
         mock_results = [
-            ("construct_1", "/test/file.py", "function", "test_func",
-             "def test_func():", 10, 15, "Test docstring", None, "file_1", 0.85)
+            (
+                "construct_1",
+                "/test/file.py",
+                "function",
+                "test_func",
+                "def test_func():",
+                10,
+                15,
+                "Test docstring",
+                None,
+                "file_1",
+                0.85,
+            )
         ]
 
         mock_connection = Mock()

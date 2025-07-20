@@ -6,11 +6,12 @@ This module tests the enhanced data structures that replace simple tuples
 in search results, providing structured data for AI reasoning.
 """
 
-import pytest
 from dataclasses import asdict
 from pathlib import Path
 
-from search_result_types import CodeSnippet, CodeSearchResult, SearchMetadata
+import pytest
+
+from search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
 
 
 class TestCodeSnippet:
@@ -23,7 +24,7 @@ class TestCodeSnippet:
             start_line=10,
             end_line=11,
             context_before="# This is a test function",
-            context_after="# End of function"
+            context_after="# End of function",
         )
 
         assert snippet.text == "def hello_world():\n    print('Hello, World!')"
@@ -34,11 +35,7 @@ class TestCodeSnippet:
 
     def test_code_snippet_minimal_creation(self):
         """Test CodeSnippet creation with minimal required fields."""
-        snippet = CodeSnippet(
-            text="print('hello')",
-            start_line=5,
-            end_line=5
-        )
+        snippet = CodeSnippet(text="print('hello')", start_line=5, end_line=5)
 
         assert snippet.text == "print('hello')"
         assert snippet.start_line == 5
@@ -48,11 +45,7 @@ class TestCodeSnippet:
 
     def test_code_snippet_str_representation(self):
         """Test that CodeSnippet has meaningful string representation."""
-        snippet = CodeSnippet(
-            text="def test():\n    pass",
-            start_line=1,
-            end_line=2
-        )
+        snippet = CodeSnippet(text="def test():\n    pass", start_line=1, end_line=2)
 
         str_repr = str(snippet)
         assert "def test():" in str_repr
@@ -61,21 +54,15 @@ class TestCodeSnippet:
 
     def test_code_snippet_to_dict(self):
         """Test JSON serialization support."""
-        snippet = CodeSnippet(
-            text="x = 42",
-            start_line=1,
-            end_line=1,
-            context_before="# Setup",
-            context_after="# Done"
-        )
+        snippet = CodeSnippet(text="x = 42", start_line=1, end_line=1, context_before="# Setup", context_after="# Done")
 
         result = snippet.to_dict()
         expected = {
-            'text': 'x = 42',
-            'start_line': 1,
-            'end_line': 1,
-            'context_before': '# Setup',
-            'context_after': '# Done'
+            "text": "x = 42",
+            "start_line": 1,
+            "end_line": 1,
+            "context_before": "# Setup",
+            "context_after": "# Done",
         }
         assert result == expected
 
@@ -86,38 +73,27 @@ class TestCodeSearchResult:
     def test_code_search_result_creation(self):
         """Test basic CodeSearchResult creation."""
         snippet = CodeSnippet(
-            text="def calculate_area(radius):\n    return 3.14 * radius * radius",
-            start_line=5,
-            end_line=6
+            text="def calculate_area(radius):\n    return 3.14 * radius * radius", start_line=5, end_line=6
         )
 
         result = CodeSearchResult(
             file_path="/path/to/file.py",
             snippet=snippet,
             similarity_score=0.85,
-            file_metadata={
-                'language': 'python',
-                'size': 1024,
-                'type': 'source',
-                'extension': '.py'
-            },
-            confidence_level="high"
+            file_metadata={"language": "python", "size": 1024, "type": "source", "extension": ".py"},
+            confidence_level="high",
         )
 
         assert result.file_path == "/path/to/file.py"
         assert result.snippet == snippet
         assert result.similarity_score == 0.85
-        assert result.file_metadata['language'] == 'python'
+        assert result.file_metadata["language"] == "python"
         assert result.confidence_level == "high"
 
     def test_code_search_result_relative_path(self):
         """Test relative path calculation."""
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
-        result = CodeSearchResult(
-            file_path="/home/user/project/src/main.py",
-            snippet=snippet,
-            similarity_score=0.9
-        )
+        result = CodeSearchResult(file_path="/home/user/project/src/main.py", snippet=snippet, similarity_score=0.9)
 
         relative = result.get_relative_path("/home/user/project")
         assert relative == "src/main.py"
@@ -129,11 +105,7 @@ class TestCodeSearchResult:
     def test_code_search_result_similarity_percentage(self):
         """Test similarity score conversion to percentage."""
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
-        result = CodeSearchResult(
-            file_path="test.py",
-            snippet=snippet,
-            similarity_score=0.75
-        )
+        result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=0.75)
 
         assert result.similarity_percentage == 75.0
 
@@ -153,11 +125,7 @@ class TestCodeSearchResult:
     def test_code_search_result_to_tuple(self):
         """Test conversion back to legacy tuple format."""
         snippet = CodeSnippet(text="print('hello')", start_line=5, end_line=5)
-        result = CodeSearchResult(
-            file_path="hello.py",
-            snippet=snippet,
-            similarity_score=0.8
-        )
+        result = CodeSearchResult(file_path="hello.py", snippet=snippet, similarity_score=0.8)
 
         tuple_result = result.to_tuple()
 
@@ -170,11 +138,7 @@ class TestCodeSearchResult:
     def test_code_search_result_str_backward_compatibility(self):
         """Test that string representation matches legacy tuple format for compatibility."""
         snippet = CodeSnippet(text="x = 1", start_line=1, end_line=1)
-        result = CodeSearchResult(
-            file_path="test.py",
-            snippet=snippet,
-            similarity_score=0.9
-        )
+        result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=0.9)
 
         # Should be usable in contexts expecting tuple-like behavior
         str_repr = str(result)
@@ -190,17 +154,17 @@ class TestCodeSearchResult:
             file_path="calc.py",
             snippet=snippet,
             similarity_score=0.95,
-            file_metadata={'language': 'python'},
-            confidence_level="high"
+            file_metadata={"language": "python"},
+            confidence_level="high",
         )
 
         result_dict = result.to_dict()
 
-        assert result_dict['file_path'] == "calc.py"
-        assert result_dict['similarity_score'] == 0.95
-        assert result_dict['snippet']['text'] == "return 42"
-        assert result_dict['file_metadata']['language'] == "python"
-        assert result_dict['confidence_level'] == "high"
+        assert result_dict["file_path"] == "calc.py"
+        assert result_dict["similarity_score"] == 0.95
+        assert result_dict["snippet"]["text"] == "return 42"
+        assert result_dict["file_metadata"]["language"] == "python"
+        assert result_dict["confidence_level"] == "high"
 
 
 class TestSearchMetadata:
@@ -212,22 +176,19 @@ class TestSearchMetadata:
             query="test function",
             total_results=5,
             execution_time=0.123,
-            confidence_distribution={'high': 2, 'medium': 2, 'low': 1},
-            search_parameters={'k': 5, 'model': 'all-MiniLM-L6-v2'}
+            confidence_distribution={"high": 2, "medium": 2, "low": 1},
+            search_parameters={"k": 5, "model": "all-MiniLM-L6-v2"},
         )
 
         assert metadata.query == "test function"
         assert metadata.total_results == 5
         assert metadata.execution_time == 0.123
-        assert metadata.confidence_distribution['high'] == 2
-        assert metadata.search_parameters['k'] == 5
+        assert metadata.confidence_distribution["high"] == 2
+        assert metadata.search_parameters["k"] == 5
 
     def test_search_metadata_minimal(self):
         """Test SearchMetadata with minimal fields."""
-        metadata = SearchMetadata(
-            query="simple search",
-            total_results=0
-        )
+        metadata = SearchMetadata(query="simple search", total_results=0)
 
         assert metadata.query == "simple search"
         assert metadata.total_results == 0
@@ -237,19 +198,15 @@ class TestSearchMetadata:
 
     def test_search_metadata_to_dict(self):
         """Test SearchMetadata serialization."""
-        metadata = SearchMetadata(
-            query="serialize test",
-            total_results=3,
-            execution_time=0.05
-        )
+        metadata = SearchMetadata(query="serialize test", total_results=3, execution_time=0.05)
 
         result = metadata.to_dict()
         expected = {
-            'query': 'serialize test',
-            'total_results': 3,
-            'execution_time': 0.05,
-            'confidence_distribution': None,
-            'search_parameters': None
+            "query": "serialize test",
+            "total_results": 3,
+            "execution_time": 0.05,
+            "confidence_distribution": None,
+            "search_parameters": None,
         }
 
         assert result == expected
@@ -266,20 +223,15 @@ class TestIntegrationScenarios:
             start_line=45,
             end_line=47,
             context_before="# User authentication functions",
-            context_after="def logout_user():"
+            context_after="def logout_user():",
         )
 
         result = CodeSearchResult(
             file_path="/project/auth/login.py",
             snippet=snippet,
             similarity_score=0.92,
-            file_metadata={
-                'language': 'python',
-                'size': 2048,
-                'type': 'source',
-                'extension': '.py'
-            },
-            confidence_level="high"
+            file_metadata={"language": "python", "size": 2048, "type": "source", "extension": ".py"},
+            confidence_level="high",
         )
 
         # Test all operations work together
@@ -298,9 +250,9 @@ class TestIntegrationScenarios:
 
         # Test serialization
         result_dict = result.to_dict()
-        assert 'file_path' in result_dict
-        assert 'snippet' in result_dict
-        assert 'similarity_score' in result_dict
+        assert "file_path" in result_dict
+        assert "snippet" in result_dict
+        assert "similarity_score" in result_dict
 
     def test_metadata_integration(self):
         """Test SearchMetadata integration with results."""
@@ -309,14 +261,14 @@ class TestIntegrationScenarios:
                 file_path="file1.py",
                 snippet=CodeSnippet(text="test1", start_line=1, end_line=1),
                 similarity_score=0.9,
-                confidence_level="high"
+                confidence_level="high",
             ),
             CodeSearchResult(
                 file_path="file2.py",
                 snippet=CodeSnippet(text="test2", start_line=1, end_line=1),
                 similarity_score=0.7,
-                confidence_level="medium"
-            )
+                confidence_level="medium",
+            ),
         ]
 
         # Create metadata that describes the search
@@ -324,13 +276,13 @@ class TestIntegrationScenarios:
             query="authentication function",
             total_results=len(results),
             execution_time=0.156,
-            confidence_distribution={'high': 1, 'medium': 1, 'low': 0}
+            confidence_distribution={"high": 1, "medium": 1, "low": 0},
         )
 
         # Ensure metadata accurately describes results
         assert metadata.total_results == 2
         high_confidence_count = sum(1 for r in results if r.confidence_level == "high")
-        assert metadata.confidence_distribution['high'] == high_confidence_count
+        assert metadata.confidence_distribution["high"] == high_confidence_count
 
     def test_multi_snippet_support(self):
         """Test CodeSearchResult with multiple snippets."""
@@ -340,9 +292,7 @@ class TestIntegrationScenarios:
 
         # Create result with multiple snippets
         result = CodeSearchResult.from_multi_snippets(
-            file_path="/test/file.py",
-            snippets=[snippet1, snippet2, snippet3],
-            similarity_score=0.85
+            file_path="/test/file.py", snippets=[snippet1, snippet2, snippet3], similarity_score=0.85
         )
 
         assert result.file_path == "/test/file.py"
@@ -355,11 +305,7 @@ class TestIntegrationScenarios:
     def test_add_snippet_method(self):
         """Test adding additional snippets to a search result."""
         primary_snippet = CodeSnippet(text="def main():", start_line=1, end_line=3)
-        result = CodeSearchResult(
-            file_path="/test/main.py",
-            snippet=primary_snippet,
-            similarity_score=0.9
-        )
+        result = CodeSearchResult(file_path="/test/main.py", snippet=primary_snippet, similarity_score=0.9)
 
         # Initially no additional snippets
         assert len(result.additional_snippets) == 0
@@ -382,28 +328,24 @@ class TestIntegrationScenarios:
             file_path="/test/multi.py",
             snippets=[snippet1, snippet2],
             similarity_score=0.75,
-            file_metadata={"language": "python"}
+            file_metadata={"language": "python"},
         )
 
         result_dict = result.to_dict()
 
         # Check basic fields
-        assert result_dict['file_path'] == "/test/multi.py"
-        assert result_dict['similarity_score'] == 0.75
-        assert result_dict['file_metadata'] == {"language": "python"}
+        assert result_dict["file_path"] == "/test/multi.py"
+        assert result_dict["similarity_score"] == 0.75
+        assert result_dict["file_metadata"] == {"language": "python"}
 
         # Check snippet fields
-        assert 'snippet' in result_dict
-        assert 'additional_snippets' in result_dict
-        assert 'total_snippets' in result_dict
-        assert result_dict['total_snippets'] == 2
-        assert len(result_dict['additional_snippets']) == 1
+        assert "snippet" in result_dict
+        assert "additional_snippets" in result_dict
+        assert "total_snippets" in result_dict
+        assert result_dict["total_snippets"] == 2
+        assert len(result_dict["additional_snippets"]) == 1
 
     def test_multi_snippet_from_empty_list_raises_error(self):
         """Test that creating multi-snippet result from empty list raises error."""
         with pytest.raises(ValueError, match="At least one snippet is required"):
-            CodeSearchResult.from_multi_snippets(
-                file_path="/test/empty.py",
-                snippets=[],
-                similarity_score=0.5
-            )
+            CodeSearchResult.from_multi_snippets(file_path="/test/empty.py", snippets=[], similarity_score=0.5)

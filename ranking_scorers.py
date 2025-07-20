@@ -16,11 +16,11 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Dict, Optional
 
-from search_result_types import CodeSearchResult
+from ranking_config import FileTypeConstants, QueryTypeConstants, get_ranking_config
 from ranking_exceptions import FileAccessError, GitInfoError, InvalidSearchResultError
-from ranking_config import get_ranking_config, FileTypeConstants, QueryTypeConstants
+from search_result_types import CodeSearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class FileTypeScorer:
         if extension in FileTypeConstants.SOURCE_CODE_TYPES:
             base_score = 1.0
             # Slightly reduce score for test files unless query is about testing
-            if is_test_file and 'test' not in query.lower():
+            if is_test_file and "test" not in query.lower():
                 base_score = 0.8
         elif extension in FileTypeConstants.DOC_FILE_TYPES:
             # Higher score for docs if query seems documentation-related
@@ -107,31 +107,31 @@ class ConstructTypeScorer:
             return 0.5  # Neutral score when query type is unknown
 
         # Check if result has construct information
-        if hasattr(result, 'file_metadata') and result.file_metadata:
-            construct_context = result.file_metadata.get('construct_context')
+        if hasattr(result, "file_metadata") and result.file_metadata:
+            construct_context = result.file_metadata.get("construct_context")
             if construct_context:
-                construct_types = construct_context.get('construct_types', [])
+                construct_types = construct_context.get("construct_types", [])
                 if query_type in construct_types:
                     return 1.0
                 # Partial match for related types
-                if query_type == 'function' and 'method' in construct_types:
+                if query_type == "function" and "method" in construct_types:
                     return 0.8
-                if query_type == 'class' and any(t in construct_types for t in ['interface', 'struct']):
+                if query_type == "class" and any(t in construct_types for t in ["interface", "struct"]):
                     return 0.8
 
         # Fallback: analyze snippet content for construct type indicators
         snippet_text = result.snippet.text.lower()
 
-        if query_type == 'function':
+        if query_type == "function":
             if any(indicator in snippet_text for indicator in QueryTypeConstants.FUNCTION_INDICATORS):
                 return 0.9
-        elif query_type == 'class':
+        elif query_type == "class":
             if any(indicator in snippet_text for indicator in QueryTypeConstants.CLASS_INDICATORS):
                 return 0.9
-        elif query_type == 'variable':
+        elif query_type == "variable":
             if any(indicator in snippet_text for indicator in QueryTypeConstants.VARIABLE_INDICATORS):
                 return 0.7
-        elif query_type == 'import':
+        elif query_type == "import":
             if any(indicator in snippet_text for indicator in QueryTypeConstants.IMPORT_INDICATORS):
                 return 0.9
 
@@ -163,8 +163,8 @@ class RecencyScorer:
                 if not isinstance(git_info, dict):
                     raise GitInfoError(f"Git info must be a dictionary, got {type(git_info)}")
 
-                if 'file_modifications' in git_info:
-                    file_mods = git_info['file_modifications']
+                if "file_modifications" in git_info:
+                    file_mods = git_info["file_modifications"]
                     if not isinstance(file_mods, dict):
                         raise GitInfoError("file_modifications must be a dictionary")
 
@@ -252,15 +252,15 @@ class FileSizeScorer:
             if not result:
                 raise InvalidSearchResultError("Search result cannot be None")
 
-            if not hasattr(result, 'file_metadata'):
+            if not hasattr(result, "file_metadata"):
                 logger.debug(f"Result for {getattr(result, 'file_path', 'unknown')} missing file_metadata attribute")
                 return 0.5
 
-            if not result.file_metadata or 'size' not in result.file_metadata:
+            if not result.file_metadata or "size" not in result.file_metadata:
                 logger.debug(f"No size information for {getattr(result, 'file_path', 'unknown')}")
                 return 0.5  # Neutral score if size is unknown
 
-            size_bytes = result.file_metadata['size']
+            size_bytes = result.file_metadata["size"]
 
             # Validate size value
             if not isinstance(size_bytes, (int, float)) or size_bytes < 0:

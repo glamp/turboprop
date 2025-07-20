@@ -21,7 +21,7 @@ import logging
 import sys
 import threading
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
@@ -40,21 +40,20 @@ from code_index import (
     watch_mode,
 )
 from config import config
+from construct_search import ConstructSearchOperations, format_construct_search_results
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
+from mcp_response_types import IndexResponse, SearchResponse, StatusResponse
 
 # Import enhanced search functionality
+from search_operations import search_hybrid  # Legacy construct hybrid search
+from search_operations import search_with_hybrid_fusion  # New semantic+text hybrid search
 from search_operations import (
+    format_hybrid_search_results,
     search_with_comprehensive_response,
-    search_hybrid,  # Legacy construct hybrid search
-    search_with_hybrid_fusion,  # New semantic+text hybrid search
     search_with_intelligent_routing,
-    format_hybrid_search_results
 )
-from construct_search import ConstructSearchOperations, format_construct_search_results
-from mcp_response_types import (
-    SearchResponse, IndexResponse, StatusResponse
-)
+
 # Removed unused imports: CodeSearchResult, convert_results_to_legacy_format, convert_legacy_to_enhanced_format
 
 # Global lock for database connection management
@@ -65,7 +64,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler(sys.stderr)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -278,6 +277,7 @@ def search_code(query: str, max_results: int = None) -> str:
 
             # Add IDE navigation URLs for enhanced user experience
             from ide_integration import get_ide_navigation_urls
+
             nav_urls = get_ide_navigation_urls(path, 1)  # Use line 1 as default
             if nav_urls:
                 # Show the first available IDE navigation URL
@@ -341,7 +341,7 @@ def search_code_structured(query: str, max_results: int = None) -> str:
                 query=query,
                 results=[],
                 total_results=0,
-                performance_notes=["No index found. Please index a repository first using the index_repository tool."]
+                performance_notes=["No index found. Please index a repository first using the index_repository tool."],
             )
             return error_response.to_json()
 
@@ -353,7 +353,7 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             k=max_results,
             include_clusters=True,
             include_suggestions=True,
-            include_query_analysis=True
+            include_query_analysis=True,
         )
 
         # Add IDE navigation data to results
@@ -373,10 +373,7 @@ def search_code_structured(query: str, max_results: int = None) -> str:
     except Exception as e:
         # Return structured error response
         error_response = SearchResponse(
-            query=query,
-            results=[],
-            total_results=0,
-            performance_notes=[f"Error in structured search: {str(e)}"]
+            query=query, results=[], total_results=0, performance_notes=[f"Error in structured search: {str(e)}"]
         )
         return error_response.to_json()
 
@@ -388,7 +385,7 @@ def search_code_hybrid(
     max_results: int = None,
     semantic_weight: float = 0.6,
     text_weight: float = 0.4,
-    enable_advanced_features: bool = True
+    enable_advanced_features: bool = True,
 ) -> str:
     """
     🔀 TURBOPROP: Advanced hybrid search combining semantic + exact text matching!
@@ -458,9 +455,7 @@ def search_code_hybrid(
         embedder = get_embedder()
 
         # Check if index exists
-        file_count = db_manager.execute_with_retry(
-            f"SELECT COUNT(*) FROM {TABLE_NAME}"
-        )[0][0]
+        file_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME}")[0][0]
         if file_count == 0:
             return "No index found. Please index a repository first using the index_repository tool."
 
@@ -471,26 +466,26 @@ def search_code_hybrid(
             )
         else:
             fusion_weights = {
-                'semantic_weight': semantic_weight,
-                'text_weight': text_weight,
-                'rrf_k': 60,
-                'boost_exact_matches': True,
-                'exact_match_boost': 1.5
+                "semantic_weight": semantic_weight,
+                "text_weight": text_weight,
+                "rrf_k": 60,
+                "boost_exact_matches": True,
+                "exact_match_boost": 1.5,
             }
             results = search_with_hybrid_fusion(
-                db_manager, embedder, query, max_results, search_mode,
-                fusion_weights, enable_query_expansion=True
+                db_manager, embedder, query, max_results, search_mode, fusion_weights, enable_query_expansion=True
             )
 
         if not results:
-            return (f"No results found for hybrid search: '{query}' (mode: {search_mode}). "
-                    "Try different search terms, change the search mode, or check that the repository is indexed.")
+            return (
+                f"No results found for hybrid search: '{query}' (mode: {search_mode}). "
+                "Try different search terms, change the search mode, or check that the repository is indexed."
+            )
 
         # Format results with hybrid search formatting
         repo_path = _config.get("repository_path")
         formatted_results = format_hybrid_search_results(
-            results, query, show_fusion_details=(search_mode == "hybrid"),
-            repo_path=repo_path
+            results, query, show_fusion_details=(search_mode == "hybrid"), repo_path=repo_path
         )
 
         # Add search mode and configuration info
@@ -499,7 +494,7 @@ def search_code_hybrid(
             f"Query: '{query}' | Mode: {search_mode} | Results: {len(results)}",
             f"Weights: semantic={semantic_weight:.2f}, text={text_weight:.2f}",
             "=" * 60,
-            ""
+            "",
         ]
 
         return "\n".join(header_lines) + formatted_results
@@ -538,6 +533,7 @@ def index_repository_structured(
         JSON string with comprehensive IndexResponse data
     """
     import time
+
     start_time = time.time()
 
     try:
@@ -550,7 +546,7 @@ def index_repository_structured(
                 operation="index",
                 status="failed",
                 message="No repository path specified",
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
             error_response.add_error("Either provide a path or configure one at startup")
             return error_response.to_json()
@@ -563,7 +559,7 @@ def index_repository_structured(
                 status="failed",
                 message="Repository path does not exist",
                 repository_path=repository_path,
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
             error_response.add_error(f"Path '{repository_path}' does not exist")
             return error_response.to_json()
@@ -574,7 +570,7 @@ def index_repository_structured(
                 status="failed",
                 message="Path is not a directory",
                 repository_path=repository_path,
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
             error_response.add_error(f"'{repository_path}' is not a directory")
             return error_response.to_json()
@@ -598,7 +594,7 @@ def index_repository_structured(
                 repository_path=str(repository_path),
                 max_file_size_mb=max_file_size_mb,
                 total_files_scanned=0,
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
             response.add_error("Make sure it's a Git repository with code files")
             return response.to_json()
@@ -630,7 +626,7 @@ def index_repository_structured(
             database_size_mb=db_size_mb,
             execution_time=execution_time,
             repository_path=str(repository_path),
-            max_file_size_mb=max_file_size_mb
+            max_file_size_mb=max_file_size_mb,
         )
 
         # Add performance notes
@@ -648,7 +644,7 @@ def index_repository_structured(
             message="Indexing failed with exception",
             repository_path=repository_path,
             max_file_size_mb=max_file_size_mb,
-            execution_time=time.time() - start_time
+            execution_time=time.time() - start_time,
         )
         error_response.add_error(f"Exception: {str(e)}")
         return error_response.to_json()
@@ -679,9 +675,7 @@ def get_index_status_structured() -> str:
 
         # Get basic statistics
         file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
-        embedding_count = con.execute(
-            f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL"
-        ).fetchone()[0]
+        embedding_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL").fetchone()[0]
 
         # Get database information
         db_path = None
@@ -701,7 +695,8 @@ def get_index_status_structured() -> str:
         # Get file type statistics
         file_types = {}
         try:
-            type_results = con.execute(f"""
+            type_results = con.execute(
+                f"""
                 SELECT
                     CASE
                         WHEN path LIKE '%.py' THEN 'Python'
@@ -720,7 +715,8 @@ def get_index_status_structured() -> str:
                 FROM {TABLE_NAME}
                 GROUP BY file_type
                 ORDER BY count DESC
-            """).fetchall()
+            """
+            ).fetchall()
             file_types = {row[0]: row[1] for row in type_results}
         except Exception:
             file_types = {}
@@ -766,7 +762,7 @@ def get_index_status_structured() -> str:
             files_needing_update=files_needing_update,
             is_index_fresh=is_fresh,
             freshness_reason=freshness_reason,
-            file_types=file_types
+            file_types=file_types,
         )
 
         # Add recommendations
@@ -789,11 +785,7 @@ def get_index_status_structured() -> str:
 
     except Exception as e:
         error_response = StatusResponse(
-            status="error",
-            is_ready_for_search=False,
-            total_files=0,
-            files_with_embeddings=0,
-            total_embeddings=0
+            status="error", is_ready_for_search=False, total_files=0, files_with_embeddings=0, total_embeddings=0
         )
         error_response.add_warning(f"Status check failed: {str(e)}")
         return error_response.to_json()
@@ -1109,6 +1101,7 @@ def list_indexed_files(limit: int = 20) -> str:
 
 # Specialized Construct Search Tools
 
+
 @mcp.tool()
 def search_functions(query: str, max_results: int = None) -> str:
     """
@@ -1167,10 +1160,7 @@ def search_functions(query: str, max_results: int = None) -> str:
 
         # Format the results specifically for functions
         formatted_result = format_construct_search_results(
-            results=construct_results,
-            query=query,
-            show_signatures=True,
-            show_docstrings=True
+            results=construct_results, query=query, show_signatures=True, show_docstrings=True
         )
 
         return formatted_result
@@ -1239,25 +1229,21 @@ def search_classes(query: str, max_results: int = None, include_methods: bool = 
 
         # Format the results specifically for classes
         formatted_result = format_construct_search_results(
-            results=class_results,
-            query=query,
-            show_signatures=True,
-            show_docstrings=True
+            results=class_results, query=query, show_signatures=True, show_docstrings=True
         )
 
         # Add methods for each class if requested
         if include_methods and class_results:
-            enhanced_lines = formatted_result.split('\n')
+            enhanced_lines = formatted_result.split("\n")
 
             for class_result in class_results:
                 try:
                     # Find related methods for this class
                     related_constructs = construct_ops.get_related_constructs(
-                        construct_id=class_result.construct_id,
-                        k=5  # Limit to top 5 methods per class
+                        construct_id=class_result.construct_id, k=5  # Limit to top 5 methods per class
                     )
 
-                    methods = [c for c in related_constructs if c.construct_type == 'method']
+                    methods = [c for c in related_constructs if c.construct_type == "method"]
 
                     if methods:
                         # Find the position to insert method information
@@ -1279,7 +1265,7 @@ def search_classes(query: str, max_results: int = None, include_methods: bool = 
                     logger.warning(f"Error adding methods for class {class_result.name}: {e}")
                     continue
 
-            formatted_result = '\n'.join(enhanced_lines)
+            formatted_result = "\n".join(enhanced_lines)
 
         return formatted_result
 
@@ -1349,7 +1335,7 @@ def search_imports(query: str, max_results: int = None) -> str:
             results=import_results,
             query=query,
             show_signatures=True,
-            show_docstrings=False  # Imports typically don't have docstrings
+            show_docstrings=False,  # Imports typically don't have docstrings
         )
 
         return formatted_result
@@ -1365,7 +1351,7 @@ def search_hybrid_constructs(
     max_results: int = None,
     construct_weight: float = 0.7,
     file_weight: float = 0.3,
-    construct_types: str = None
+    construct_types: str = None,
 ) -> str:
     """
     🔀 TURBOPROP: Hybrid search combining files and constructs (BEST OF BOTH WORLDS!)
@@ -1418,7 +1404,7 @@ def search_hybrid_constructs(
         # Parse construct types filter
         construct_types_list = None
         if construct_types:
-            construct_types_list = [t.strip() for t in construct_types.split(',') if t.strip()]
+            construct_types_list = [t.strip() for t in construct_types.split(",") if t.strip()]
 
         db_manager = get_db_connection()
         embedder = get_embedder()
@@ -1431,7 +1417,7 @@ def search_hybrid_constructs(
             k=max_results,
             construct_weight=construct_weight,
             file_weight=file_weight,
-            construct_types=construct_types_list
+            construct_types=construct_types_list,
         )
 
         if not hybrid_results:
@@ -1439,9 +1425,7 @@ def search_hybrid_constructs(
 
         # Format hybrid results with construct context
         formatted_result = format_hybrid_search_results(
-            results=hybrid_results,
-            query=query,
-            show_construct_context=True
+            results=hybrid_results, query=query, show_construct_context=True
         )
 
         return formatted_result

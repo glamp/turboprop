@@ -12,11 +12,12 @@ Classes:
 - SearchMetadata: Overall search execution information
 """
 
-from dataclasses import dataclass, asdict, field
-from typing import Dict, Optional, Tuple, Any, List
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 from config import config
-from ide_integration import get_ide_navigation_urls, get_mcp_navigation_actions, SyntaxHighlightingHint
+from ide_integration import SyntaxHighlightingHint, get_ide_navigation_urls, get_mcp_navigation_actions
 
 
 @dataclass
@@ -27,6 +28,7 @@ class CodeSnippet:
     This class encapsulates a piece of code with its location information,
     enabling precise navigation and better understanding of the code context.
     """
+
     text: str
     start_line: int
     end_line: int
@@ -47,7 +49,7 @@ class CodeSnippet:
 
         max_length = config.search.SNIPPET_DISPLAY_MAX_LENGTH
         truncated_text = self.text[:max_length]
-        ellipsis = '...' if len(self.text) > max_length else ''
+        ellipsis = "..." if len(self.text) > max_length else ""
         return f"{line_info}: {truncated_text}{ellipsis}"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,6 +72,7 @@ class CodeSearchResult:
     confidence assessment, and explainable match reasons. Supports both single and
     multiple snippets per file.
     """
+
     file_path: str
     snippet: CodeSnippet
     similarity_score: float
@@ -133,20 +136,12 @@ class CodeSearchResult:
         # Generate IDE navigation URLs
         nav_urls = get_ide_navigation_urls(self.file_path, primary_line)
         self.ide_navigation_urls = [
-            {
-                "ide": url.display_name,
-                "url": url.url,
-                "available": url.is_available,
-                "ide_type": url.ide_type.value
-            }
+            {"ide": url.display_name, "url": url.url, "available": url.is_available, "ide_type": url.ide_type.value}
             for url in nav_urls
         ]
 
         # Generate MCP navigation actions
-        self.mcp_navigation_actions = get_mcp_navigation_actions(
-            self.file_path,
-            primary_line
-        )
+        self.mcp_navigation_actions = get_mcp_navigation_actions(self.file_path, primary_line)
 
     def generate_syntax_hints(self, file_content: Optional[str] = None) -> None:
         """
@@ -158,17 +153,16 @@ class CodeSearchResult:
         """
         if file_content is None:
             try:
-                with open(self.file_path, 'r', encoding='utf-8') as f:
+                with open(self.file_path, "r", encoding="utf-8") as f:
                     file_content = f.read()
             except (IOError, UnicodeDecodeError):
                 # If we can't read the file, skip syntax highlighting
                 return
 
         from ide_integration import ide_integration
+
         self.syntax_highlighting_hints = ide_integration.generate_syntax_hints(
-            self.file_path,
-            file_content,
-            self.snippet.start_line
+            self.file_path, file_content, self.snippet.start_line
         )
 
     @classmethod
@@ -178,8 +172,8 @@ class CodeSearchResult:
         snippets: List[CodeSnippet],
         similarity_score: float,
         file_metadata: Optional[Dict[str, Any]] = None,
-        repository_context: Optional[Dict[str, Any]] = None
-    ) -> 'CodeSearchResult':
+        repository_context: Optional[Dict[str, Any]] = None,
+    ) -> "CodeSearchResult":
         """
         Create a CodeSearchResult from multiple snippets.
 
@@ -205,7 +199,7 @@ class CodeSearchResult:
             similarity_score=similarity_score,
             file_metadata=file_metadata,
             additional_snippets=additional_snippets,
-            repository_context=repository_context
+            repository_context=repository_context,
         )
 
     @property
@@ -247,10 +241,8 @@ class CodeSearchResult:
 
     @classmethod
     def from_tuple(
-        cls,
-        legacy_tuple: Tuple[str, str, float],
-        repository_context: Optional[Dict[str, Any]] = None
-    ) -> 'CodeSearchResult':
+        cls, legacy_tuple: Tuple[str, str, float], repository_context: Optional[Dict[str, Any]] = None
+    ) -> "CodeSearchResult":
         """
         Create CodeSearchResult from legacy tuple format.
 
@@ -270,17 +262,13 @@ class CodeSearchResult:
         similarity_score = 1.0 - distance_score
 
         # Create basic code snippet (assuming single line for legacy compatibility)
-        snippet = CodeSnippet(
-            text=snippet_text,
-            start_line=1,
-            end_line=1
-        )
+        snippet = CodeSnippet(text=snippet_text, start_line=1, end_line=1)
 
         return cls(
             file_path=file_path,
             snippet=snippet,
             similarity_score=similarity_score,
-            repository_context=repository_context
+            repository_context=repository_context,
         )
 
     def to_tuple(self) -> Tuple[str, str, float]:
@@ -316,38 +304,38 @@ class CodeSearchResult:
             Dictionary representation suitable for JSON/API responses
         """
         result = {
-            'file_path': self.file_path,
-            'snippet': self.snippet.to_dict(),
-            'similarity_score': self.similarity_score,
-            'similarity_percentage': self.similarity_percentage,
-            'file_metadata': self.file_metadata,
-            'confidence_level': self.confidence_level,
-            'repository_context': self.repository_context,
-            'match_reasons': self.match_reasons,
-            'ranking_score': self.ranking_score,
-            'ranking_factors': self.ranking_factors,
-            'ide_navigation_urls': self.ide_navigation_urls,
-            'mcp_navigation_actions': self.mcp_navigation_actions
+            "file_path": self.file_path,
+            "snippet": self.snippet.to_dict(),
+            "similarity_score": self.similarity_score,
+            "similarity_percentage": self.similarity_percentage,
+            "file_metadata": self.file_metadata,
+            "confidence_level": self.confidence_level,
+            "repository_context": self.repository_context,
+            "match_reasons": self.match_reasons,
+            "ranking_score": self.ranking_score,
+            "ranking_factors": self.ranking_factors,
+            "ide_navigation_urls": self.ide_navigation_urls,
+            "mcp_navigation_actions": self.mcp_navigation_actions,
         }
 
         # Convert syntax highlighting hints to dict format
         if self.syntax_highlighting_hints:
-            result['syntax_highlighting_hints'] = [
+            result["syntax_highlighting_hints"] = [
                 {
-                    'language': hint.language,
-                    'token_type': hint.token_type,
-                    'start_line': hint.start_line,
-                    'end_line': hint.end_line,
-                    'start_column': hint.start_column,
-                    'end_column': hint.end_column
+                    "language": hint.language,
+                    "token_type": hint.token_type,
+                    "start_line": hint.start_line,
+                    "end_line": hint.end_line,
+                    "start_column": hint.start_column,
+                    "end_column": hint.end_column,
                 }
                 for hint in self.syntax_highlighting_hints
             ]
 
         # Include additional snippets if present
         if self.additional_snippets:
-            result['additional_snippets'] = [s.to_dict() for s in self.additional_snippets]
-            result['total_snippets'] = len(self.all_snippets)
+            result["additional_snippets"] = [s.to_dict() for s in self.additional_snippets]
+            result["total_snippets"] = len(self.all_snippets)
 
         return result
 
@@ -360,6 +348,7 @@ class SearchMetadata:
     This class captures metadata about a search operation, including timing,
     result statistics, and search parameters used.
     """
+
     query: str
     total_results: int
     execution_time: Optional[float] = None
@@ -388,6 +377,7 @@ class SearchMetadata:
 
 # Utility functions for working with search results
 
+
 def convert_legacy_results(legacy_results: list) -> Tuple[list, SearchMetadata]:
     """
     Convert a list of legacy tuple results to structured format.
@@ -405,15 +395,13 @@ def convert_legacy_results(legacy_results: list) -> Tuple[list, SearchMetadata]:
         structured_results.append(result)
 
     # Create metadata
-    confidence_counts = {'high': 0, 'medium': 0, 'low': 0}
+    confidence_counts = {"high": 0, "medium": 0, "low": 0}
     for result in structured_results:
         if result.confidence_level is not None:
             confidence_counts[result.confidence_level] += 1
 
     metadata = SearchMetadata(
-        query="legacy_conversion",
-        total_results=len(structured_results),
-        confidence_distribution=confidence_counts
+        query="legacy_conversion", total_results=len(structured_results), confidence_distribution=confidence_counts
     )
 
     return structured_results, metadata

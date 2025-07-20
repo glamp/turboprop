@@ -106,7 +106,7 @@ class TestLanguageDetector:
         """Test handling binary files."""
         detector = LanguageDetector()
         # Simulate binary content
-        binary_content = b'\x00\x01\x02\x03\x04\xff'.decode('latin1')
+        binary_content = b"\x00\x01\x02\x03\x04\xff".decode("latin1")
         result = detector.detect_language("image.png", binary_content)
         assert result.language == "Binary"
         assert result.file_type == ".png"

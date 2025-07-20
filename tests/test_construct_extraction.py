@@ -9,12 +9,11 @@ variables) from source code files using AST parsing and pattern matching.
 import tempfile
 from pathlib import Path
 
-
 from code_construct_extractor import (
     CodeConstruct,
     CodeConstructExtractor,
-    PythonConstructExtractor,
     JavaScriptConstructExtractor,
+    PythonConstructExtractor,
 )
 from database_manager import DatabaseManager
 from language_detection import LanguageDetector
@@ -179,7 +178,7 @@ class ScientificCalculator(Calculator):
 
     def test_extract_global_variables(self):
         """Test extracting global variable assignments."""
-        code = '''
+        code = """
 # Configuration constants
 MAX_RETRIES = 3
 DEFAULT_TIMEOUT = 30.0
@@ -187,7 +186,7 @@ API_BASE_URL = "https://api.example.com"
 
 def some_function():
     pass
-'''
+"""
         constructs = self.extractor.extract_constructs(code, "test.py")
 
         variable_constructs = [c for c in constructs if c.construct_type == "variable"]
@@ -198,7 +197,7 @@ def some_function():
 
     def test_extract_imports(self):
         """Test extracting import statements."""
-        code = '''
+        code = """
 import os
 import sys
 from pathlib import Path
@@ -206,7 +205,7 @@ from typing import List, Dict, Optional
 
 def some_function():
     pass
-'''
+"""
         constructs = self.extractor.extract_constructs(code, "test.py")
 
         import_constructs = [c for c in constructs if c.construct_type == "import"]
@@ -242,11 +241,11 @@ async def fetch_data(url: str) -> dict:
 
     def test_extract_syntax_error_handling(self):
         """Test handling of files with syntax errors."""
-        code = '''
+        code = """
 def broken_function(
     # Missing closing parenthesis and colon
     pass
-'''
+"""
         # Should not raise exception, just return empty list
         constructs = self.extractor.extract_constructs(code, "test.py")
         assert len(constructs) == 0
@@ -261,12 +260,12 @@ class TestJavaScriptConstructExtractor:
 
     def test_extract_function_declaration(self):
         """Test extracting function declarations."""
-        code = '''
+        code = """
 function calculateSum(a, b) {
     // Calculate the sum of two numbers
     return a + b;
 }
-'''
+"""
         constructs = self.extractor.extract_constructs(code, "test.js")
 
         assert len(constructs) == 1
@@ -277,13 +276,13 @@ function calculateSum(a, b) {
 
     def test_extract_arrow_function(self):
         """Test extracting arrow function expressions."""
-        code = '''
+        code = """
 const multiply = (x, y) => {
     return x * y;
 };
 
 const square = x => x * x;
-'''
+"""
         constructs = self.extractor.extract_constructs(code, "test.js")
 
         assert len(constructs) == 2
@@ -294,7 +293,7 @@ const square = x => x * x;
 
     def test_extract_class_definition(self):
         """Test extracting ES6 class definitions."""
-        code = '''
+        code = """
 class Calculator {
     constructor(initialValue = 0) {
         this.value = initialValue;
@@ -309,7 +308,7 @@ class Calculator {
         return obj instanceof Calculator;
     }
 }
-'''
+"""
         constructs = self.extractor.extract_constructs(code, "test.js")
 
         # Should extract class and methods
@@ -352,7 +351,7 @@ class Greeter:
 
     def test_extract_javascript_file(self):
         """Test extraction from JavaScript file."""
-        code = '''
+        code = """
 function greet(name) {
     return `Hello, ${name}!`;
 }
@@ -362,7 +361,7 @@ class Person {
         this.name = name;
     }
 }
-'''
+"""
         constructs = self.extractor.extract_constructs(code, "test.js")
 
         assert len(constructs) > 0
@@ -371,13 +370,13 @@ class Person {
 
     def test_extract_unsupported_language(self):
         """Test extraction from unsupported language falls back gracefully."""
-        code = '''
+        code = """
 #include <iostream>
 int main() {
     std::cout << "Hello World" << std::endl;
     return 0;
 }
-'''
+"""
         # Should not crash, but may return empty list
         constructs = self.extractor.extract_constructs(code, "test.cpp")
         assert isinstance(constructs, list)
@@ -413,10 +412,7 @@ class TestConstructExtractionIntegration:
 
             # Verify it was stored
             with db_manager.get_connection() as conn:
-                result = conn.execute(
-                    "SELECT * FROM code_constructs WHERE id = ?",
-                    (construct_id,)
-                ).fetchone()
+                result = conn.execute("SELECT * FROM code_constructs WHERE id = ?", (construct_id,)).fetchone()
 
                 assert result is not None
                 assert result[2] == "function"  # construct_type

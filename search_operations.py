@@ -14,21 +14,16 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import response_config
+from config import config
+from construct_search import ConstructSearchOperations, ConstructSearchResult
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from search_result_types import CodeSnippet, CodeSearchResult
-from search_utils import create_enhanced_snippet, extract_file_metadata, detect_file_language, search_index_enhanced
-from config import config
-from mcp_response_types import (
-    SearchResponse, QueryAnalysis, ResultCluster,
-    create_search_response_from_results
-)
-import response_config
-from construct_search import ConstructSearchOperations, ConstructSearchResult
-from result_ranking import rank_search_results, RankingWeights, generate_match_explanations
-from hybrid_search import (
-    HybridSearchEngine, SearchMode, FusionWeights, QueryAnalyzer
-)
+from hybrid_search import FusionWeights, HybridSearchEngine, QueryAnalyzer, SearchMode
+from mcp_response_types import QueryAnalysis, ResultCluster, SearchResponse, create_search_response_from_results
+from result_ranking import RankingWeights, generate_match_explanations, rank_search_results
+from search_result_types import CodeSearchResult, CodeSnippet
+from search_utils import create_enhanced_snippet, detect_file_language, extract_file_metadata, search_index_enhanced
 
 # Constants
 TABLE_NAME = "code_files"
@@ -45,7 +40,7 @@ def search_index_with_advanced_ranking(
     k: int,
     repo_path: Optional[str] = None,
     ranking_weights: Optional[RankingWeights] = None,
-    enable_advanced_ranking: bool = True
+    enable_advanced_ranking: bool = True,
 ) -> List[CodeSearchResult]:
     """
     Enhanced search with advanced multi-factor ranking and explainable results.
@@ -79,7 +74,7 @@ def search_index_with_advanced_ranking(
             query=query,
             repo_path=repo_path,
             git_info=None,  # TODO: Add Git integration for file recency
-            ranking_weights=ranking_weights
+            ranking_weights=ranking_weights,
         )
 
         # Generate match explanations and add to results
@@ -97,7 +92,7 @@ def search_index_with_advanced_ranking(
             f"Database connection: {db_manager is not None}. "
             f"Embedder: {embedder is not None}. "
             f"Error: {e}",
-            exc_info=True
+            exc_info=True,
         )
         # Fallback to basic enhanced search
         logger.info("Falling back to basic enhanced search")
@@ -144,8 +139,11 @@ def search_index(
         legacy_results = []
         for path, content, distance in results:
             # Create simple snippet (no object overhead)
-            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + \
-                "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            snippet = (
+                content[: config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..."
+                if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH
+                else content
+            )
             legacy_results.append((path, snippet, distance))
 
         return legacy_results
@@ -156,7 +154,7 @@ def search_index(
             f"Database connection: {db_manager is not None}. "
             f"Embedder: {embedder is not None}. "
             f"Error: {e}",
-            exc_info=True
+            exc_info=True,
         )
         print(f"❌ Search failed for query '{query}': {e}", file=sys.stderr)
         return []
@@ -172,7 +170,7 @@ def search_with_comprehensive_response(
     include_query_analysis: bool = True,
     enable_advanced_ranking: bool = True,
     repo_path: Optional[str] = None,
-    ranking_weights: Optional[RankingWeights] = None
+    ranking_weights: Optional[RankingWeights] = None,
 ) -> SearchResponse:
     """
     Perform enhanced search and return comprehensive structured response.
@@ -200,9 +198,7 @@ def search_with_comprehensive_response(
     try:
         # Perform the search with optional advanced ranking
         if enable_advanced_ranking:
-            results = search_index_with_advanced_ranking(
-                db_manager, embedder, query, k, repo_path, ranking_weights
-            )
+            results = search_index_with_advanced_ranking(db_manager, embedder, query, k, repo_path, ranking_weights)
         else:
             results = search_index_enhanced(db_manager, embedder, query, k)
         execution_time = time.time() - start_time
@@ -213,7 +209,7 @@ def search_with_comprehensive_response(
             results=results,
             execution_time=execution_time,
             add_clusters=include_clusters,
-            add_suggestions=include_suggestions
+            add_suggestions=include_suggestions,
         )
 
         # Add query analysis if requested
@@ -222,13 +218,9 @@ def search_with_comprehensive_response(
 
         # Add performance notes
         if execution_time > 1.0:
-            response.performance_notes.append(
-                f"Search took {execution_time:.2f}s - consider indexing optimization"
-            )
+            response.performance_notes.append(f"Search took {execution_time:.2f}s - consider indexing optimization")
         elif execution_time < 0.1:
-            response.performance_notes.append(
-                f"Fast search in {execution_time:.3f}s - index is well optimized"
-            )
+            response.performance_notes.append(f"Fast search in {execution_time:.3f}s - index is well optimized")
 
         return response
 
@@ -241,7 +233,7 @@ def search_with_comprehensive_response(
             results=[],
             total_results=0,
             execution_time=time.time() - start_time,
-            performance_notes=[f"Search failed: {str(e)}"]
+            performance_notes=[f"Search failed: {str(e)}"],
         )
 
 
@@ -271,24 +263,27 @@ def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryA
 
     # Estimate result quality and suggest refinements
     if not results:
-        analysis.suggested_refinements.extend([
-            f"Try broader terms like: '{_suggest_broader_terms(query)}'",
-            "Check spelling and try synonyms",
-            "Consider programming language context"
-        ])
+        analysis.suggested_refinements.extend(
+            [
+                f"Try broader terms like: '{_suggest_broader_terms(query)}'",
+                "Check spelling and try synonyms",
+                "Consider programming language context",
+            ]
+        )
         analysis.search_hints.append("No results found - try different search terms")
     elif len(results) < 3:
-        analysis.suggested_refinements.extend([
-            f"Related terms: '{_suggest_related_terms(query)}'",
-            "Try including file type or framework context"
-        ])
+        analysis.suggested_refinements.extend(
+            [f"Related terms: '{_suggest_related_terms(query)}'", "Try including file type or framework context"]
+        )
         analysis.search_hints.append("Few results - consider broader or related terms")
     elif len(results) >= 8:
-        analysis.suggested_refinements.extend([
-            f"More specific: '{query} function'",
-            f"With context: '{query} implementation'",
-            "Add language context like 'python' or 'javascript'"
-        ])
+        analysis.suggested_refinements.extend(
+            [
+                f"More specific: '{query} function'",
+                f"With context: '{query} implementation'",
+                "Add language context like 'python' or 'javascript'",
+            ]
+        )
         analysis.search_hints.append("Many results - add more specific terms to narrow down")
 
     # Analyze result confidence
@@ -299,11 +294,11 @@ def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryA
         analysis.search_hints.append("High confidence results - query matches well")
 
     # Add technical hints based on query content
-    if any(term in query.lower() for term in ['function', 'method', 'def']):
+    if any(term in query.lower() for term in ["function", "method", "def"]):
         analysis.search_hints.append("Searching for functions - results show function definitions")
-    elif any(term in query.lower() for term in ['class', 'interface', 'struct']):
+    elif any(term in query.lower() for term in ["class", "interface", "struct"]):
         analysis.search_hints.append("Searching for types - results show class/interface definitions")
-    elif any(term in query.lower() for term in ['error', 'exception', 'handling']):
+    elif any(term in query.lower() for term in ["error", "exception", "handling"]):
         analysis.search_hints.append("Searching for error handling - check try-catch blocks")
 
     analysis.estimated_result_count = len(results)
@@ -314,14 +309,14 @@ def _suggest_broader_terms(query: str) -> str:
     """Generate broader search terms from a specific query."""
     # Simple word replacement for common technical terms
     broader_terms = {
-        'authentication': 'auth login user',
-        'database': 'db data storage',
-        'configuration': 'config settings',
-        'implementation': 'code function',
-        'optimization': 'performance speed',
-        'validation': 'validate check',
-        'serialization': 'serialize json',
-        'initialization': 'init setup start'
+        "authentication": "auth login user",
+        "database": "db data storage",
+        "configuration": "config settings",
+        "implementation": "code function",
+        "optimization": "performance speed",
+        "validation": "validate check",
+        "serialization": "serialize json",
+        "initialization": "init setup start",
     }
 
     query_lower = query.lower()
@@ -337,16 +332,16 @@ def _suggest_related_terms(query: str) -> str:
     """Generate related search terms from a query."""
     # Simple related term suggestions
     related_terms = {
-        'login': 'authentication signin user',
-        'auth': 'login token session',
-        'database': 'sql query connection',
-        'config': 'settings environment variables',
-        'error': 'exception handling try catch',
-        'test': 'unittest pytest testing',
-        'api': 'endpoint route http',
-        'json': 'parse serialize data',
-        'file': 'read write stream',
-        'cache': 'memory storage redis'
+        "login": "authentication signin user",
+        "auth": "login token session",
+        "database": "sql query connection",
+        "config": "settings environment variables",
+        "error": "exception handling try catch",
+        "test": "unittest pytest testing",
+        "api": "endpoint route http",
+        "json": "parse serialize data",
+        "file": "read write stream",
+        "cache": "memory storage redis",
     }
 
     query_lower = query.lower()
@@ -370,9 +365,9 @@ def cluster_results_by_language(results: List[CodeSearchResult]) -> List[ResultC
     language_groups = {}
 
     for result in results:
-        lang = 'unknown'
-        if result.file_metadata and 'language' in result.file_metadata:
-            lang = result.file_metadata['language']
+        lang = "unknown"
+        if result.file_metadata and "language" in result.file_metadata:
+            lang = result.file_metadata["language"]
 
         if lang not in language_groups:
             language_groups[lang] = []
@@ -384,11 +379,11 @@ def cluster_results_by_language(results: List[CodeSearchResult]) -> List[ResultC
             avg_score = sum(r.similarity_score for r in lang_results) / len(lang_results)
 
             cluster = ResultCluster(
-                cluster_name=f"{language} Files" if language != 'unknown' else 'Other Files',
+                cluster_name=f"{language} Files" if language != "unknown" else "Other Files",
                 cluster_type="language",
                 results=lang_results,
                 cluster_score=avg_score,
-                cluster_description=f"Search results from {language} source files"
+                cluster_description=f"Search results from {language} source files",
             )
             clusters.append(cluster)
 
@@ -427,7 +422,7 @@ def cluster_results_by_directory(results: List[CodeSearchResult]) -> List[Result
                 cluster_type="directory",
                 results=dir_results,
                 cluster_score=avg_score,
-                cluster_description=f"Search results from {directory}"
+                cluster_description=f"Search results from {directory}",
             )
             clusters.append(cluster)
 
@@ -446,10 +441,10 @@ def cluster_results_by_confidence(results: List[CodeSearchResult]) -> List[Resul
     Returns:
         List of ResultCluster objects grouped by confidence
     """
-    confidence_groups = {'high': [], 'medium': [], 'low': []}
+    confidence_groups = {"high": [], "medium": [], "low": []}
 
     for result in results:
-        confidence = result.confidence_level or 'low'
+        confidence = result.confidence_level or "low"
         confidence_groups[confidence].append(result)
 
     clusters = []
@@ -462,15 +457,13 @@ def cluster_results_by_confidence(results: List[CodeSearchResult]) -> List[Resul
                 cluster_type="confidence",
                 results=conf_results,
                 cluster_score=avg_score,
-                cluster_description=f"Results with {confidence_level} confidence level"
+                cluster_description=f"Results with {confidence_level} confidence level",
             )
             clusters.append(cluster)
 
     # Sort by confidence level (high -> medium -> low)
-    confidence_order = {'high': 3, 'medium': 2, 'low': 1}
-    clusters.sort(key=lambda c: confidence_order.get(
-        c.cluster_name.split()[0].lower(), 0
-    ), reverse=True)
+    confidence_order = {"high": 3, "medium": 2, "low": 1}
+    clusters.sort(key=lambda c: confidence_order.get(c.cluster_name.split()[0].lower(), 0), reverse=True)
 
     return clusters
 
@@ -502,9 +495,7 @@ def generate_cross_references(results: List[CodeSearchResult]) -> List[str]:
             max_files = response_config.MAX_FILENAMES_IN_CROSS_REF
             files_list = ", ".join(filenames[:max_files])
             ellipsis = "..." if len(filenames) > max_files else ""
-            cross_refs.append(
-                f"Related files in {Path(directory).name}/: {files_list}{ellipsis}"
-            )
+            cross_refs.append(f"Related files in {Path(directory).name}/: {files_list}{ellipsis}")
 
     # Find files with similar names
     file_stems = {}
@@ -517,16 +508,12 @@ def generate_cross_references(results: List[CodeSearchResult]) -> List[str]:
     for stem, stem_results in file_stems.items():
         if len(stem_results) > 1:
             extensions = [Path(r.file_path).suffix for r in stem_results]
-            cross_refs.append(
-                f"Related '{stem}' files: {', '.join(extensions)}"
-            )
+            cross_refs.append(f"Related '{stem}' files: {', '.join(extensions)}")
 
-    return cross_refs[:response_config.MAX_CROSS_REFERENCES]  # Limit to top cross-references
+    return cross_refs[: response_config.MAX_CROSS_REFERENCES]  # Limit to top cross-references
 
 
-def format_advanced_search_results(
-    results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None
-) -> str:
+def format_advanced_search_results(results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None) -> str:
     """
     Format advanced search results with match explanations and ranking information.
 
@@ -554,7 +541,8 @@ def format_advanced_search_results(
         formatted_lines.append(f"{i}. {display_path}")
         formatted_lines.append(
             f"   📊 Ranking: {ranking_score:.3f} | Similarity: {result.similarity_percentage:.1f}% "
-            f"({result.confidence_level} confidence)")
+            f"({result.confidence_level} confidence)"
+        )
 
         # Show ranking factors if available
         if result.ranking_factors:
@@ -568,8 +556,8 @@ def format_advanced_search_results(
         # Show file metadata if available
         if result.file_metadata:
             metadata = result.file_metadata
-            lang = metadata.get('language', 'unknown')
-            size = metadata.get('size', 0)
+            lang = metadata.get("language", "unknown")
+            size = metadata.get("size", 0)
             if size > 0:
                 size_str = f"{size} bytes" if size < 1024 else f"{size/1024:.1f}KB"
                 formatted_lines.append(f"   📄 Type: {lang} ({size_str})")
@@ -598,9 +586,7 @@ def format_advanced_search_results(
                 if additional_snippet.start_line == additional_snippet.end_line:
                     add_line_info = f"Line {additional_snippet.start_line}"
                 else:
-                    add_line_info = (
-                        f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
-                    )
+                    add_line_info = f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
 
                 # Truncate additional snippets for display
                 add_text = additional_snippet.text.strip()
@@ -614,9 +600,7 @@ def format_advanced_search_results(
     return "\n".join(formatted_lines)
 
 
-def format_enhanced_search_results(
-    results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None
-) -> str:
+def format_enhanced_search_results(results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None) -> str:
     """
     Format enhanced search results for display with rich metadata.
 
@@ -642,14 +626,14 @@ def format_enhanced_search_results(
         # Display enriched information
         formatted_lines.append(f"{i}. {display_path}")
         formatted_lines.append(
-            f"   Similarity: {result.similarity_percentage:.1f}% "
-            f"({result.confidence_level} confidence)")
+            f"   Similarity: {result.similarity_percentage:.1f}% " f"({result.confidence_level} confidence)"
+        )
 
         # Show file metadata if available
         if result.file_metadata:
             metadata = result.file_metadata
-            lang = metadata.get('language', 'unknown')
-            size = metadata.get('size', 0)
+            lang = metadata.get("language", "unknown")
+            size = metadata.get("size", 0)
             if size > 0:
                 size_str = f"{size} bytes" if size < 1024 else f"{size/1024:.1f}KB"
                 formatted_lines.append(f"   Type: {lang} ({size_str})")
@@ -672,9 +656,7 @@ def format_enhanced_search_results(
                 if additional_snippet.start_line == additional_snippet.end_line:
                     add_line_info = f"Line {additional_snippet.start_line}"
                 else:
-                    add_line_info = (
-                        f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
-                    )
+                    add_line_info = f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
 
                 # Truncate additional snippets for display
                 add_text = additional_snippet.text.strip()
@@ -688,9 +670,7 @@ def format_enhanced_search_results(
     return "\n".join(formatted_lines)
 
 
-def format_search_results(
-    results: List[Tuple[str, str, float]], query: str, repo_path: Optional[str] = None
-) -> str:
+def format_search_results(results: List[Tuple[str, str, float]], query: str, repo_path: Optional[str] = None) -> str:
     """
     Format search results for display.
 
@@ -738,17 +718,14 @@ def get_file_content(db_manager: DatabaseManager, file_path: str) -> Optional[st
         File content if found, None otherwise
     """
     try:
-        result = db_manager.execute_with_retry(
-            f"SELECT content FROM {TABLE_NAME} WHERE path = ?", (file_path,))
+        result = db_manager.execute_with_retry(f"SELECT content FROM {TABLE_NAME} WHERE path = ?", (file_path,))
         return result[0][0] if result else None
     except Exception as e:
         logger.error(f"Error getting file content for {file_path}: {e}")
         return None
 
 
-def search_by_file_extension(
-    db_manager: DatabaseManager, extension: str, limit: int = 10
-) -> List[Tuple[str, str]]:
+def search_by_file_extension(db_manager: DatabaseManager, extension: str, limit: int = 10) -> List[Tuple[str, str]]:
     """
     Search for files by file extension.
 
@@ -780,8 +757,11 @@ def search_by_file_extension(
         # Format results with snippets
         formatted_results = []
         for path, content in results:
-            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + \
-                "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            snippet = (
+                content[: config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..."
+                if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH
+                else content
+            )
             formatted_results.append((path, snippet))
 
         return formatted_results
@@ -791,9 +771,7 @@ def search_by_file_extension(
         return []
 
 
-def search_by_filename(
-    db_manager: DatabaseManager, filename_pattern: str, limit: int = 10
-) -> List[Tuple[str, str]]:
+def search_by_filename(db_manager: DatabaseManager, filename_pattern: str, limit: int = 10) -> List[Tuple[str, str]]:
     """
     Search for files by filename pattern.
 
@@ -819,8 +797,11 @@ def search_by_filename(
         # Format results with snippets
         formatted_results = []
         for path, content in results:
-            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + \
-                "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            snippet = (
+                content[: config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..."
+                if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH
+                else content
+            )
             formatted_results.append((path, snippet))
 
         return formatted_results
@@ -848,8 +829,7 @@ def get_search_statistics(db_manager: DatabaseManager) -> dict:
         stats["total_files"] = result[0][0] if result else 0
 
         # Files with embeddings
-        result = db_manager.execute_with_retry(
-            f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
+        result = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL")
         stats["files_with_embeddings"] = result[0][0] if result else 0
 
         # File types
@@ -904,8 +884,7 @@ def find_similar_files_enhanced(
     """
     try:
         # Get the embedding of the reference file
-        result = db_manager.execute_with_retry(
-            f"SELECT embedding FROM {TABLE_NAME} WHERE path = ?", (reference_file,))
+        result = db_manager.execute_with_retry(f"SELECT embedding FROM {TABLE_NAME} WHERE path = ?", (reference_file,))
 
         if not result:
             logger.warning(f"Reference file not found in index: {reference_file}")
@@ -954,10 +933,7 @@ def find_similar_files_enhanced(
 
             # Create CodeSearchResult
             search_result = CodeSearchResult(
-                file_path=path,
-                snippet=snippet,
-                similarity_score=similarity_score,
-                file_metadata=file_metadata
+                file_path=path, snippet=snippet, similarity_score=similarity_score, file_metadata=file_metadata
             )
 
             structured_results.append(search_result)
@@ -1004,6 +980,7 @@ def find_similar_files(
 
 # Enhanced Hybrid Search Functions - Combining Semantic and Text Search
 
+
 def search_with_hybrid_fusion(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
@@ -1011,7 +988,7 @@ def search_with_hybrid_fusion(
     k: int = 10,
     mode: str = "auto",
     fusion_weights: Optional[Dict] = None,
-    enable_query_expansion: bool = True
+    enable_query_expansion: bool = True,
 ) -> List[CodeSearchResult]:
     """
     Enhanced hybrid search combining semantic similarity with exact text matching.
@@ -1048,18 +1025,16 @@ def search_with_hybrid_fusion(
         weights = None
         if fusion_weights:
             weights = FusionWeights(
-                semantic_weight=fusion_weights.get('semantic_weight', 0.6),
-                text_weight=fusion_weights.get('text_weight', 0.4),
-                rrf_k=fusion_weights.get('rrf_k', 60),
-                boost_exact_matches=fusion_weights.get('boost_exact_matches', True),
-                exact_match_boost=fusion_weights.get('exact_match_boost', 1.5)
+                semantic_weight=fusion_weights.get("semantic_weight", 0.6),
+                text_weight=fusion_weights.get("text_weight", 0.4),
+                rrf_k=fusion_weights.get("rrf_k", 60),
+                boost_exact_matches=fusion_weights.get("boost_exact_matches", True),
+                exact_match_boost=fusion_weights.get("exact_match_boost", 1.5),
             )
 
         # Use the hybrid search engine
         engine = HybridSearchEngine(db_manager, embedder, weights)
-        hybrid_results = engine.search(
-            query, k, search_mode, weights, enable_query_expansion
-        )
+        hybrid_results = engine.search(query, k, search_mode, weights, enable_query_expansion)
 
         # Extract CodeSearchResult objects
         results = [hr.code_result for hr in hybrid_results]
@@ -1077,7 +1052,7 @@ def search_with_intelligent_routing(
     embedder: EmbeddingGenerator,
     query: str,
     k: int = 10,
-    enable_advanced_features: bool = True
+    enable_advanced_features: bool = True,
 ) -> List[CodeSearchResult]:
     """
     Intelligent search with automatic query routing and preprocessing.
@@ -1124,14 +1099,10 @@ def search_with_intelligent_routing(
         # Handle file type filtering
         file_types = _extract_file_type_filters(query)
         if file_types:
-            return _search_with_file_type_filter(
-                db_manager, embedder, query, k, file_types
-            )
+            return _search_with_file_type_filter(db_manager, embedder, query, k, file_types)
 
         # Use hybrid search for most queries
-        return search_with_hybrid_fusion(
-            db_manager, embedder, query, k, mode="auto"
-        )
+        return search_with_hybrid_fusion(db_manager, embedder, query, k, mode="auto")
 
     except Exception as e:
         logger.error(f"Intelligent routing search failed for query '{query}': {e}")
@@ -1139,9 +1110,7 @@ def search_with_intelligent_routing(
         return search_index_enhanced(db_manager, embedder, query, k)
 
 
-def _search_regex_with_results(
-    db_manager: DatabaseManager, pattern: str, k: int
-) -> List[CodeSearchResult]:
+def _search_regex_with_results(db_manager: DatabaseManager, pattern: str, k: int) -> List[CodeSearchResult]:
     """Convert regex search results to CodeSearchResult objects."""
     try:
         # Use database manager's regex search
@@ -1153,10 +1122,7 @@ def _search_regex_with_results(
             file_metadata = extract_file_metadata(path, content)
 
             result = CodeSearchResult(
-                file_path=path,
-                snippet=snippet,
-                similarity_score=relevance_score,
-                file_metadata=file_metadata
+                file_path=path, snippet=snippet, similarity_score=relevance_score, file_metadata=file_metadata
             )
             result.match_reasons = ["Regex pattern match"]
             results.append(result)
@@ -1169,15 +1135,13 @@ def _search_regex_with_results(
 
 
 def _search_exact_phrases(
-    db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator,
-    query: str,
-    k: int
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, query: str, k: int
 ) -> List[CodeSearchResult]:
     """Search for exact phrases using text search with semantic fallback."""
     try:
         # Extract phrases from quotes
         import re
+
         phrases = re.findall(r'"([^"]*)"', query)
 
         if not phrases:
@@ -1197,10 +1161,7 @@ def _search_exact_phrases(
                     file_metadata = extract_file_metadata(path, content)
 
                     result = CodeSearchResult(
-                        file_path=path,
-                        snippet=snippet,
-                        similarity_score=relevance_score,
-                        file_metadata=file_metadata
+                        file_path=path, snippet=snippet, similarity_score=relevance_score, file_metadata=file_metadata
                     )
                     result.match_reasons = [f"Exact phrase match: '{phrase}'"]
                     all_results.append(result)
@@ -1216,10 +1177,7 @@ def _search_exact_phrases(
 
 
 def _search_boolean_query(
-    db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator,
-    query: str,
-    k: int
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, query: str, k: int
 ) -> List[CodeSearchResult]:
     """Handle Boolean query operators."""
     try:
@@ -1232,10 +1190,7 @@ def _search_boolean_query(
             file_metadata = extract_file_metadata(path, content)
 
             result = CodeSearchResult(
-                file_path=path,
-                snippet=snippet,
-                similarity_score=relevance_score,
-                file_metadata=file_metadata
+                file_path=path, snippet=snippet, similarity_score=relevance_score, file_metadata=file_metadata
             )
             result.match_reasons = ["Boolean operator match"]
             results.append(result)
@@ -1252,37 +1207,29 @@ def _extract_file_type_filters(query: str) -> List[str]:
     import re
 
     # Look for filetype: or ext: patterns
-    file_type_patterns = [
-        r'\bfiletype:(\w+)',
-        r'\bext:(\w+)',
-        r'\.(\w+)\s+files?',
-        r'(\w+)\s+files?'
-    ]
+    file_type_patterns = [r"\bfiletype:(\w+)", r"\bext:(\w+)", r"\.(\w+)\s+files?", r"(\w+)\s+files?"]
 
     file_types = []
     for pattern in file_type_patterns:
         matches = re.findall(pattern, query.lower())
         for match in matches:
-            if match in ['py', 'js', 'ts', 'java', 'cpp', 'c', 'go', 'rs', 'rb', 'php']:
-                file_types.append(f'.{match}')
+            if match in ["py", "js", "ts", "java", "cpp", "c", "go", "rs", "rb", "php"]:
+                file_types.append(f".{match}")
 
     return list(set(file_types))  # Remove duplicates
 
 
 def _search_with_file_type_filter(
-    db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator,
-    query: str,
-    k: int,
-    file_types: List[str]
+    db_manager: DatabaseManager, embedder: EmbeddingGenerator, query: str, k: int, file_types: List[str]
 ) -> List[CodeSearchResult]:
     """Search with file type filtering."""
     try:
         # Clean query from file type filters
         import re
+
         clean_query = query
-        for pattern in [r'\bfiletype:\w+', r'\bext:\w+', r'\.\w+\s+files?', r'\w+\s+files?']:
-            clean_query = re.sub(pattern, '', clean_query, flags=re.IGNORECASE)
+        for pattern in [r"\bfiletype:\w+", r"\bext:\w+", r"\.\w+\s+files?", r"\w+\s+files?"]:
+            clean_query = re.sub(pattern, "", clean_query, flags=re.IGNORECASE)
         clean_query = clean_query.strip()
 
         if not clean_query:
@@ -1297,10 +1244,7 @@ def _search_with_file_type_filter(
             file_metadata = extract_file_metadata(path, content)
 
             result = CodeSearchResult(
-                file_path=path,
-                snippet=snippet,
-                similarity_score=relevance_score,
-                file_metadata=file_metadata
+                file_path=path, snippet=snippet, similarity_score=relevance_score, file_metadata=file_metadata
             )
             result.match_reasons = [f"File type filter: {', '.join(file_types)}"]
             results.append(result)
@@ -1319,7 +1263,7 @@ def search_with_date_range(
     k: int = 10,
     days_back: Optional[int] = None,
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
 ) -> List[CodeSearchResult]:
     """
     Search with date range filtering for recently modified files.
@@ -1390,7 +1334,7 @@ def format_hybrid_search_results(
     query: str,
     show_fusion_details: bool = False,
     show_construct_context: bool = True,
-    repo_path: Optional[str] = None
+    repo_path: Optional[str] = None,
 ) -> str:
     """
     Format hybrid search results with enhanced information display.
@@ -1416,25 +1360,18 @@ def format_hybrid_search_results(
         # Format path
         display_path = result.file_path
         if repo_path and display_path.startswith(repo_path):
-            display_path = display_path[len(repo_path):].lstrip('/')
+            display_path = display_path[len(repo_path) :].lstrip("/")
 
         # Result header with confidence emoji
-        confidence_emoji = {
-            'high': '🎯',
-            'medium': '✅',
-            'low': '⚠️'
-        }.get(result.confidence_level, '❓')
+        confidence_emoji = {"high": "🎯", "medium": "✅", "low": "⚠️"}.get(result.confidence_level, "❓")
 
         lines.append(f"{confidence_emoji} [{i}] {display_path}")
 
         # Show confidence and similarity
-        lines.append(
-            f"   📊 Similarity: {result.similarity_percentage:.1f}% "
-            f"({result.confidence_level} confidence)"
-        )
+        lines.append(f"   📊 Similarity: {result.similarity_percentage:.1f}% " f"({result.confidence_level} confidence)")
 
         # Show match reasons if available
-        if hasattr(result, 'match_reasons') and result.match_reasons:
+        if hasattr(result, "match_reasons") and result.match_reasons:
             lines.append("   🎯 Match reasons:")
             for reason in result.match_reasons[:3]:
                 lines.append(f"      • {reason}")
@@ -1442,8 +1379,8 @@ def format_hybrid_search_results(
         # Show file metadata
         if result.file_metadata:
             metadata = result.file_metadata
-            lang = metadata.get('language', 'unknown')
-            size = metadata.get('size', 0)
+            lang = metadata.get("language", "unknown")
+            size = metadata.get("size", 0)
             if size > 0:
                 size_str = f"{size} bytes" if size < 1024 else f"{size/1024:.1f}KB"
                 lines.append(f"   📄 Type: {lang} ({size_str})")
@@ -1460,21 +1397,16 @@ def format_hybrid_search_results(
         lines.append(f"   💻 {line_info}: {snippet.text.strip()}")
 
         # Show construct context if available and requested
-        if (show_construct_context and result.file_metadata
-                and 'construct_context' in result.file_metadata):
-
-            context = result.file_metadata['construct_context']
-            construct_count = context['related_constructs']
-            construct_types = ', '.join(context['construct_types'])
+        if show_construct_context and result.file_metadata and "construct_context" in result.file_metadata:
+            context = result.file_metadata["construct_context"]
+            construct_count = context["related_constructs"]
+            construct_types = ", ".join(context["construct_types"])
 
             lines.append(f"   🔧 {construct_count} constructs: {construct_types}")
 
             # Show top constructs
-            for construct in context['top_constructs']:
-                lines.append(
-                    f"      • {construct['type']}: {construct['name']} "
-                    f"(line {construct['line']})"
-                )
+            for construct in context["top_constructs"]:
+                lines.append(f"      • {construct['type']}: {construct['name']} " f"(line {construct['line']})")
 
         lines.append("")
 
@@ -1484,6 +1416,7 @@ def format_hybrid_search_results(
 # Legacy Hybrid Search Functions - Combining File-level and Construct-level Search
 # (Renamed to avoid conflicts with new hybrid search)
 
+
 def search_constructs_and_files_hybrid(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
@@ -1491,7 +1424,7 @@ def search_constructs_and_files_hybrid(
     k: int = 10,
     construct_weight: float = 0.7,
     file_weight: float = 0.3,
-    construct_types: Optional[List[str]] = None
+    construct_types: Optional[List[str]] = None,
 ) -> List[CodeSearchResult]:
     """
     Perform legacy hybrid search combining file-level and construct-level results.
@@ -1518,11 +1451,7 @@ def search_constructs_and_files_hybrid(
 
         # Search constructs with higher k to get more candidates
         construct_k = min(k * 2, 20)  # Search more constructs for better selection
-        construct_results = construct_ops.search_constructs(
-            query=query,
-            k=construct_k,
-            construct_types=construct_types
-        )
+        construct_results = construct_ops.search_constructs(query=query, k=construct_k, construct_types=construct_types)
 
         # Search files
         file_results = search_index_enhanced(db_manager, embedder, query, k)
@@ -1590,7 +1519,7 @@ def search_hybrid(
     k: int = 10,
     construct_weight: float = 0.7,
     file_weight: float = 0.3,
-    construct_types: Optional[List[str]] = None
+    construct_types: Optional[List[str]] = None,
 ) -> List[CodeSearchResult]:
     """
     Backward compatible hybrid search function that combines construct and file searches.
@@ -1617,7 +1546,7 @@ def search_hybrid(
         k=k,
         construct_weight=construct_weight,
         file_weight=file_weight,
-        construct_types=construct_types
+        construct_types=construct_types,
     )
 
 
@@ -1626,7 +1555,7 @@ def search_with_construct_focus(
     embedder: EmbeddingGenerator,
     query: str,
     k: int = 10,
-    construct_types: Optional[List[str]] = None
+    construct_types: Optional[List[str]] = None,
 ) -> List[CodeSearchResult]:
     """
     Search with primary focus on constructs, falling back to file search if needed.
@@ -1651,13 +1580,12 @@ def search_with_construct_focus(
         k=k,
         construct_weight=0.8,
         file_weight=0.2,
-        construct_types=construct_types
+        construct_types=construct_types,
     )
 
 
 def _add_construct_context(
-    result: CodeSearchResult,
-    construct_results: List[ConstructSearchResult]
+    result: CodeSearchResult, construct_results: List[ConstructSearchResult]
 ) -> CodeSearchResult:
     """
     Add construct context to a CodeSearchResult when applicable.
@@ -1670,10 +1598,7 @@ def _add_construct_context(
         Enhanced CodeSearchResult with construct context
     """
     # Find constructs from the same file
-    file_constructs = [
-        c for c in construct_results
-        if c.file_path == result.file_path
-    ]
+    file_constructs = [c for c in construct_results if c.file_path == result.file_path]
 
     if not file_constructs:
         return result
@@ -1684,20 +1609,20 @@ def _add_construct_context(
 
     # Add construct summary to metadata
     construct_summary = {
-        'related_constructs': len(file_constructs),
-        'construct_types': list(set(c.construct_type for c in file_constructs)),
-        'top_constructs': [
+        "related_constructs": len(file_constructs),
+        "construct_types": list(set(c.construct_type for c in file_constructs)),
+        "top_constructs": [
             {
-                'name': c.name,
-                'type': c.construct_type,
-                'line': c.start_line,
-                'signature': c.signature[:100] + "..." if len(c.signature) > 100 else c.signature
+                "name": c.name,
+                "type": c.construct_type,
+                "line": c.start_line,
+                "signature": c.signature[:100] + "..." if len(c.signature) > 100 else c.signature,
             }
             for c in sorted(file_constructs, key=lambda x: x.similarity_score, reverse=True)[:3]
-        ]
+        ],
     }
 
-    result.file_metadata['construct_context'] = construct_summary
+    result.file_metadata["construct_context"] = construct_summary
     return result
 
 
@@ -1706,7 +1631,7 @@ def search_constructs_with_file_context(
     embedder: EmbeddingGenerator,
     query: str,
     k: int = 10,
-    construct_types: Optional[List[str]] = None
+    construct_types: Optional[List[str]] = None,
 ) -> Tuple[List[ConstructSearchResult], List[CodeSearchResult]]:
     """
     Search constructs and provide related file context.
@@ -1729,11 +1654,7 @@ def search_constructs_with_file_context(
         construct_ops = ConstructSearchOperations(db_manager, embedder)
 
         # Search constructs
-        construct_results = construct_ops.search_constructs(
-            query=query,
-            k=k,
-            construct_types=construct_types
-        )
+        construct_results = construct_ops.search_constructs(query=query, k=k, construct_types=construct_types)
 
         if not construct_results:
             return [], []
@@ -1753,16 +1674,16 @@ def search_constructs_with_file_context(
                     best_construct = max(file_constructs, key=lambda c: c.similarity_score)
 
                     snippet = CodeSnippet(
-                        text=content[best_construct.start_line:best_construct.end_line],
+                        text=content[best_construct.start_line : best_construct.end_line],
                         start_line=best_construct.start_line,
-                        end_line=best_construct.end_line
+                        end_line=best_construct.end_line,
                     )
 
                     file_metadata = {
-                        'language': detect_file_language(file_path),
-                        'filename': Path(file_path).name,
-                        'directory': str(Path(file_path).parent),
-                        'construct_matches': len(file_constructs)
+                        "language": detect_file_language(file_path),
+                        "filename": Path(file_path).name,
+                        "directory": str(Path(file_path).parent),
+                        "construct_matches": len(file_constructs),
                     }
 
                     file_result = CodeSearchResult(
@@ -1770,7 +1691,7 @@ def search_constructs_with_file_context(
                         snippet=snippet,
                         similarity_score=best_construct.similarity_score,
                         file_metadata=file_metadata,
-                        confidence_level=best_construct.confidence_level
+                        confidence_level=best_construct.confidence_level,
                     )
 
                     file_context_results.append(file_result)

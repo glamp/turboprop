@@ -7,15 +7,15 @@ detect project types, parse dependency files, and create comprehensive
 repository context for better code understanding.
 """
 
-import json
 import hashlib
+import json
 import re
 import subprocess
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
 
@@ -30,6 +30,7 @@ class RepositoryContext:
     This class contains comprehensive information about a code repository
     that helps AI agents better understand the project structure and dependencies.
     """
+
     repository_id: str
     repository_path: str
     git_branch: Optional[str] = None
@@ -59,7 +60,7 @@ class RepositoryContext:
         Returns:
             SHA-256 hash of the repository path
         """
-        return hashlib.sha256(repository_path.encode('utf-8')).hexdigest()
+        return hashlib.sha256(repository_path.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -69,18 +70,16 @@ class RepositoryContext:
             Dictionary representation suitable for database insertion
         """
         return {
-            'repository_id': self.repository_id,
-            'repository_path': self.repository_path,
-            'git_branch': self.git_branch,
-            'git_commit': self.git_commit,
-            'git_remote_url': self.git_remote_url,
-            'project_type': self.project_type,
-            'dependencies': json.dumps(self.dependencies) if self.dependencies else None,
-            'package_managers': (
-                json.dumps(self.package_managers) if self.package_managers else None
-            ),
-            'indexed_at': self.indexed_at.isoformat() if self.indexed_at else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            "repository_id": self.repository_id,
+            "repository_path": self.repository_path,
+            "git_branch": self.git_branch,
+            "git_commit": self.git_commit,
+            "git_remote_url": self.git_remote_url,
+            "project_type": self.project_type,
+            "dependencies": json.dumps(self.dependencies) if self.dependencies else None,
+            "package_managers": (json.dumps(self.package_managers) if self.package_managers else None),
+            "indexed_at": self.indexed_at.isoformat() if self.indexed_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 
@@ -115,7 +114,7 @@ class GitRepository:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                check=False
+                check=False,
             )
             return result.returncode == 0 and result.stdout.strip() == "true"
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
@@ -135,14 +134,10 @@ class GitRepository:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                check=True
+                check=True,
             )
             return Path(result.stdout.strip())
-        except (
-            subprocess.TimeoutExpired,
-            subprocess.CalledProcessError,
-            FileNotFoundError
-        ) as error:
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as error:
             logger.debug("Failed to get git repository root: %s", error)
             return None
 
@@ -160,15 +155,11 @@ class GitRepository:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                check=True
+                check=True,
             )
             branch = result.stdout.strip()
             return branch if branch else None
-        except (
-            subprocess.TimeoutExpired,
-            subprocess.CalledProcessError,
-            FileNotFoundError
-        ) as error:
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as error:
             logger.debug("Failed to get git branch: %s", error)
             return None
 
@@ -181,19 +172,10 @@ class GitRepository:
         """
         try:
             result = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=True
+                ["git", "rev-parse", "HEAD"], cwd=self.repo_path, capture_output=True, text=True, timeout=10, check=True
             )
             return result.stdout.strip()
-        except (
-            subprocess.TimeoutExpired,
-            subprocess.CalledProcessError,
-            FileNotFoundError
-        ) as error:
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as error:
             logger.debug("Failed to get git commit: %s", error)
             return None
 
@@ -206,34 +188,25 @@ class GitRepository:
         """
         try:
             result = subprocess.run(
-                ["git", "remote", "-v"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=True
+                ["git", "remote", "-v"], cwd=self.repo_path, capture_output=True, text=True, timeout=10, check=True
             )
 
             remotes = {}
-            for line in result.stdout.strip().split('\n'):
-                if line and '\t' in line:
+            for line in result.stdout.strip().split("\n"):
+                if line and "\t" in line:
                     # Format: "remote_name\turl (fetch|push)"
-                    parts = line.split('\t')
+                    parts = line.split("\t")
                     if len(parts) >= 2:
                         remote_name = parts[0]
                         url_with_type = parts[1]
                         # Extract just the URL part (before the space and parentheses)
-                        url = url_with_type.split(' ')[0]
+                        url = url_with_type.split(" ")[0]
                         # Only store fetch URLs to avoid duplicates
-                        if '(fetch)' in url_with_type and remote_name not in remotes:
+                        if "(fetch)" in url_with_type and remote_name not in remotes:
                             remotes[remote_name] = url
 
             return remotes
-        except (
-            subprocess.TimeoutExpired,
-            subprocess.CalledProcessError,
-            FileNotFoundError
-        ) as error:
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as error:
             logger.debug("Failed to get git remotes: %s", error)
             return {}
 
@@ -248,36 +221,16 @@ class ProjectDetector:
 
     # Project type detection patterns
     PROJECT_PATTERNS = {
-        'python': [
-            'pyproject.toml', 'setup.py', 'requirements.txt', 'Pipfile', 'setup.cfg'
-        ],
-        'javascript': [
-            'package.json', 'package-lock.json', 'yarn.lock', '.nvmrc'
-        ],
-        'typescript': [
-            'tsconfig.json', 'package.json'  # TypeScript often has package.json too
-        ],
-        'java': [
-            'pom.xml', 'build.gradle', 'build.gradle.kts', 'gradle.properties'
-        ],
-        'go': [
-            'go.mod', 'go.sum', 'Gopkg.toml', 'Gopkg.lock'
-        ],
-        'rust': [
-            'Cargo.toml', 'Cargo.lock'
-        ],
-        'ruby': [
-            'Gemfile', 'Gemfile.lock', '.ruby-version'
-        ],
-        'php': [
-            'composer.json', 'composer.lock'
-        ],
-        'csharp': [
-            '*.csproj', '*.sln', 'project.json', 'packages.config'
-        ],
-        'cpp': [
-            'CMakeLists.txt', 'conanfile.txt', 'vcpkg.json'
-        ]
+        "python": ["pyproject.toml", "setup.py", "requirements.txt", "Pipfile", "setup.cfg"],
+        "javascript": ["package.json", "package-lock.json", "yarn.lock", ".nvmrc"],
+        "typescript": ["tsconfig.json", "package.json"],  # TypeScript often has package.json too
+        "java": ["pom.xml", "build.gradle", "build.gradle.kts", "gradle.properties"],
+        "go": ["go.mod", "go.sum", "Gopkg.toml", "Gopkg.lock"],
+        "rust": ["Cargo.toml", "Cargo.lock"],
+        "ruby": ["Gemfile", "Gemfile.lock", ".ruby-version"],
+        "php": ["composer.json", "composer.lock"],
+        "csharp": ["*.csproj", "*.sln", "project.json", "packages.config"],
+        "cpp": ["CMakeLists.txt", "conanfile.txt", "vcpkg.json"],
     }
 
     def __init__(self, repo_path: Path):
@@ -300,7 +253,7 @@ class ProjectDetector:
 
         for project_type, patterns in self.PROJECT_PATTERNS.items():
             for pattern in patterns:
-                if '*' in pattern:
+                if "*" in pattern:
                     # Handle glob patterns like *.csproj
                     matching_files = list(self.repo_path.glob(pattern))
                     if matching_files:
@@ -353,14 +306,15 @@ class ProjectDetector:
         if pyproject_file.exists():
             try:
                 import tomllib  # Python 3.11+
-                with open(pyproject_file, 'rb') as f:
+
+                with open(pyproject_file, "rb") as f:
                     data = tomllib.load(f)
 
                 # Extract from [project.dependencies]
-                if 'project' in data and 'dependencies' in data['project']:
-                    for dep_spec in data['project']['dependencies']:
+                if "project" in data and "dependencies" in data["project"]:
+                    for dep_spec in data["project"]["dependencies"]:
                         parsed = self._parse_python_requirement(dep_spec)
-                        parsed['source'] = 'pyproject.toml'
+                        parsed["source"] = "pyproject.toml"
                         dependencies.append(parsed)
 
             except (ImportError, OSError, ValueError) as error:
@@ -368,13 +322,14 @@ class ProjectDetector:
                 # Fallback to tomli for older Python versions
                 try:
                     import tomli
-                    with open(pyproject_file, 'rb') as f:
+
+                    with open(pyproject_file, "rb") as f:
                         data = tomli.load(f)
 
-                    if 'project' in data and 'dependencies' in data['project']:
-                        for dep_spec in data['project']['dependencies']:
+                    if "project" in data and "dependencies" in data["project"]:
+                        for dep_spec in data["project"]["dependencies"]:
                             parsed = self._parse_python_requirement(dep_spec)
-                            parsed['source'] = 'pyproject.toml'
+                            parsed["source"] = "pyproject.toml"
                             dependencies.append(parsed)
                 except (ImportError, OSError, ValueError) as fallback_error:
                     logger.debug("Failed to parse pyproject.toml with tomli: %s", fallback_error)
@@ -383,12 +338,12 @@ class ProjectDetector:
         requirements_file = self.repo_path / "requirements.txt"
         if requirements_file.exists():
             try:
-                with open(requirements_file, 'r', encoding='utf-8') as f:
+                with open(requirements_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if line and not line.startswith('#'):
+                        if line and not line.startswith("#"):
                             parsed = self._parse_python_requirement(line)
-                            parsed['source'] = 'requirements.txt'
+                            parsed["source"] = "requirements.txt"
                             dependencies.append(parsed)
             except OSError as error:
                 logger.debug("Failed to read requirements.txt: %s", error)
@@ -398,19 +353,13 @@ class ProjectDetector:
     def _parse_python_requirement(self, requirement: str) -> Dict[str, Any]:
         """Parse a Python requirement string into components."""
         # Simple parsing - could be enhanced with proper requirement parsing
-        match = re.match(r'^([a-zA-Z0-9\-_.]+)(.*)$', requirement.strip())
+        match = re.match(r"^([a-zA-Z0-9\-_.]+)(.*)$", requirement.strip())
         if match:
             name = match.group(1)
             version_spec = match.group(2).strip() if match.group(2) else None
-            return {
-                'name': name,
-                'version': version_spec if version_spec else None
-            }
+            return {"name": name, "version": version_spec if version_spec else None}
         else:
-            return {
-                'name': requirement.strip(),
-                'version': None
-            }
+            return {"name": requirement.strip(), "version": None}
 
     def _extract_javascript_dependencies(self) -> List[Dict[str, Any]]:
         """Extract JavaScript dependencies from package.json."""
@@ -419,28 +368,22 @@ class ProjectDetector:
         package_json = self.repo_path / "package.json"
         if package_json.exists():
             try:
-                with open(package_json, 'r', encoding='utf-8') as f:
+                with open(package_json, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Production dependencies
-                if 'dependencies' in data:
-                    for name, version in data['dependencies'].items():
-                        dependencies.append({
-                            'name': name,
-                            'version': version,
-                            'source': 'package.json',
-                            'type': 'production'
-                        })
+                if "dependencies" in data:
+                    for name, version in data["dependencies"].items():
+                        dependencies.append(
+                            {"name": name, "version": version, "source": "package.json", "type": "production"}
+                        )
 
                 # Development dependencies
-                if 'devDependencies' in data:
-                    for name, version in data['devDependencies'].items():
-                        dependencies.append({
-                            'name': name,
-                            'version': version,
-                            'source': 'package.json',
-                            'type': 'development'
-                        })
+                if "devDependencies" in data:
+                    for name, version in data["devDependencies"].items():
+                        dependencies.append(
+                            {"name": name, "version": version, "source": "package.json", "type": "development"}
+                        )
 
             except (OSError, json.JSONDecodeError) as error:
                 logger.debug("Failed to parse package.json: %s", error)
@@ -459,20 +402,22 @@ class ProjectDetector:
                 root = tree.getroot()
 
                 # Maven XML namespace handling
-                ns = {'maven': 'http://maven.apache.org/POM/4.0.0'}
-                deps = root.findall('.//maven:dependency', ns) or root.findall('.//dependency')
+                ns = {"maven": "http://maven.apache.org/POM/4.0.0"}
+                deps = root.findall(".//maven:dependency", ns) or root.findall(".//dependency")
 
                 for dep in deps:
-                    group_id = dep.find('groupId') or dep.find('maven:groupId', ns)
-                    artifact_id = dep.find('artifactId') or dep.find('maven:artifactId', ns)
-                    version = dep.find('version') or dep.find('maven:version', ns)
+                    group_id = dep.find("groupId") or dep.find("maven:groupId", ns)
+                    artifact_id = dep.find("artifactId") or dep.find("maven:artifactId", ns)
+                    version = dep.find("version") or dep.find("maven:version", ns)
 
                     if group_id is not None and artifact_id is not None:
-                        dependencies.append({
-                            'name': f"{group_id.text}:{artifact_id.text}",
-                            'version': version.text if version is not None else None,
-                            'source': 'pom.xml'
-                        })
+                        dependencies.append(
+                            {
+                                "name": f"{group_id.text}:{artifact_id.text}",
+                                "version": version.text if version is not None else None,
+                                "source": "pom.xml",
+                            }
+                        )
 
             except (OSError, ET.ParseError) as error:
                 logger.debug("Failed to parse pom.xml: %s", error)
@@ -481,7 +426,7 @@ class ProjectDetector:
         gradle_file = self.repo_path / "build.gradle"
         if gradle_file.exists():
             try:
-                with open(gradle_file, 'r', encoding='utf-8') as f:
+                with open(gradle_file, "r", encoding="utf-8") as f:
                     content = f.read()
 
                 # Basic regex to find dependencies
@@ -489,11 +434,9 @@ class ProjectDetector:
                 matches = re.findall(dep_pattern, content)
 
                 for group_id, artifact_id, version in matches:
-                    dependencies.append({
-                        'name': f"{group_id}:{artifact_id}",
-                        'version': version,
-                        'source': 'build.gradle'
-                    })
+                    dependencies.append(
+                        {"name": f"{group_id}:{artifact_id}", "version": version, "source": "build.gradle"}
+                    )
 
             except OSError as error:
                 logger.debug("Failed to read build.gradle: %s", error)
@@ -507,24 +450,24 @@ class ProjectDetector:
         go_mod = self.repo_path / "go.mod"
         if go_mod.exists():
             try:
-                with open(go_mod, 'r', encoding='utf-8') as f:
+                with open(go_mod, "r", encoding="utf-8") as f:
                     content = f.read()
 
                 # Parse require block
                 in_require = False
-                for line in content.split('\n'):
+                for line in content.split("\n"):
                     line = line.strip()
 
-                    if line.startswith('require ('):
+                    if line.startswith("require ("):
                         in_require = True
                         continue
-                    elif line == ')' and in_require:
+                    elif line == ")" and in_require:
                         in_require = False
                         continue
 
-                    if in_require or line.startswith('require '):
+                    if in_require or line.startswith("require "):
                         # Handle single line or block format
-                        if line.startswith('require '):
+                        if line.startswith("require "):
                             dep_line = line[8:]  # Remove 'require '
                         else:
                             dep_line = line
@@ -533,11 +476,7 @@ class ProjectDetector:
                         if len(parts) >= 2:
                             name = parts[0]
                             version = parts[1]
-                            dependencies.append({
-                                'name': name,
-                                'version': version,
-                                'source': 'go.mod'
-                            })
+                            dependencies.append({"name": name, "version": version, "source": "go.mod"})
 
             except OSError as error:
                 logger.debug("Failed to read go.mod: %s", error)
@@ -552,51 +491,37 @@ class ProjectDetector:
         if cargo_toml.exists():
             try:
                 import tomllib  # Python 3.11+
-                with open(cargo_toml, 'rb') as f:
+
+                with open(cargo_toml, "rb") as f:
                     data = tomllib.load(f)
 
                 # Extract dependencies
-                if 'dependencies' in data:
-                    for name, spec in data['dependencies'].items():
+                if "dependencies" in data:
+                    for name, spec in data["dependencies"].items():
                         if isinstance(spec, str):
                             # Simple version specification
-                            dependencies.append({
-                                'name': name,
-                                'version': spec,
-                                'source': 'Cargo.toml'
-                            })
+                            dependencies.append({"name": name, "version": spec, "source": "Cargo.toml"})
                         elif isinstance(spec, dict):
                             # Complex specification with version key
-                            version = spec.get('version')
-                            dependencies.append({
-                                'name': name,
-                                'version': version,
-                                'source': 'Cargo.toml'
-                            })
+                            version = spec.get("version")
+                            dependencies.append({"name": name, "version": version, "source": "Cargo.toml"})
 
             except (ImportError, OSError, ValueError) as error:
                 logger.debug("Failed to parse Cargo.toml: %s", error)
                 # Fallback to tomli
                 try:
                     import tomli
-                    with open(cargo_toml, 'rb') as f:
+
+                    with open(cargo_toml, "rb") as f:
                         data = tomli.load(f)
 
-                    if 'dependencies' in data:
-                        for name, spec in data['dependencies'].items():
+                    if "dependencies" in data:
+                        for name, spec in data["dependencies"].items():
                             if isinstance(spec, str):
-                                dependencies.append({
-                                    'name': name,
-                                    'version': spec,
-                                    'source': 'Cargo.toml'
-                                })
+                                dependencies.append({"name": name, "version": spec, "source": "Cargo.toml"})
                             elif isinstance(spec, dict):
-                                version = spec.get('version')
-                                dependencies.append({
-                                    'name': name,
-                                    'version': version,
-                                    'source': 'Cargo.toml'
-                                })
+                                version = spec.get("version")
+                                dependencies.append({"name": name, "version": version, "source": "Cargo.toml"})
                 except (ImportError, OSError, ValueError) as fallback_error:
                     logger.debug("Failed to parse Cargo.toml with tomli: %s", fallback_error)
 
@@ -613,15 +538,15 @@ class ProjectDetector:
 
         # Package manager file patterns
         manager_patterns = {
-            'pip': ['requirements.txt', 'pyproject.toml', 'setup.py', 'Pipfile'],
-            'npm': ['package.json', 'package-lock.json'],
-            'yarn': ['yarn.lock'],
-            'maven': ['pom.xml'],
-            'gradle': ['build.gradle', 'build.gradle.kts'],
-            'go': ['go.mod', 'go.sum'],
-            'cargo': ['Cargo.toml', 'Cargo.lock'],
-            'composer': ['composer.json', 'composer.lock'],
-            'bundler': ['Gemfile', 'Gemfile.lock']
+            "pip": ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"],
+            "npm": ["package.json", "package-lock.json"],
+            "yarn": ["yarn.lock"],
+            "maven": ["pom.xml"],
+            "gradle": ["build.gradle", "build.gradle.kts"],
+            "go": ["go.mod", "go.sum"],
+            "cargo": ["Cargo.toml", "Cargo.lock"],
+            "composer": ["composer.json", "composer.lock"],
+            "bundler": ["Gemfile", "Gemfile.lock"],
         }
 
         for manager, patterns in manager_patterns.items():
@@ -655,10 +580,7 @@ class RepositoryContextExtractor:
         repository_id = RepositoryContext.compute_repository_id(str(repo_path))
 
         # Initialize context with basic information
-        context = RepositoryContext(
-            repository_id=repository_id,
-            repository_path=str(repo_path)
-        )
+        context = RepositoryContext(repository_id=repository_id, repository_path=str(repo_path))
 
         # Extract git information
         git_repo = GitRepository(repo_path)
@@ -678,8 +600,8 @@ class RepositoryContextExtractor:
 
             # Get primary remote URL (prefer origin)
             remotes = git_repo.get_remote_urls()
-            if 'origin' in remotes:
-                context.git_remote_url = remotes['origin']
+            if "origin" in remotes:
+                context.git_remote_url = remotes["origin"]
             elif remotes:
                 context.git_remote_url = next(iter(remotes.values()))
 
@@ -691,7 +613,9 @@ class RepositoryContextExtractor:
 
         logger.debug(
             "Extracted repository context: type=%s, deps=%d, managers=%s",
-            context.project_type, len(context.dependencies), context.package_managers
+            context.project_type,
+            len(context.dependencies),
+            context.package_managers,
         )
 
         return context

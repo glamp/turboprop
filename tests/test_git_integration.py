@@ -12,12 +12,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from git_integration import (
-    GitRepository,
-    ProjectDetector,
-    RepositoryContext,
-    RepositoryContextExtractor
-)
+from git_integration import GitRepository, ProjectDetector, RepositoryContext, RepositoryContextExtractor
 
 
 class TestGitRepository(unittest.TestCase):
@@ -33,7 +28,7 @@ class TestGitRepository(unittest.TestCase):
         result = self.git_repo.is_git_repository()
         self.assertFalse(result)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_current_branch_success(self, mock_run):
         """Test successful git branch extraction."""
         mock_run.return_value.returncode = 0
@@ -43,17 +38,15 @@ class TestGitRepository(unittest.TestCase):
         result = self.git_repo.get_current_branch()
         self.assertEqual(result, "main")
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_current_branch_failure(self, mock_run):
         """Test git branch extraction failure."""
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "git", "fatal: not a git repository"
-        )
+        mock_run.side_effect = subprocess.CalledProcessError(1, "git", "fatal: not a git repository")
 
         result = self.git_repo.get_current_branch()
         self.assertIsNone(result)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_current_commit_success(self, mock_run):
         """Test successful git commit hash extraction."""
         mock_run.return_value.returncode = 0
@@ -63,13 +56,12 @@ class TestGitRepository(unittest.TestCase):
         result = self.git_repo.get_current_commit()
         self.assertEqual(result, "abc123def456")
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_remote_urls_success(self, mock_run):
         """Test successful git remote URL extraction."""
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = (
-            "origin\tgit@github.com:user/repo.git (fetch)\n"
-            "origin\tgit@github.com:user/repo.git (push)\n"
+            "origin\tgit@github.com:user/repo.git (fetch)\n" "origin\tgit@github.com:user/repo.git (push)\n"
         )
         mock_run.return_value.stderr = ""
 
@@ -77,7 +69,7 @@ class TestGitRepository(unittest.TestCase):
         expected = {"origin": "git@github.com:user/repo.git"}
         self.assertEqual(result, expected)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_repository_root_success(self, mock_run):
         """Test successful git repository root detection."""
         mock_run.return_value.returncode = 0
@@ -100,12 +92,14 @@ class TestProjectDetector(unittest.TestCase):
         """Test Python project detection with pyproject.toml."""
         # Create a pyproject.toml file
         pyproject_file = self.temp_dir / "pyproject.toml"
-        pyproject_file.write_text("""
+        pyproject_file.write_text(
+            """
 [project]
 name = "test-project"
 version = "0.1.0"
 dependencies = ["requests>=2.25.0", "click>=8.0.0"]
-""")
+"""
+        )
 
         result = self.detector.detect_project_type()
         self.assertEqual(result, "python")
@@ -114,7 +108,8 @@ dependencies = ["requests>=2.25.0", "click>=8.0.0"]
         """Test JavaScript project detection with package.json."""
         # Create a package.json file
         package_file = self.temp_dir / "package.json"
-        package_file.write_text("""
+        package_file.write_text(
+            """
 {
   "name": "test-project",
   "version": "1.0.0",
@@ -123,7 +118,8 @@ dependencies = ["requests>=2.25.0", "click>=8.0.0"]
     "lodash": "^4.17.21"
   }
 }
-""")
+"""
+        )
 
         result = self.detector.detect_project_type()
         self.assertEqual(result, "javascript")
@@ -132,7 +128,8 @@ dependencies = ["requests>=2.25.0", "click>=8.0.0"]
         """Test Rust project detection with Cargo.toml."""
         # Create a Cargo.toml file
         cargo_file = self.temp_dir / "Cargo.toml"
-        cargo_file.write_text("""
+        cargo_file.write_text(
+            """
 [package]
 name = "test-project"
 version = "0.1.0"
@@ -140,7 +137,8 @@ version = "0.1.0"
 [dependencies]
 serde = "1.0"
 tokio = "1.0"
-""")
+"""
+        )
 
         result = self.detector.detect_project_type()
         self.assertEqual(result, "rust")
@@ -158,7 +156,8 @@ tokio = "1.0"
     def test_extract_python_dependencies_from_pyproject_toml(self):
         """Test Python dependency extraction from pyproject.toml."""
         pyproject_file = self.temp_dir / "pyproject.toml"
-        pyproject_file.write_text("""
+        pyproject_file.write_text(
+            """
 [project]
 name = "test-project"
 dependencies = [
@@ -166,20 +165,22 @@ dependencies = [
     "click>=8.0.0",
     "numpy"
 ]
-""")
+"""
+        )
 
         result = self.detector.extract_dependencies()
         expected = [
             {"name": "requests", "version": ">=2.25.0", "source": "pyproject.toml"},
             {"name": "click", "version": ">=8.0.0", "source": "pyproject.toml"},
-            {"name": "numpy", "version": None, "source": "pyproject.toml"}
+            {"name": "numpy", "version": None, "source": "pyproject.toml"},
         ]
         self.assertEqual(result, expected)
 
     def test_extract_javascript_dependencies_from_package_json(self):
         """Test JavaScript dependency extraction from package.json."""
         package_file = self.temp_dir / "package.json"
-        package_file.write_text("""
+        package_file.write_text(
+            """
 {
   "name": "test-project",
   "dependencies": {
@@ -190,23 +191,14 @@ dependencies = [
     "jest": "^27.0.0"
   }
 }
-""")
+"""
+        )
 
         result = self.detector.extract_dependencies()
         expected = [
-            {
-                "name": "express",
-                "version": "^4.17.1",
-                "source": "package.json",
-                "type": "production"
-            },
-            {
-                "name": "lodash",
-                "version": "^4.17.21",
-                "source": "package.json",
-                "type": "production"
-            },
-            {"name": "jest", "version": "^27.0.0", "source": "package.json", "type": "development"}
+            {"name": "express", "version": "^4.17.1", "source": "package.json", "type": "production"},
+            {"name": "lodash", "version": "^4.17.21", "source": "package.json", "type": "production"},
+            {"name": "jest", "version": "^27.0.0", "source": "package.json", "type": "development"},
         ]
         self.assertEqual(result, expected)
 
@@ -214,7 +206,7 @@ dependencies = [
         """Test package manager detection."""
         # Create package manager files
         (self.temp_dir / "package.json").write_text('{"name": "test"}')
-        (self.temp_dir / "package-lock.json").write_text('{}')
+        (self.temp_dir / "package-lock.json").write_text("{}")
         (self.temp_dir / "pyproject.toml").write_text("[project]\nname='test'")
 
         result = self.detector.get_package_managers()
@@ -235,7 +227,7 @@ class TestRepositoryContext(unittest.TestCase):
             git_remote_url="git@github.com:user/repo.git",
             project_type="python",
             dependencies=[{"name": "requests", "version": "2.25.0"}],
-            package_managers=["pip"]
+            package_managers=["pip"],
         )
 
         self.assertEqual(context.repository_id, "abc123")
@@ -249,15 +241,12 @@ class TestRepositoryContext(unittest.TestCase):
 
         # Should be a 64-character hex string (SHA-256)
         self.assertEqual(len(context), 64)
-        self.assertTrue(all(c in '0123456789abcdef' for c in context))
+        self.assertTrue(all(c in "0123456789abcdef" for c in context))
 
     def test_to_dict_conversion(self):
         """Test conversion to dictionary."""
         context = RepositoryContext(
-            repository_id="abc123",
-            repository_path="/path/to/repo",
-            git_branch="main",
-            project_type="python"
+            repository_id="abc123", repository_path="/path/to/repo", git_branch="main", project_type="python"
         )
 
         result = context.to_dict()
@@ -274,8 +263,8 @@ class TestRepositoryContextExtractor(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp())
         self.extractor = RepositoryContextExtractor()
 
-    @patch('git_integration.GitRepository')
-    @patch('git_integration.ProjectDetector')
+    @patch("git_integration.GitRepository")
+    @patch("git_integration.ProjectDetector")
     def test_extract_context_success(self, mock_detector, mock_git_repo):
         """Test successful repository context extraction."""
         # Mock git repository
@@ -290,9 +279,7 @@ class TestRepositoryContextExtractor(unittest.TestCase):
         # Mock project detector
         mock_detector_instance = Mock()
         mock_detector_instance.detect_project_type.return_value = "python"
-        mock_detector_instance.extract_dependencies.return_value = [
-            {"name": "requests", "version": "2.25.0"}
-        ]
+        mock_detector_instance.extract_dependencies.return_value = [{"name": "requests", "version": "2.25.0"}]
         mock_detector_instance.get_package_managers.return_value = ["pip"]
         mock_detector.return_value = mock_detector_instance
 
@@ -305,7 +292,7 @@ class TestRepositoryContextExtractor(unittest.TestCase):
 
     def test_extract_context_non_git_directory(self):
         """Test context extraction for non-git directory."""
-        with patch('git_integration.ProjectDetector') as mock_detector:
+        with patch("git_integration.ProjectDetector") as mock_detector:
             mock_detector_instance = Mock()
             mock_detector_instance.detect_project_type.return_value = "python"
             mock_detector_instance.extract_dependencies.return_value = []

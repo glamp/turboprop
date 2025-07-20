@@ -7,6 +7,7 @@ and the new structured CodeSearchResult format, enabling backward compatibility.
 """
 
 from typing import List, Tuple
+
 from search_result_types import CodeSearchResult
 
 

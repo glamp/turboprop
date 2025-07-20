@@ -39,7 +39,7 @@ NOT_READY_PENALTY = 30  # Points deducted if not ready for search
 MIN_HEALTH_SCORE = 0.0  # Minimum possible health score
 
 # Confidence distribution
-DEFAULT_CONFIDENCE_LEVELS = ['high', 'medium', 'low']
+DEFAULT_CONFIDENCE_LEVELS = ["high", "medium", "low"]
 
 # Language breakdown
-UNKNOWN_LANGUAGE = 'unknown'
+UNKNOWN_LANGUAGE = "unknown"

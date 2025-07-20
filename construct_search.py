@@ -19,14 +19,14 @@ Functions:
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
+from config import config
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from search_result_types import CodeSnippet, CodeSearchResult
-from config import config
-from exceptions import DatabaseError, SearchError
 from error_handling_utils import handle_search_errors, handle_statistics_errors
+from exceptions import DatabaseError, SearchError
+from search_result_types import CodeSearchResult, CodeSnippet
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ CONSTRUCT_EMBEDDING_DIMENSIONS = 384
 @dataclass
 class ConstructIdentity:
     """Core construct identification information."""
+
     construct_id: str
     construct_type: str  # 'function', 'class', 'method', 'variable', 'import'
     name: str
@@ -47,6 +48,7 @@ class ConstructIdentity:
 @dataclass
 class ConstructLocation:
     """Construct location and position information."""
+
     file_path: str
     start_line: int
     end_line: int
@@ -56,6 +58,7 @@ class ConstructLocation:
 @dataclass
 class ConstructMetadata:
     """Additional construct metadata."""
+
     docstring: Optional[str] = None
     parent_construct_id: Optional[str] = None
 
@@ -63,6 +66,7 @@ class ConstructMetadata:
 @dataclass
 class SearchResultMetrics:
     """Search-related metrics and confidence."""
+
     similarity_score: float
     confidence_level: Optional[str] = None
 
@@ -84,6 +88,7 @@ class ConstructSearchResult:
 
     This class uses composition to organize construct information into focused components.
     """
+
     identity: ConstructIdentity
     location: ConstructLocation
     metadata: ConstructMetadata
@@ -149,20 +154,16 @@ class ConstructSearchResult:
         if self.docstring:
             snippet_text += f"\n\n{self.docstring}"
 
-        snippet = CodeSnippet(
-            text=snippet_text,
-            start_line=self.start_line,
-            end_line=self.end_line
-        )
+        snippet = CodeSnippet(text=snippet_text, start_line=self.start_line, end_line=self.end_line)
 
         file_metadata = {
-            'construct_id': self.construct_id,
-            'construct_type': self.construct_type,
-            'construct_name': self.name,
-            'parent_construct_id': self.parent_construct_id,
-            'language': self._detect_language_from_path(self.file_path),
-            'filename': Path(self.file_path).name,
-            'directory': str(Path(self.file_path).parent)
+            "construct_id": self.construct_id,
+            "construct_type": self.construct_type,
+            "construct_name": self.name,
+            "parent_construct_id": self.parent_construct_id,
+            "language": self._detect_language_from_path(self.file_path),
+            "filename": Path(self.file_path).name,
+            "directory": str(Path(self.file_path).parent),
         }
 
         return CodeSearchResult(
@@ -170,57 +171,54 @@ class ConstructSearchResult:
             snippet=snippet,
             similarity_score=self.similarity_score,
             file_metadata=file_metadata,
-            confidence_level=self.confidence_level
+            confidence_level=self.confidence_level,
         )
 
     def _detect_language_from_path(self, file_path: str) -> str:
         """Detect programming language from file extension."""
         ext = Path(file_path).suffix.lower()
-        return config.file_processing.EXTENSION_TO_LANGUAGE_MAP.get(ext, 'unknown')
+        return config.file_processing.EXTENSION_TO_LANGUAGE_MAP.get(ext, "unknown")
 
     @classmethod
-    def create(cls, construct_id: str, file_path: str, construct_type: str, name: str,
-               signature: str, start_line: int, end_line: int, similarity_score: float,
-               docstring: Optional[str] = None, parent_construct_id: Optional[str] = None,
-               file_id: Optional[str] = None) -> 'ConstructSearchResult':
+    def create(
+        cls,
+        construct_id: str,
+        file_path: str,
+        construct_type: str,
+        name: str,
+        signature: str,
+        start_line: int,
+        end_line: int,
+        similarity_score: float,
+        docstring: Optional[str] = None,
+        parent_construct_id: Optional[str] = None,
+        file_id: Optional[str] = None,
+    ) -> "ConstructSearchResult":
         """Factory method to create ConstructSearchResult with the old interface for compatibility."""
         return cls(
             identity=ConstructIdentity(
-                construct_id=construct_id,
-                construct_type=construct_type,
-                name=name,
-                signature=signature
+                construct_id=construct_id, construct_type=construct_type, name=name, signature=signature
             ),
-            location=ConstructLocation(
-                file_path=file_path,
-                start_line=start_line,
-                end_line=end_line,
-                file_id=file_id
-            ),
-            metadata=ConstructMetadata(
-                docstring=docstring,
-                parent_construct_id=parent_construct_id
-            ),
-            metrics=SearchResultMetrics(
-                similarity_score=similarity_score
-            )
+            location=ConstructLocation(file_path=file_path, start_line=start_line, end_line=end_line, file_id=file_id),
+            metadata=ConstructMetadata(docstring=docstring, parent_construct_id=parent_construct_id),
+            metrics=SearchResultMetrics(similarity_score=similarity_score),
         )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
-            'construct_id': self.construct_id,
-            'file_path': self.file_path,
-            'construct_type': self.construct_type,
-            'name': self.name,
-            'signature': self.signature,
-            'start_line': self.start_line,
-            'end_line': self.end_line,
-            'similarity_score': self.similarity_score,
-            'docstring': self.docstring,
-            'parent_construct_id': self.parent_construct_id,
-            'file_id': self.file_id,
-            'confidence_level': self.confidence_level
+            "construct_id": self.construct_id,
+            "file_path": self.file_path,
+            "construct_type": self.construct_type,
+            "name": self.name,
+            "signature": self.signature,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "similarity_score": self.similarity_score,
+            "docstring": self.docstring,
+            "parent_construct_id": self.parent_construct_id,
+            "file_id": self.file_id,
+            "confidence_level": self.confidence_level,
         }
 
 
@@ -240,11 +238,7 @@ class ConstructSearchOperations:
 
     @handle_search_errors("construct search")
     def search_constructs(
-        self,
-        query: str,
-        k: int = 10,
-        construct_types: Optional[List[str]] = None,
-        min_similarity: float = 0.1
+        self, query: str, k: int = 10, construct_types: Optional[List[str]] = None, min_similarity: float = 0.1
     ) -> List[ConstructSearchResult]:
         """
         Search code constructs using semantic similarity.
@@ -284,7 +278,7 @@ class ConstructSearchOperations:
 
         # Add type filtering if specified
         if construct_types:
-            placeholders = ','.join(['?'] * len(construct_types))
+            placeholders = ",".join(["?"] * len(construct_types))
             base_sql += f" AND cc.construct_type IN ({placeholders})"
             params.extend(construct_types)
 
@@ -303,19 +297,21 @@ class ConstructSearchOperations:
         # Convert to ConstructSearchResult objects
         construct_results = []
         for row in results:
-            construct_results.append(ConstructSearchResult.create(
-                construct_id=row[0],
-                file_path=row[1],
-                construct_type=row[2],
-                name=row[3],
-                signature=row[4],
-                start_line=row[5],
-                end_line=row[6],
-                docstring=row[7],
-                parent_construct_id=row[8],
-                file_id=row[9],
-                similarity_score=row[10]
-            ))
+            construct_results.append(
+                ConstructSearchResult.create(
+                    construct_id=row[0],
+                    file_path=row[1],
+                    construct_type=row[2],
+                    name=row[3],
+                    signature=row[4],
+                    start_line=row[5],
+                    end_line=row[6],
+                    docstring=row[7],
+                    parent_construct_id=row[8],
+                    file_id=row[9],
+                    similarity_score=row[10],
+                )
+            )
 
         logger.info("Found %d construct matches for query: %s", len(construct_results), query)
         return construct_results
@@ -331,11 +327,7 @@ class ConstructSearchOperations:
         Returns:
             List of function/method ConstructSearchResult objects
         """
-        return self.search_constructs(
-            query=query,
-            k=k,
-            construct_types=['function', 'method']
-        )
+        return self.search_constructs(query=query, k=k, construct_types=["function", "method"])
 
     def search_classes(self, query: str, k: int = 10) -> List[ConstructSearchResult]:
         """
@@ -348,11 +340,7 @@ class ConstructSearchOperations:
         Returns:
             List of class ConstructSearchResult objects
         """
-        return self.search_constructs(
-            query=query,
-            k=k,
-            construct_types=['class']
-        )
+        return self.search_constructs(query=query, k=k, construct_types=["class"])
 
     def search_imports(self, query: str, k: int = 10) -> List[ConstructSearchResult]:
         """
@@ -365,17 +353,9 @@ class ConstructSearchOperations:
         Returns:
             List of import ConstructSearchResult objects
         """
-        return self.search_constructs(
-            query=query,
-            k=k,
-            construct_types=['import']
-        )
+        return self.search_constructs(query=query, k=k, construct_types=["import"])
 
-    def get_related_constructs(
-        self,
-        construct_id: str,
-        k: int = 5
-    ) -> List[ConstructSearchResult]:
+    def get_related_constructs(self, construct_id: str, k: int = 5) -> List[ConstructSearchResult]:
         """
         Find constructs related to a given construct (same file, parent/child relationships).
 
@@ -389,11 +369,14 @@ class ConstructSearchOperations:
         try:
             # First get the construct details
             with self.db_manager.get_connection() as conn:
-                construct_info = conn.execute("""
+                construct_info = conn.execute(
+                    """
                     SELECT file_id, parent_construct_id, construct_type, name
                     FROM code_constructs
                     WHERE id = ?
-                """, (construct_id,)).fetchone()
+                """,
+                    (construct_id,),
+                ).fetchone()
 
                 if not construct_info:
                     logger.warning("Construct not found: %s", construct_id)
@@ -432,32 +415,37 @@ class ConstructSearchOperations:
                     LIMIT ?
                 """
 
-                results = conn.execute(related_sql, (
-                    construct_id,           # Exclude the construct itself
-                    file_id,               # Same file
-                    construct_id,          # Child constructs (parent_construct_id = construct_id)
-                    parent_construct_id,   # Parent construct
-                    construct_id,          # For ordering child constructs first
-                    parent_construct_id,   # For ordering parent construct second
-                    k
-                )).fetchall()
+                results = conn.execute(
+                    related_sql,
+                    (
+                        construct_id,  # Exclude the construct itself
+                        file_id,  # Same file
+                        construct_id,  # Child constructs (parent_construct_id = construct_id)
+                        parent_construct_id,  # Parent construct
+                        construct_id,  # For ordering child constructs first
+                        parent_construct_id,  # For ordering parent construct second
+                        k,
+                    ),
+                ).fetchall()
 
                 # Convert to ConstructSearchResult objects
                 related_constructs = []
                 for row in results:
-                    related_constructs.append(ConstructSearchResult.create(
-                        construct_id=row[0],
-                        file_path=row[1],
-                        construct_type=row[2],
-                        name=row[3],
-                        signature=row[4],
-                        start_line=row[5],
-                        end_line=row[6],
-                        docstring=row[7],
-                        parent_construct_id=row[8],
-                        file_id=row[9],
-                        similarity_score=row[10]
-                    ))
+                    related_constructs.append(
+                        ConstructSearchResult.create(
+                            construct_id=row[0],
+                            file_path=row[1],
+                            construct_type=row[2],
+                            name=row[3],
+                            signature=row[4],
+                            start_line=row[5],
+                            end_line=row[6],
+                            docstring=row[7],
+                            parent_construct_id=row[8],
+                            file_id=row[9],
+                            similarity_score=row[10],
+                        )
+                    )
 
                 logger.info("Found %d related constructs for %s", len(related_constructs), construct_id)
                 return related_constructs
@@ -480,37 +468,36 @@ class ConstructSearchOperations:
         """
         with self.db_manager.get_connection() as conn:
             # Get overall counts
-            total_constructs = conn.execute(
-                "SELECT COUNT(*) FROM code_constructs"
-            ).fetchone()[0]
+            total_constructs = conn.execute("SELECT COUNT(*) FROM code_constructs").fetchone()[0]
 
             # Get counts by type
-            type_counts = conn.execute("""
+            type_counts = conn.execute(
+                """
                 SELECT construct_type, COUNT(*) as count
                 FROM code_constructs
                 GROUP BY construct_type
                 ORDER BY count DESC
-            """).fetchall()
+            """
+            ).fetchall()
 
             # Get embedding coverage
-            embedded_constructs = conn.execute("""
+            embedded_constructs = conn.execute(
+                """
                 SELECT COUNT(*) FROM code_constructs
                 WHERE embedding IS NOT NULL
-            """).fetchone()[0]
+            """
+            ).fetchone()[0]
 
             return {
-                'total_constructs': total_constructs,
-                'embedded_constructs': embedded_constructs,
-                'embedding_coverage': embedded_constructs / total_constructs if total_constructs > 0 else 0,
-                'construct_types': dict(type_counts)
+                "total_constructs": total_constructs,
+                "embedded_constructs": embedded_constructs,
+                "embedding_coverage": embedded_constructs / total_constructs if total_constructs > 0 else 0,
+                "construct_types": dict(type_counts),
             }
 
 
 def format_construct_search_results(
-    results: List[ConstructSearchResult],
-    query: str,
-    show_signatures: bool = True,
-    show_docstrings: bool = True
+    results: List[ConstructSearchResult], query: str, show_signatures: bool = True, show_docstrings: bool = True
 ) -> str:
     """
     Format construct search results for display.
@@ -531,11 +518,7 @@ def format_construct_search_results(
 
     for i, result in enumerate(results, 1):
         # Result header with construct info
-        confidence_emoji = {
-            'high': '🎯',
-            'medium': '✅',
-            'low': '⚠️'
-        }.get(result.confidence_level, '❓')
+        confidence_emoji = {"high": "🎯", "medium": "✅", "low": "⚠️"}.get(result.confidence_level, "❓")
 
         formatted_lines.append(
             f"{confidence_emoji} [{i}] {result.construct_type.upper()}: {result.name} "

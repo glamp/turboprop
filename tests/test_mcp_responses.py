@@ -13,16 +13,19 @@ from unittest.mock import Mock
 import pytest
 
 from mcp_response_types import (
-    SearchResponse, IndexResponse, StatusResponse,
-    QueryAnalysis, ResultCluster,
-    create_search_response_from_results
+    IndexResponse,
+    QueryAnalysis,
+    ResultCluster,
+    SearchResponse,
+    StatusResponse,
+    create_search_response_from_results,
 )
 from search_operations import (
     _analyze_search_query,
-    cluster_results_by_language,
-    cluster_results_by_directory,
     cluster_results_by_confidence,
-    generate_cross_references
+    cluster_results_by_directory,
+    cluster_results_by_language,
+    generate_cross_references,
 )
 from search_result_types import CodeSearchResult, CodeSnippet
 
@@ -37,7 +40,7 @@ class TestQueryAnalysis:
             suggested_refinements=["try this", "or that"],
             query_complexity="medium",
             estimated_result_count=5,
-            search_hints=["hint 1", "hint 2"]
+            search_hints=["hint 1", "hint 2"],
         )
 
         assert analysis.original_query == "test query"
@@ -48,10 +51,7 @@ class TestQueryAnalysis:
 
     def test_query_analysis_to_dict(self):
         """Test converting QueryAnalysis to dictionary."""
-        analysis = QueryAnalysis(
-            original_query="test query",
-            query_complexity="low"
-        )
+        analysis = QueryAnalysis(original_query="test query", query_complexity="low")
 
         result_dict = analysis.to_dict()
 
@@ -96,7 +96,7 @@ class TestResultCluster:
             cluster_type="language",
             results=[result1, result2],
             cluster_score=0.85,
-            cluster_description="Python source files"
+            cluster_description="Python source files",
         )
 
         assert cluster.cluster_name == "Python Files"
@@ -111,10 +111,7 @@ class TestResultCluster:
         result = CodeSearchResult("test.py", snippet, 0.9)
 
         cluster = ResultCluster(
-            cluster_name="Test Cluster",
-            cluster_type="language",
-            results=[result],
-            cluster_score=0.9
+            cluster_name="Test Cluster", cluster_type="language", results=[result], cluster_score=0.9
         )
 
         result_dict = cluster.to_dict()
@@ -189,11 +186,7 @@ class TestSearchResponse:
         snippet = CodeSnippet(text="def test():", start_line=1, end_line=1)
         result = CodeSearchResult("test.py", snippet, 0.9, {"language": "Python"})
 
-        response = SearchResponse(
-            query="test query",
-            results=[result],
-            execution_time=0.5
-        )
+        response = SearchResponse(query="test query", results=[result], execution_time=0.5)
 
         assert response.query == "test query"
         assert len(response.results) == 1
@@ -212,11 +205,7 @@ class TestSearchResponse:
         snippet = CodeSnippet(text="def test():", start_line=1, end_line=1)
         result = CodeSearchResult("test.py", snippet, 0.9)
 
-        response = SearchResponse(
-            query="test query",
-            results=[result],
-            execution_time=0.5
-        )
+        response = SearchResponse(query="test query", results=[result], execution_time=0.5)
 
         json_str = response.to_json()
 
@@ -255,11 +244,7 @@ class TestSearchResponse:
         result2 = CodeSearchResult("test2.py", snippet, 0.8, {"language": "Python"})
 
         response = create_search_response_from_results(
-            query="test query",
-            results=[result1, result2],
-            execution_time=0.5,
-            add_clusters=True,
-            add_suggestions=True
+            query="test query", results=[result1, result2], execution_time=0.5, add_clusters=True, add_suggestions=True
         )
 
         assert response.query == "test query"
@@ -281,7 +266,7 @@ class TestIndexResponse:
             files_skipped=2,
             total_files_scanned=12,
             execution_time=30.5,
-            repository_path="/test/repo"
+            repository_path="/test/repo",
         )
 
         assert response.operation == "index"
@@ -300,11 +285,7 @@ class TestIndexResponse:
 
     def test_index_response_add_methods(self):
         """Test IndexResponse add_* methods."""
-        response = IndexResponse(
-            operation="index",
-            status="success",
-            message="test"
-        )
+        response = IndexResponse(operation="index", status="success", message="test")
 
         response.add_warning("Warning 1")
         response.add_warning("Warning 2")
@@ -325,37 +306,22 @@ class TestIndexResponse:
     def test_index_response_is_successful(self):
         """Test IndexResponse success checking."""
         # Successful response
-        success_response = IndexResponse(
-            operation="index",
-            status="success",
-            message="success"
-        )
+        success_response = IndexResponse(operation="index", status="success", message="success")
         assert success_response.is_successful() is True
 
         # Failed response
-        failed_response = IndexResponse(
-            operation="index",
-            status="failed",
-            message="failed"
-        )
+        failed_response = IndexResponse(operation="index", status="failed", message="failed")
         assert failed_response.is_successful() is False
 
         # Response with errors
-        error_response = IndexResponse(
-            operation="index",
-            status="success",
-            message="success"
-        )
+        error_response = IndexResponse(operation="index", status="success", message="success")
         error_response.add_error("Some error")
         assert error_response.is_successful() is False
 
     def test_index_response_to_json(self):
         """Test converting IndexResponse to JSON."""
         response = IndexResponse(
-            operation="index",
-            status="success",
-            message="Successfully indexed files",
-            files_processed=5
+            operation="index", status="success", message="Successfully indexed files", files_processed=5
         )
 
         json_str = response.to_json()
@@ -380,7 +346,7 @@ class TestStatusResponse:
             total_embeddings=95,
             database_size_mb=50.5,
             repository_path="/test/repo",
-            file_types={"Python": 70, "JavaScript": 25, "Other": 5}
+            file_types={"Python": 70, "JavaScript": 25, "Other": 5},
         )
 
         assert response.status == "healthy"
@@ -395,10 +361,7 @@ class TestStatusResponse:
 
     def test_status_response_add_methods(self):
         """Test StatusResponse add_* methods."""
-        response = StatusResponse(
-            status="healthy",
-            is_ready_for_search=True
-        )
+        response = StatusResponse(status="healthy", is_ready_for_search=True)
 
         response.add_recommendation("Rec 1")
         response.add_recommendation("Rec 2")
@@ -420,11 +383,7 @@ class TestStatusResponse:
         """Test StatusResponse health score computation."""
         # Perfect health
         perfect_response = StatusResponse(
-            status="healthy",
-            is_ready_for_search=True,
-            total_files=100,
-            files_with_embeddings=100,
-            is_index_fresh=True
+            status="healthy", is_ready_for_search=True, total_files=100, files_with_embeddings=100, is_index_fresh=True
         )
         assert perfect_response.compute_health_score() == 100.0
 
@@ -434,29 +393,23 @@ class TestStatusResponse:
             is_ready_for_search=True,
             total_files=100,
             files_with_embeddings=80,  # 20% missing
-            is_index_fresh=True
+            is_index_fresh=True,
         )
         # Should lose 30% of 20% missing = 6 points
-        assert perfect_response.compute_health_score() - degraded_response.compute_health_score() == pytest.approx(6, abs=1)
+        assert perfect_response.compute_health_score() - degraded_response.compute_health_score() == pytest.approx(
+            6, abs=1
+        )
 
         # Not ready for search
         not_ready_response = StatusResponse(
-            status="offline",
-            is_ready_for_search=False,
-            total_files=0,
-            files_with_embeddings=0,
-            is_index_fresh=True
+            status="offline", is_ready_for_search=False, total_files=0, files_with_embeddings=0, is_index_fresh=True
         )
         # Should lose 30 points for not being ready
         assert not_ready_response.compute_health_score() == 70.0
 
     def test_status_response_to_json(self):
         """Test converting StatusResponse to JSON."""
-        response = StatusResponse(
-            status="healthy",
-            is_ready_for_search=True,
-            total_files=50
-        )
+        response = StatusResponse(status="healthy", is_ready_for_search=True, total_files=50)
 
         json_str = response.to_json()
 
@@ -503,12 +456,7 @@ class TestIntegrationScenarios:
 
     def test_empty_search_response(self):
         """Test structured response for empty search results."""
-        response = SearchResponse(
-            query="nonexistent code",
-            results=[],
-            total_results=0,
-            execution_time=0.1
-        )
+        response = SearchResponse(query="nonexistent code", results=[], total_results=0, execution_time=0.1)
 
         json_str = response.to_json()
         parsed = json.loads(json_str)
@@ -531,11 +479,7 @@ class TestIntegrationScenarios:
 
         # Create comprehensive response
         response = create_search_response_from_results(
-            query="user authentication",
-            results=results,
-            execution_time=0.25,
-            add_clusters=True,
-            add_suggestions=True
+            query="user authentication", results=results, execution_time=0.25, add_clusters=True, add_suggestions=True
         )
 
         # Add query analysis
@@ -580,10 +524,7 @@ class TestIntegrationScenarios:
         """Test structured error responses."""
         # Search error response
         search_error = SearchResponse(
-            query="failed query",
-            results=[],
-            total_results=0,
-            performance_notes=["Database connection failed"]
+            query="failed query", results=[], total_results=0, performance_notes=["Database connection failed"]
         )
 
         json_str = search_error.to_json()
@@ -593,11 +534,7 @@ class TestIntegrationScenarios:
         assert "Database connection failed" in parsed["performance_notes"]
 
         # Index error response
-        index_error = IndexResponse(
-            operation="index",
-            status="failed",
-            message="Repository not found"
-        )
+        index_error = IndexResponse(operation="index", status="failed", message="Repository not found")
         index_error.add_error("Path does not exist")
 
         json_str = index_error.to_json()
@@ -609,11 +546,7 @@ class TestIntegrationScenarios:
 
         # Status error response
         status_error = StatusResponse(
-            status="error",
-            is_ready_for_search=False,
-            total_files=0,
-            files_with_embeddings=0,
-            total_embeddings=0
+            status="error", is_ready_for_search=False, total_files=0, files_with_embeddings=0, total_embeddings=0
         )
         status_error.add_warning("Index check failed")
 
@@ -645,7 +578,7 @@ def mock_database():
     mock_db = Mock()
     mock_db.execute_with_retry.return_value = [
         ("test.py", "def test(): pass", 0.1),
-        ("main.py", "if __name__ == '__main__':", 0.2)
+        ("main.py", "if __name__ == '__main__':", 0.2),
     ]
     return mock_db
 

@@ -10,18 +10,19 @@ Tests for the snippet_extractor module including:
 - Fallback extraction for unsupported languages
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
-from snippet_extractor import (
-    SnippetExtractor,
-    PythonSnippetExtractor,
-    JavaScriptSnippetExtractor,
-    GenericSnippetExtractor,
-    ExtractedSnippet
-)
+import pytest
+
+from language_detection import LanguageDetectionResult, LanguageDetector
 from search_result_types import CodeSnippet
-from language_detection import LanguageDetector, LanguageDetectionResult
+from snippet_extractor import (
+    ExtractedSnippet,
+    GenericSnippetExtractor,
+    JavaScriptSnippetExtractor,
+    PythonSnippetExtractor,
+    SnippetExtractor,
+)
 
 
 class TestExtractedSnippet:
@@ -34,7 +35,7 @@ class TestExtractedSnippet:
             start_line=10,
             end_line=11,
             relevance_score=0.9,
-            snippet_type="function"
+            snippet_type="function",
         )
 
         assert snippet.text == "def hello():\n    return 'world'"
@@ -46,11 +47,7 @@ class TestExtractedSnippet:
     def test_extracted_snippet_to_code_snippet(self):
         """Test conversion to CodeSnippet."""
         extracted = ExtractedSnippet(
-            text="class Example:\n    pass",
-            start_line=5,
-            end_line=6,
-            relevance_score=0.8,
-            snippet_type="class"
+            text="class Example:\n    pass", start_line=5, end_line=6, relevance_score=0.8, snippet_type="class"
         )
 
         code_snippet = extracted.to_code_snippet()
@@ -156,13 +153,13 @@ def unrelated_function():
 
     def test_fallback_on_syntax_error(self, python_extractor):
         """Test fallback extraction when Python code has syntax errors."""
-        content = '''def broken_function(
+        content = """def broken_function(
     # Missing closing parenthesis
     return "this is broken"
 
 def working_function():
     return "this works"
-'''
+"""
 
         snippets = python_extractor.extract_snippets(content, "working function")
 
@@ -180,7 +177,7 @@ class TestJavaScriptSnippetExtractor:
 
     def test_extract_function_declaration(self, js_extractor):
         """Test extraction of function declaration."""
-        content = '''const express = require('express');
+        content = """const express = require('express');
 const app = express();
 
 function calculateTotal(items) {
@@ -196,7 +193,7 @@ function anotherFunction() {
 }
 
 module.exports = { calculateTotal };
-'''
+"""
 
         snippets = js_extractor.extract_snippets(content, "calculate total")
 
@@ -208,7 +205,7 @@ module.exports = { calculateTotal };
 
     def test_extract_arrow_function(self, js_extractor):
         """Test extraction of arrow function."""
-        content = '''import { useState } from 'react';
+        content = """import { useState } from 'react';
 
 const MyComponent = () => {
     const [count, setCount] = useState(0);
@@ -221,7 +218,7 @@ const MyComponent = () => {
 };
 
 export default MyComponent;
-'''
+"""
 
         snippets = js_extractor.extract_snippets(content, "increment counter")
 
@@ -232,7 +229,7 @@ export default MyComponent;
 
     def test_extract_class_with_methods(self, js_extractor):
         """Test extraction of class with methods."""
-        content = '''class DataProcessor {
+        content = """class DataProcessor {
     constructor(options) {
         this.options = options;
     }
@@ -247,7 +244,7 @@ export default MyComponent;
 }
 
 module.exports = DataProcessor;
-'''
+"""
 
         snippets = js_extractor.extract_snippets(content, "process items")
 
@@ -267,7 +264,7 @@ class TestGenericSnippetExtractor:
 
     def test_extract_by_lines(self, generic_extractor):
         """Test line-based extraction for unsupported languages."""
-        content = '''package main
+        content = """package main
 
 import "fmt"
 
@@ -280,7 +277,7 @@ func main() {
     sum := calculateSum(5, 3)
     fmt.Println(sum)
 }
-'''
+"""
 
         snippets = generic_extractor.extract_snippets(content, "calculate sum")
 
@@ -292,7 +289,7 @@ func main() {
 
     def test_intelligent_boundary_detection(self, generic_extractor):
         """Test intelligent boundary detection using braces."""
-        content = '''public class Calculator {
+        content = """public class Calculator {
     private int value;
 
     public int add(int a, int b) {
@@ -303,7 +300,7 @@ func main() {
         return a * b;
     }
 }
-'''
+"""
 
         snippets = generic_extractor.extract_snippets(content, "add method")
 
@@ -340,11 +337,7 @@ class TestSnippetExtractor:
     return "success"
 '''
 
-        snippets = snippet_extractor.extract_snippets(
-            content=content,
-            file_path="test.py",
-            query="hello world"
-        )
+        snippets = snippet_extractor.extract_snippets(content=content, file_path="test.py", query="hello world")
 
         assert len(snippets) >= 1
         assert snippets[0].snippet_type in ["function", "generic"]
@@ -356,20 +349,16 @@ class TestSnippetExtractor:
             language="JavaScript", file_type=".js", confidence=1.0, category="source"
         )
 
-        content = '''function greetUser(name) {
+        content = """function greetUser(name) {
     return `Hello, ${name}!`;
 }
 
 const anotherFunction = () => {
     console.log("test");
 };
-'''
+"""
 
-        snippets = snippet_extractor.extract_snippets(
-            content=content,
-            file_path="test.js",
-            query="greet user"
-        )
+        snippets = snippet_extractor.extract_snippets(content=content, file_path="test.js", query="greet user")
 
         assert len(snippets) >= 1
         assert "greetUser" in snippets[0].text
@@ -380,17 +369,13 @@ const anotherFunction = () => {
             language="Unknown", file_type=".xyz", confidence=0.0, category="unknown"
         )
 
-        content = '''some random content
+        content = """some random content
 with multiple lines
 that contains search terms
 and more content
-'''
+"""
 
-        snippets = snippet_extractor.extract_snippets(
-            content=content,
-            file_path="test.xyz",
-            query="search terms"
-        )
+        snippets = snippet_extractor.extract_snippets(content=content, file_path="test.xyz", query="search terms")
 
         assert len(snippets) >= 1
         assert "search terms" in snippets[0].text
@@ -419,11 +404,7 @@ def unrelated_function():
     return "nothing"
 '''
 
-        snippets = snippet_extractor.extract_snippets(
-            content=content,
-            file_path="test.py",
-            query="search"
-        )
+        snippets = snippet_extractor.extract_snippets(content=content, file_path="test.py", query="search")
 
         # Should extract multiple relevant snippets
         assert len(snippets) >= 2
@@ -442,15 +423,18 @@ def unrelated_function():
         )
 
         # Create a very long function
-        long_content = '''def very_long_function():
+        long_content = (
+            '''def very_long_function():
     """A very long function for testing."""
-''' + '    print("line")\n' * 100
+'''
+            + '    print("line")\n' * 100
+        )
 
         snippets = snippet_extractor.extract_snippets(
             content=long_content,
             file_path="test.py",
             query="very long function",
-            max_snippet_length=500  # Limit snippet size
+            max_snippet_length=500,  # Limit snippet size
         )
 
         assert len(snippets) >= 1
@@ -507,18 +491,13 @@ class SearchManager:
 
         extractor = SnippetExtractor()
         snippets = extractor.extract_snippets(
-            content=content,
-            file_path="search_operations.py",
-            query="enhanced search"
+            content=content, file_path="search_operations.py", query="enhanced search"
         )
 
         assert len(snippets) >= 1
 
         # Should extract the search_index_enhanced function
-        enhanced_search_found = any(
-            "search_index_enhanced" in s.text and "def " in s.text
-            for s in snippets
-        )
+        enhanced_search_found = any("search_index_enhanced" in s.text and "def " in s.text for s in snippets)
         assert enhanced_search_found
 
         # Should include proper line numbers
