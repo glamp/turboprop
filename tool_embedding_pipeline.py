@@ -88,13 +88,13 @@ class ToolEmbeddingPipeline:
     ) -> tuple[List[np.ndarray], List[str], Optional[List[float]]]:
         """
         Generate embeddings for a batch of descriptions with common validation logic.
-        
+
         Args:
             descriptions: List of text descriptions to embed
             item_names: List of item names for logging/error reporting
             item_type: Type of items being embedded (for error messages)
             include_quality_scores: Whether to calculate quality scores
-            
+
         Returns:
             Tuple of (embeddings, errors, quality_scores)
         """
@@ -124,7 +124,9 @@ class ToolEmbeddingPipeline:
                     logger.debug("Generated embedding for %s: %s", item_type, item_names[i])
                 else:
                     if include_quality_scores:
-                        error_msg = f"Low quality embedding for {item_type} {item_names[i]} (score: {quality_score:.3f})"
+                        error_msg = (
+                            f"Low quality embedding for {item_type} {item_names[i]} (score: {quality_score:.3f})"
+                        )
                     else:
                         error_msg = f"Invalid embedding for {item_type}: {item_names[i]}"
                     errors.append(error_msg)

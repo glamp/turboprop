@@ -31,45 +31,82 @@ FUNCTIONALITY_SYNONYMS = {
 
 # Query confidence adjustment constants
 CONFIDENCE_ADJUSTMENTS = {
-    "base_confidence": 0.5,              # Base confidence level
-    "long_query_boost": 0.2,             # Boost for queries with 4+ words
-    "medium_query_boost": 0.1,           # Boost for queries with 2-3 words
-    "intent_confidence_multiplier": 0.3, # Multiplier for search intent confidence
-    "category_detection_boost": 0.2,     # Boost when category is detected
-    "technical_terms_boost": 0.1,        # Boost for technical terminology
+    "base_confidence": 0.5,  # Base confidence level
+    "long_query_boost": 0.2,  # Boost for queries with 4+ words
+    "medium_query_boost": 0.1,  # Boost for queries with 2-3 words
+    "intent_confidence_multiplier": 0.3,  # Multiplier for search intent confidence
+    "category_detection_boost": 0.2,  # Boost when category is detected
+    "technical_terms_boost": 0.1,  # Boost for technical terminology
 }
 
 # Input validation security constants
 SECURITY_LIMITS = {
-    "max_query_length": 1000,            # Maximum query length in characters
-    "max_word_count": 50,                # Maximum number of words
-    "max_word_length": 100,              # Maximum individual word length
-    "min_query_length": 1,               # Minimum query length
+    "max_query_length": 1000,  # Maximum query length in characters
+    "max_word_count": 50,  # Maximum number of words
+    "max_word_length": 100,  # Maximum individual word length
+    "min_query_length": 1,  # Minimum query length
 }
 
 # Patterns for security validation
 SECURITY_PATTERNS = {
     "sql_injection": [
-        r"(\bunion\b.*\bselect\b)", r"(\bselect\b.*\bfrom\b)", r"(\binsert\b.*\binto\b)",
-        r"(\bdelete\b.*\bfrom\b)", r"(\bdrop\b.*\btable\b)", r"(\btruncate\b.*\btable\b)",
-        r"(\balter\b.*\btable\b)", r"(\bcreate\b.*\btable\b)", r"(\bupdate\b.*\bset\b)",
-        r"(\bexec\b\s+xp_)", r"(\bexecute\b\s+sp_)", r"(\bsp_\w+)", r"(\bxp_\w+)",
-        r"(--)", r"(/\*)", r"(\*/)", r"(\bor\b.*=.*)", r"(\band\b.*=.*)",
-        r"('.*--)", r"('.*\*/)", r"('.*\*)",
+        r"(\bunion\b.*\bselect\b)",
+        r"(\bselect\b.*\bfrom\b)",
+        r"(\binsert\b.*\binto\b)",
+        r"(\bdelete\b.*\bfrom\b)",
+        r"(\bdrop\b.*\btable\b)",
+        r"(\btruncate\b.*\btable\b)",
+        r"(\balter\b.*\btable\b)",
+        r"(\bcreate\b.*\btable\b)",
+        r"(\bupdate\b.*\bset\b)",
+        r"(\bexec\b\s+xp_)",
+        r"(\bexecute\b\s+sp_)",
+        r"(\bsp_\w+)",
+        r"(\bxp_\w+)",
+        r"(--)",
+        r"(/\*)",
+        r"(\*/)",
+        r"(\bor\b.*=.*)",
+        r"(\band\b.*=.*)",
+        r"('.*--)",
+        r"('.*\*/)",
+        r"('.*\*)",
     ],
     "script_injection": [
         r"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>",
-        r"javascript:", r"vbscript:", r"onload\s*=", r"onerror\s*=",
-        r"onclick\s*=", r"onmouseover\s*=", r"onfocus\s*=",
-        r"<iframe\b", r"<object\b", r"<embed\b", r"<applet\b",
+        r"javascript:",
+        r"vbscript:",
+        r"onload\s*=",
+        r"onerror\s*=",
+        r"onclick\s*=",
+        r"onmouseover\s*=",
+        r"onfocus\s*=",
+        r"<iframe\b",
+        r"<object\b",
+        r"<embed\b",
+        r"<applet\b",
     ],
     "command_injection": [
-        r"(\|\s*\w+)", r"(\&\&\s*\w+)", r"(\;\s*\w+)", r"(\$\()", 
-        r"(\`.*\`)", r"(\beval\s*\()", r"(\bexec\s*\()", r"(\bsystem\s*\()",
+        r"(\|\s*\w+)",
+        r"(\&\&\s*\w+)",
+        r"(\;\s*\w+)",
+        r"(\$\()",
+        r"(\`.*\`)",
+        r"(\beval\s*\()",
+        r"(\bexec\s*\()",
+        r"(\bsystem\s*\()",
     ],
     "path_traversal": [
-        r"(\.\.\/)", r"(\.\.\\)", r"(%2e%2e%2f)", r"(%2e%2e%5c)", r"(%2f)", r"(%5c)",
-        r"(\.\./)", r"(\..\\/)", r"(/etc/passwd)", r"(/proc/)",
+        r"(\.\.\/)",
+        r"(\.\.\\)",
+        r"(%2e%2e%2f)",
+        r"(%2e%2e%5c)",
+        r"(%2f)",
+        r"(%5c)",
+        r"(\.\./)",
+        r"(\..\\/)",
+        r"(/etc/passwd)",
+        r"(/proc/)",
     ],
 }
 
@@ -396,35 +433,35 @@ class ToolQueryProcessor:
         except Exception as e:
             logger.error("Unexpected error processing query '%s': %s", query, e)
             return self._create_fallback_query(query)
-    
+
     def _analyze_query_components(self, cleaned_query: str) -> Dict[str, Any]:
         """Analyze query components including intent, categories, and terms."""
         # Analyze search intent
         search_intent = self.query_analyzer.analyze_search_intent(cleaned_query)
-        
+
         # Expand query terms
         expanded_terms = self.expand_query_terms(cleaned_query)
-        
+
         # Detect category and tool type
         detected_category = self.query_analyzer.detect_category(cleaned_query)
         detected_tool_type = self.query_analyzer.detect_tool_type(cleaned_query)
-        
+
         return {
             "search_intent": search_intent,
             "expanded_terms": expanded_terms,
             "detected_category": detected_category,
             "detected_tool_type": detected_tool_type,
         }
-    
-    def _build_processed_query(self, original_query: str, cleaned_query: str, query_analysis: Dict[str, Any]) -> ProcessedQuery:
+
+    def _build_processed_query(
+        self, original_query: str, cleaned_query: str, query_analysis: Dict[str, Any]
+    ) -> ProcessedQuery:
         """Build ProcessedQuery object from analysis components."""
         # Calculate overall confidence
         confidence = self._calculate_query_confidence(
-            cleaned_query, 
-            query_analysis["search_intent"], 
-            query_analysis["detected_category"]
+            cleaned_query, query_analysis["search_intent"], query_analysis["detected_category"]
         )
-        
+
         return ProcessedQuery(
             original_query=original_query,
             cleaned_query=cleaned_query,
@@ -434,7 +471,7 @@ class ToolQueryProcessor:
             search_intent=query_analysis["search_intent"],
             confidence=confidence,
         )
-    
+
     def _create_fallback_query(self, query: str) -> ProcessedQuery:
         """Create a basic fallback ProcessedQuery when processing fails."""
         return ProcessedQuery(
@@ -488,13 +525,13 @@ class ToolQueryProcessor:
         """
         # Input validation and security checks
         self._validate_query_security(query)
-        
+
         # Remove extra whitespace
         cleaned = re.sub(r"\s+", " ", query.strip())
 
         # Remove control characters and potentially dangerous characters
-        cleaned = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', cleaned)
-        
+        cleaned = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", cleaned)
+
         # Normalize punctuation (allow more technical characters)
         cleaned = re.sub(r'[^\w\s\-"\'\.\_\+\#\@]', " ", cleaned)
 
@@ -506,75 +543,75 @@ class ToolQueryProcessor:
             if len(word) > SECURITY_LIMITS["max_word_length"]:
                 logger.warning("Skipping excessively long word in query: %d chars", len(word))
                 continue
-                
+
             if len(word) >= 2 or word.lower() in ["js", "py", "go", "r", "c", "c+", "c#"]:
                 meaningful_words.append(word)
 
         return " ".join(meaningful_words)
-    
+
     def _validate_query_security(self, query: str) -> None:
         """
         Validate query against security threats and size limits.
-        
+
         Args:
             query: Query string to validate
-            
+
         Raises:
             ValueError: If query fails security validation
         """
         if not query:
             raise ValueError("Query cannot be empty")
-            
+
         # Check query length limits
         if len(query) > SECURITY_LIMITS["max_query_length"]:
             raise ValueError(f"Query too long: {len(query)} chars > {SECURITY_LIMITS['max_query_length']} limit")
-        
+
         if len(query) < SECURITY_LIMITS["min_query_length"]:
             raise ValueError(f"Query too short: {len(query)} chars < {SECURITY_LIMITS['min_query_length']} minimum")
-        
+
         # Check word count
         word_count = len(query.split())
         if word_count > SECURITY_LIMITS["max_word_count"]:
             raise ValueError(f"Too many words: {word_count} > {SECURITY_LIMITS['max_word_count']} limit")
-        
+
         # Convert to lowercase for pattern matching
         query_lower = query.lower()
-        
+
         # Check for SQL injection patterns
         for pattern in SECURITY_PATTERNS["sql_injection"]:
             if re.search(pattern, query_lower, re.IGNORECASE):
                 logger.warning("Potential SQL injection detected in query: %s", pattern)
                 raise ValueError("Query contains potentially malicious SQL patterns")
-        
+
         # Check for script injection patterns
         for pattern in SECURITY_PATTERNS["script_injection"]:
             if re.search(pattern, query, re.IGNORECASE):
                 logger.warning("Potential script injection detected in query: %s", pattern)
                 raise ValueError("Query contains potentially malicious script patterns")
-        
+
         # Check for command injection patterns
         for pattern in SECURITY_PATTERNS["command_injection"]:
             if re.search(pattern, query_lower, re.IGNORECASE):
                 logger.warning("Potential command injection detected in query: %s", pattern)
                 raise ValueError("Query contains potentially malicious command patterns")
-        
+
         # Check for path traversal patterns
         for pattern in SECURITY_PATTERNS["path_traversal"]:
             if re.search(pattern, query, re.IGNORECASE):
                 logger.warning("Potential path traversal detected in query: %s", pattern)
                 raise ValueError("Query contains potentially malicious path patterns")
-        
+
         # Additional security checks
         self._validate_encoding_attacks(query)
         self._validate_repeated_patterns(query)
-    
+
     def _validate_encoding_attacks(self, query: str) -> None:
         """
         Validate against encoding-based attacks.
-        
+
         Args:
             query: Query to validate
-            
+
         Raises:
             ValueError: If encoding attack patterns detected
         """
@@ -583,7 +620,7 @@ class ToolQueryProcessor:
         for pattern in url_encoded_patterns:
             if pattern in query.lower():
                 raise ValueError("Query contains potentially malicious URL encoded characters")
-        
+
         # Check for Unicode attacks (excessive non-ASCII)
         try:
             ascii_chars = sum(1 for c in query if ord(c) < 128)
@@ -593,14 +630,14 @@ class ToolQueryProcessor:
                 # Don't reject, but log for monitoring
         except Exception:
             pass  # Ignore encoding issues in validation
-    
+
     def _validate_repeated_patterns(self, query: str) -> None:
         """
         Validate against repeated pattern attacks.
-        
+
         Args:
             query: Query to validate
-            
+
         Raises:
             ValueError: If excessive repetition detected
         """
@@ -610,7 +647,7 @@ class ToolQueryProcessor:
             for char in set(query):
                 if query.count(char) > len(query) * 0.7:
                     raise ValueError("Query contains excessive character repetition")
-            
+
             # Check for repeated substrings
             words = query.split()
             if len(words) > 5:

@@ -127,24 +127,24 @@ class ToolCatalogManager:
     def _execute_discovery_phase(self) -> tuple[List[Any], Dict[str, float], List[str]]:
         """
         Execute the discovery phase of catalog rebuild.
-        
+
         Returns:
             Tuple of (discovered_tools, phase_timings, errors)
         """
         logger.info("Phase 1: Discovering tools")
         phase_start = time.time()
         errors = []
-        
+
         try:
             discovered_tools = self.discovery_engine.discover_system_tools()
             custom_tools = self.discovery_engine.discover_custom_tools()
             all_discovered = discovered_tools + custom_tools
-            
+
             phase_timing = time.time() - phase_start
             logger.info("Discovery completed: %d tools found in %.2fs", len(all_discovered), phase_timing)
-            
+
             return all_discovered, {"discovery": phase_timing}, errors
-            
+
         except Exception as e:
             error_msg = f"Discovery phase failed: {e}"
             errors.append(error_msg)
@@ -152,13 +152,15 @@ class ToolCatalogManager:
             phase_timing = time.time() - phase_start
             return [], {"discovery": phase_timing}, errors
 
-    def _execute_analysis_phase(self, discovered_tools: List[Any]) -> tuple[List[Any], int, Dict[str, float], List[str]]:
+    def _execute_analysis_phase(
+        self, discovered_tools: List[Any]
+    ) -> tuple[List[Any], int, Dict[str, float], List[str]]:
         """
         Execute the metadata analysis phase.
-        
+
         Args:
             discovered_tools: Tools to analyze
-            
+
         Returns:
             Tuple of (analyzed_tools, tools_failed, phase_timings, errors)
         """
@@ -167,7 +169,7 @@ class ToolCatalogManager:
         analyzed_tools = []
         tools_failed = 0
         errors = []
-        
+
         try:
             for tool in discovered_tools:
                 try:
@@ -189,7 +191,7 @@ class ToolCatalogManager:
 
             phase_timing = time.time() - phase_start
             logger.info("Analysis completed: %d tools analyzed in %.2fs", len(analyzed_tools), phase_timing)
-            
+
             return analyzed_tools, tools_failed, {"analysis": phase_timing}, errors
 
         except Exception as e:
@@ -202,17 +204,17 @@ class ToolCatalogManager:
     def _execute_embedding_phase(self, analyzed_tools: List[Any]) -> tuple[int, Dict[str, float], List[str]]:
         """
         Execute the embedding generation phase.
-        
+
         Args:
             analyzed_tools: Tools to generate embeddings for
-            
+
         Returns:
             Tuple of (embeddings_generated, phase_timings, errors)
         """
         logger.info("Phase 3: Generating embeddings")
         phase_start = time.time()
         errors = []
-        
+
         try:
             embedding_result = self.embedding_pipeline.generate_tool_embeddings(analyzed_tools)
 
@@ -223,7 +225,7 @@ class ToolCatalogManager:
             embeddings_generated = len(embedding_result.embeddings)
             phase_timing = time.time() - phase_start
             logger.info("Embedding completed: %d embeddings in %.2fs", embeddings_generated, phase_timing)
-            
+
             return embeddings_generated, {"embedding": phase_timing}, errors
 
         except Exception as e:
@@ -233,33 +235,35 @@ class ToolCatalogManager:
             phase_timing = time.time() - phase_start
             return 0, {"embedding": phase_timing}, errors
 
-    def _execute_relationship_phase(self, analyzed_tools: List[Any]) -> tuple[List[Any], int, Dict[str, float], List[str]]:
+    def _execute_relationship_phase(
+        self, analyzed_tools: List[Any]
+    ) -> tuple[List[Any], int, Dict[str, float], List[str]]:
         """
         Execute the relationship detection phase.
-        
+
         Args:
             analyzed_tools: Tools to analyze relationships for
-            
+
         Returns:
             Tuple of (relationships, relationships_count, phase_timings, errors)
         """
         logger.info("Phase 4: Detecting relationships")
         phase_start = time.time()
         errors = []
-        
+
         try:
             relationship_result = self.relationship_detector.analyze_all_relationships(analyzed_tools)
 
             all_relationships = (
-                relationship_result.alternatives
-                + relationship_result.complements
-                + relationship_result.prerequisites
+                relationship_result.alternatives + relationship_result.complements + relationship_result.prerequisites
             )
             relationships_created = len(all_relationships)
 
             phase_timing = time.time() - phase_start
-            logger.info("Relationship detection completed: %d relationships in %.2fs", relationships_created, phase_timing)
-            
+            logger.info(
+                "Relationship detection completed: %d relationships in %.2fs", relationships_created, phase_timing
+            )
+
             return all_relationships, relationships_created, {"relationships": phase_timing}, errors
 
         except Exception as e:
@@ -270,14 +274,16 @@ class ToolCatalogManager:
             phase_timing = time.time() - phase_start
             return [], 0, {"relationships": phase_timing}, errors
 
-    def _execute_storage_phase(self, analyzed_tools: List[Any], relationships: List[Any]) -> tuple[int, int, Dict[str, float], List[str]]:
+    def _execute_storage_phase(
+        self, analyzed_tools: List[Any], relationships: List[Any]
+    ) -> tuple[int, int, Dict[str, float], List[str]]:
         """
         Execute the storage phase.
-        
+
         Args:
             analyzed_tools: Tools to store
             relationships: Relationships to store
-            
+
         Returns:
             Tuple of (tools_stored, tools_failed, phase_timings, errors)
         """
@@ -285,7 +291,7 @@ class ToolCatalogManager:
         phase_start = time.time()
         errors = []
         tools_failed = 0
-        
+
         try:
             # Store tools with metadata
             storage_result = self.storage_ops.store_tool_batch(analyzed_tools)
@@ -308,7 +314,7 @@ class ToolCatalogManager:
 
             phase_timing = time.time() - phase_start
             logger.info("Storage completed: %d tools stored in %.2fs", tools_stored, phase_timing)
-            
+
             return tools_stored, tools_failed, {"storage": phase_timing}, errors
 
         except Exception as e:
@@ -321,14 +327,14 @@ class ToolCatalogManager:
     def _execute_validation_phase(self) -> tuple[Dict[str, float], List[str]]:
         """
         Execute the validation phase.
-        
+
         Returns:
             Tuple of (phase_timings, errors)
         """
         logger.info("Phase 6: Validating catalog")
         phase_start = time.time()
         errors = []
-        
+
         try:
             consistency_report = self.validator.validate_catalog_consistency()
 
@@ -338,7 +344,7 @@ class ToolCatalogManager:
 
             phase_timing = time.time() - phase_start
             logger.info("Validation completed in %.2fs", phase_timing)
-            
+
             return {"validation": phase_timing}, errors
 
         except Exception as e:
@@ -385,15 +391,17 @@ class ToolCatalogManager:
             discovered_tools, discovery_timings, discovery_errors = self._execute_discovery_phase()
             phase_timings.update(discovery_timings)
             all_errors.extend(discovery_errors)
-            
+
             if discovery_errors:
                 return self._create_failed_rebuild_result(start_time, all_errors, phase_timings)
 
             # Execute Phase 2: Analysis
-            analyzed_tools, tools_failed_analysis, analysis_timings, analysis_errors = self._execute_analysis_phase(discovered_tools)
+            analyzed_tools, tools_failed_analysis, analysis_timings, analysis_errors = self._execute_analysis_phase(
+                discovered_tools
+            )
             phase_timings.update(analysis_timings)
             all_errors.extend(analysis_errors)
-            
+
             if analysis_errors:
                 return self._create_failed_rebuild_result(start_time, all_errors, phase_timings)
 
@@ -401,21 +409,28 @@ class ToolCatalogManager:
             embeddings_generated, embedding_timings, embedding_errors = self._execute_embedding_phase(analyzed_tools)
             phase_timings.update(embedding_timings)
             all_errors.extend(embedding_errors)
-            
+
             if embedding_errors:
                 return self._create_failed_rebuild_result(start_time, all_errors, phase_timings)
 
             # Execute Phase 4: Relationships
-            relationships, relationships_created, relationship_timings, relationship_errors = self._execute_relationship_phase(analyzed_tools)
+            (
+                relationships,
+                relationships_created,
+                relationship_timings,
+                relationship_errors,
+            ) = self._execute_relationship_phase(analyzed_tools)
             phase_timings.update(relationship_timings)
             all_errors.extend(relationship_errors)
             # Note: Relationship errors are not fatal, continue
 
             # Execute Phase 5: Storage
-            tools_stored, tools_failed_storage, storage_timings, storage_errors = self._execute_storage_phase(analyzed_tools, relationships)
+            tools_stored, tools_failed_storage, storage_timings, storage_errors = self._execute_storage_phase(
+                analyzed_tools, relationships
+            )
             phase_timings.update(storage_timings)
             all_errors.extend(storage_errors)
-            
+
             if storage_errors:
                 return self._create_failed_rebuild_result(start_time, all_errors, phase_timings)
 

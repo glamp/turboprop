@@ -66,16 +66,16 @@ class ToolStorageOperations:
     def _create_parameter_operations(self, tool_id: ToolId, parameters: List[ParameterAnalysis]) -> List[tuple]:
         """
         Create database operations for tool parameters.
-        
+
         Args:
             tool_id: ID of the parent tool
             parameters: List of parameter analyses
-            
+
         Returns:
             List of database operation tuples
         """
         operations = []
-        
+
         for param in parameters:
             param_id = generate_tool_id()
             param_embedding = [0.0] * 384  # Will be replaced by actual embedding
@@ -103,30 +103,28 @@ class ToolStorageOperations:
                         param.type,
                         param.required,
                         param.description,
-                        str(getattr(param, "default_value", None))
-                        if hasattr(param, "default_value")
-                        else None,
+                        str(getattr(param, "default_value", None)) if hasattr(param, "default_value") else None,
                         json.dumps(getattr(param, "constraints", {})),
                         param_embedding,
                     ),
                 )
             )
-        
+
         return operations
 
     def _create_example_operations(self, tool_id: ToolId, examples: List[ToolExample]) -> List[tuple]:
         """
         Create database operations for tool examples.
-        
+
         Args:
             tool_id: ID of the parent tool
             examples: List of tool examples
-            
+
         Returns:
             List of database operation tuples
         """
         operations = []
-        
+
         for example in examples:
             example_id = generate_tool_id()
             example_embedding = [0.0] * 384  # Will be replaced by actual embedding
@@ -158,7 +156,7 @@ class ToolStorageOperations:
                     ),
                 )
             )
-        
+
         return operations
 
     def store_tool_batch(self, tools: List[MCPToolMetadata]) -> StorageResult:

@@ -86,9 +86,11 @@ class ToolMatchingAlgorithms:
 
             # Normalize to [0, 1] range (cosine similarity is in [-1, 1])
             normalized_similarity = max(
-                COSINE_SIMILARITY_MIN_BOUND, 
-                min(COSINE_SIMILARITY_MAX_BOUND, 
-                    (similarity + COSINE_SIMILARITY_RANGE_OFFSET) / COSINE_SIMILARITY_RANGE_DIVISOR)
+                COSINE_SIMILARITY_MIN_BOUND,
+                min(
+                    COSINE_SIMILARITY_MAX_BOUND,
+                    (similarity + COSINE_SIMILARITY_RANGE_OFFSET) / COSINE_SIMILARITY_RANGE_DIVISOR,
+                ),
             )
 
             return normalized_similarity
