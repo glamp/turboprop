@@ -16,6 +16,7 @@ from dataclasses import dataclass, asdict, field
 from typing import Dict, Optional, Tuple, Any, List
 from pathlib import Path
 from config import config
+from ide_integration import get_ide_navigation_urls, get_mcp_navigation_actions, SyntaxHighlightingHint
 
 
 @dataclass
@@ -82,6 +83,10 @@ class CodeSearchResult:
     match_reasons: List[str] = field(default_factory=list)
     ranking_score: Optional[float] = None
     ranking_factors: Optional[Dict[str, float]] = None
+    # IDE navigation and integration fields
+    ide_navigation_urls: Optional[List[Dict[str, Any]]] = None
+    syntax_highlighting_hints: Optional[List[SyntaxHighlightingHint]] = None
+    mcp_navigation_actions: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Initialize default values after dataclass construction."""
@@ -115,6 +120,56 @@ class CodeSearchResult:
             snippet: CodeSnippet to add
         """
         self.additional_snippets.append(snippet)
+
+    def generate_ide_navigation(self) -> None:
+        """
+        Generate IDE navigation URLs and actions for this search result.
+        
+        This method populates the ide_navigation_urls and mcp_navigation_actions
+        fields with data suitable for IDE integration.
+        """
+        primary_line = self.snippet.start_line
+        
+        # Generate IDE navigation URLs
+        nav_urls = get_ide_navigation_urls(self.file_path, primary_line)
+        self.ide_navigation_urls = [
+            {
+                "ide": url.display_name,
+                "url": url.url,
+                "available": url.is_available,
+                "ide_type": url.ide_type.value
+            }
+            for url in nav_urls
+        ]
+        
+        # Generate MCP navigation actions
+        self.mcp_navigation_actions = get_mcp_navigation_actions(
+            self.file_path, 
+            primary_line
+        )
+
+    def generate_syntax_hints(self, file_content: str = None) -> None:
+        """
+        Generate syntax highlighting hints for this search result.
+        
+        Args:
+            file_content: Optional file content to analyze. If not provided,
+                         will attempt to read the file from disk.
+        """
+        if file_content is None:
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+            except (IOError, UnicodeDecodeError):
+                # If we can't read the file, skip syntax highlighting
+                return
+        
+        from ide_integration import ide_integration
+        self.syntax_highlighting_hints = ide_integration.generate_syntax_hints(
+            self.file_path,
+            file_content,
+            self.snippet.start_line
+        )
 
     @classmethod
     def from_multi_snippets(
@@ -270,8 +325,24 @@ class CodeSearchResult:
             'repository_context': self.repository_context,
             'match_reasons': self.match_reasons,
             'ranking_score': self.ranking_score,
-            'ranking_factors': self.ranking_factors
+            'ranking_factors': self.ranking_factors,
+            'ide_navigation_urls': self.ide_navigation_urls,
+            'mcp_navigation_actions': self.mcp_navigation_actions
         }
+
+        # Convert syntax highlighting hints to dict format
+        if self.syntax_highlighting_hints:
+            result['syntax_highlighting_hints'] = [
+                {
+                    'language': hint.language,
+                    'token_type': hint.token_type,
+                    'start_line': hint.start_line,
+                    'end_line': hint.end_line,
+                    'start_column': hint.start_column,
+                    'end_column': hint.end_column
+                }
+                for hint in self.syntax_highlighting_hints
+            ]
 
         # Include additional snippets if present
         if self.additional_snippets:

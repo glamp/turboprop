@@ -259,7 +259,7 @@ def search_code(query: str, max_results: int = None) -> str:
                 "Try different search terms or make sure the repository is indexed."
             )
 
-        # Format results
+        # Format results with IDE navigation
         formatted_results = []
         formatted_results.append(f"Found {len(results)} results for: '{query}'\n")
 
@@ -268,6 +268,15 @@ def search_code(query: str, max_results: int = None) -> str:
             formatted_results.append(f"{i}. {path}")
             formatted_results.append(f"   Similarity: {similarity_pct:.1f}%")
             formatted_results.append(f"   Preview: {snippet.strip()[:config.file_processing.PREVIEW_LENGTH]}" "...")
+            
+            # Add IDE navigation URLs for enhanced user experience
+            from ide_integration import get_ide_navigation_urls
+            nav_urls = get_ide_navigation_urls(path, 1)  # Use line 1 as default
+            if nav_urls:
+                # Show the first available IDE navigation URL
+                primary_url = next((url for url in nav_urls if url.is_available), nav_urls[0])
+                formatted_results.append(f"   🔗 Open in {primary_url.display_name}: {primary_url.url}")
+            
             formatted_results.append("")
 
         return "\n".join(formatted_results)
@@ -339,6 +348,13 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             include_suggestions=True,
             include_query_analysis=True
         )
+
+        # Add IDE navigation data to results
+        for result in response.results:
+            # Generate IDE navigation URLs for each result
+            result.generate_ide_navigation()
+            # Generate syntax highlighting hints if we can read the file
+            result.generate_syntax_hints()
 
         # Add repository context if available
         repo_path = _config.get("repository_path")
