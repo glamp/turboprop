@@ -279,7 +279,7 @@ class DocstringParser:
                         for line in lines[1:]:
                             try:
                                 if line.strip():
-                                    cleaned_lines.append(line[min_indent:])
+                                    cleaned_lines.append(line[int(min_indent) :])
                                 else:
                                     cleaned_lines.append("")
                             except Exception as e:
@@ -583,7 +583,7 @@ class DocstringParser:
             # Continuation of description
             elif current_param and line.strip():
                 if current_param["description"]:
-                    current_param["description"] += " " + line.strip()
+                    current_param["description"] = str(current_param["description"]) + " " + line.strip()
                 else:
                     current_param["description"] = line.strip()
 

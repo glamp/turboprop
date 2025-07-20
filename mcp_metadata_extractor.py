@@ -75,8 +75,9 @@ class MCPMetadataExtractor:
             try:
                 parameters_schema = tool_def.get("parameters", {})
                 if isinstance(parameters_schema, list):
-                    # Old format - list of parameter definitions
-                    parameter_analyses = self.analyze_parameter_schema(parameters_schema)
+                    # Old format - list of parameter definitions - convert to empty dict for compatibility
+                    logger.warning("Old list format for parameters in tool '%s' - skipping parameter analysis", name)
+                    parameter_analyses = []
                 else:
                     # New format - JSON schema object
                     parameter_analyses = self.analyze_parameter_schema(parameters_schema)

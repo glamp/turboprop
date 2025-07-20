@@ -14,6 +14,7 @@ from uuid import uuid4
 import duckdb
 
 from config import EmbeddingConfig
+from database_manager import DatabaseManager
 from exceptions import DatabaseError, DatabaseMigrationError
 from logging_config import get_logger
 
@@ -129,7 +130,7 @@ class MCPToolSchema:
 class MCPToolMigration:
     """Handles database migrations for MCP tool schema."""
 
-    def __init__(self, db_manager: "DatabaseManager") -> None:
+    def __init__(self, db_manager: DatabaseManager) -> None:
         """Initialize migration manager with database manager."""
         self.db_manager = db_manager
         self.migrations_dir = Path(__file__).parent / "migrations"

@@ -155,7 +155,7 @@ class ParameterAnalyzer:
         optional_count = total_count - required_count
 
         # Analyze parameter types and complexity
-        type_distribution = {}
+        type_distribution: Dict[str, int] = {}
         has_nested = False
         has_arrays = False
         total_constraint_complexity = 0.0

@@ -285,7 +285,7 @@ class QueryAnalyzer:
 
         # Error handling requirements
         if any(term in query_lower for term in ["error handling", "robust", "safe", "reliable"]):
-            constraints["error_handling"] = True
+            constraints["error_handling"] = "required"
 
         # Performance requirements
         if any(term in query_lower for term in ["fast", "quick", "performance", "efficient"]):

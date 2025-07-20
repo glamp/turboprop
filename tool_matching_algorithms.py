@@ -382,7 +382,7 @@ class ToolMatchingAlgorithms:
         Returns:
             Diversified list of results
         """
-        category_counts = {}
+        category_counts: Dict[str, int] = {}
         diversified_results = []
 
         for result in results:

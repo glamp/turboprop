@@ -1,5 +1,5 @@
 -- Rollback script for migration version 1
--- Generated at 2025-07-20 12:22:32
+-- Generated at 2025-07-20 16:02:39
 
 BEGIN TRANSACTION;
 

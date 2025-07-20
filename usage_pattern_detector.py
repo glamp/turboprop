@@ -8,7 +8,7 @@ usage scenarios based on tool structure and metadata.
 """
 
 from functools import lru_cache
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from logging_config import get_logger
 from mcp_metadata_types import ComplexityAnalysis, MCPToolMetadata, ParameterAnalysis, UsagePattern
@@ -306,12 +306,12 @@ class UsagePatternDetector:
 
                 pattern = UsagePattern(
                     pattern_name=pattern_name,
-                    description=pattern_info["description"],
-                    parameter_combination=pattern_info["parameters"],
+                    description=cast(str, pattern_info["description"]),
+                    parameter_combination=cast(List[str], pattern_info["parameters"]),
                     use_case=self._generate_use_case(tool_metadata.name, pattern_name),
-                    complexity_level=pattern_info["complexity"],
+                    complexity_level=cast(str, pattern_info["complexity"]),
                     example_code=example_code,
-                    success_probability=pattern_info["success_probability"],
+                    success_probability=cast(float, pattern_info["success_probability"]),
                 )
                 patterns.append(pattern)
 

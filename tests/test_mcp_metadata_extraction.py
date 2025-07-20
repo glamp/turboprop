@@ -477,7 +477,7 @@ class TestExampleGenerator:
         
         Example 2: Search in specific file
         ```bash
-        grep "TODO" main.py
+        grep "import" main.py
         ```
         """
 

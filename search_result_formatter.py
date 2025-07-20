@@ -354,7 +354,7 @@ class SearchResultFormatter:
         Returns:
             Dictionary with exportable data
         """
-        export_data = {
+        export_data: Dict[str, Any] = {
             "metadata": {
                 "query": response.query,
                 "timestamp": response.execution_time,

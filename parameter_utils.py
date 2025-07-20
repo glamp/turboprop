@@ -85,8 +85,8 @@ def analyze_parameter_complexity(parameters: List[ParameterAnalysis]) -> Dict[st
     optional_count = total_count - required_count
 
     # Analyze parameter types for complexity
-    has_nested = any(p.type_info and "object" in str(p.type_info).lower() for p in parameters)
-    has_arrays = any(p.type_info and "array" in str(p.type_info).lower() for p in parameters)
+    has_nested = any(p.type and "object" in str(p.type).lower() for p in parameters)
+    has_arrays = any(p.type and "array" in str(p.type).lower() for p in parameters)
 
     # Simple complexity score based on count and types
     complexity_score = min(1.0, (total_count * 0.1) + (0.2 if has_nested else 0) + (0.1 if has_arrays else 0))

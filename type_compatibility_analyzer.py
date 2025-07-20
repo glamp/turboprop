@@ -171,7 +171,7 @@ class TypeCompatibilityAnalyzer:
         Returns:
             Matrix of compatibility scores
         """
-        matrix = {}
+        matrix: Dict[str, Dict[str, float]] = {}
 
         for source_type in types:
             matrix[source_type] = {}

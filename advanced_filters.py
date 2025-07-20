@@ -423,7 +423,7 @@ class AdvancedFilters:
 
         passed_tools = []
         filtered_out = []
-        filter_statistics = {}
+        filter_statistics: Dict[str, int] = {}
         applied_filters = []
 
         for tool in tools:
