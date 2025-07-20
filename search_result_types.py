@@ -66,7 +66,8 @@ class CodeSearchResult:
 
     This class represents a single search result with detailed information about
     the matched file, including the code snippet(s), similarity score, file metadata,
-    and confidence assessment. Supports both single and multiple snippets per file.
+    confidence assessment, and explainable match reasons. Supports both single and
+    multiple snippets per file.
     """
     file_path: str
     snippet: CodeSnippet
@@ -77,6 +78,10 @@ class CodeSearchResult:
     additional_snippets: List[CodeSnippet] = field(default_factory=list)
     # Repository context information
     repository_context: Optional[Dict[str, Any]] = None
+    # Advanced ranking and explainability fields
+    match_reasons: List[str] = field(default_factory=list)
+    ranking_score: Optional[float] = None
+    ranking_factors: Optional[Dict[str, float]] = None
 
     def __post_init__(self):
         """Initialize default values after dataclass construction."""
@@ -262,7 +267,10 @@ class CodeSearchResult:
             'similarity_percentage': self.similarity_percentage,
             'file_metadata': self.file_metadata,
             'confidence_level': self.confidence_level,
-            'repository_context': self.repository_context
+            'repository_context': self.repository_context,
+            'match_reasons': self.match_reasons,
+            'ranking_score': self.ranking_score,
+            'ranking_factors': self.ranking_factors
         }
 
         # Include additional snippets if present

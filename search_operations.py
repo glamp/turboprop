@@ -26,6 +26,7 @@ from mcp_response_types import (
 )
 import response_config
 from construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
+from result_ranking import rank_search_results, RankingWeights, generate_match_explanations
 
 # Constants
 TABLE_NAME = "code_files"
@@ -165,6 +166,72 @@ def _extract_file_metadata(file_path: str, content: str) -> dict:
         'filename': path_obj.name,
         'directory': str(path_obj.parent)
     }
+
+
+def search_index_with_advanced_ranking(
+    db_manager: DatabaseManager, 
+    embedder: EmbeddingGenerator, 
+    query: str, 
+    k: int,
+    repo_path: Optional[str] = None,
+    ranking_weights: Optional[RankingWeights] = None,
+    enable_advanced_ranking: bool = True
+) -> List[CodeSearchResult]:
+    """
+    Enhanced search with advanced multi-factor ranking and explainable results.
+
+    This function provides the most sophisticated search experience by combining
+    semantic similarity with advanced ranking algorithms, match explanations,
+    and confidence scoring.
+
+    Args:
+        db_manager: DatabaseManager instance
+        embedder: EmbeddingGenerator instance for generating query embeddings
+        query: Search query string
+        k: Number of top results to return
+        repo_path: Optional repository path for relative path display and Git info
+        ranking_weights: Optional custom ranking weights
+        enable_advanced_ranking: Whether to apply advanced ranking (default: True)
+
+    Returns:
+        List of CodeSearchResult objects with advanced ranking and explanations
+    """
+    try:
+        # Get initial search results using the existing enhanced search
+        initial_results = search_index_enhanced(db_manager, embedder, query, k * 2)  # Get more candidates
+        
+        if not initial_results or not enable_advanced_ranking:
+            return initial_results[:k]  # Return original results if ranking disabled
+        
+        # Apply advanced ranking
+        ranked_results = rank_search_results(
+            results=initial_results,
+            query=query,
+            repo_path=repo_path,
+            git_info=None,  # TODO: Add Git integration for file recency
+            ranking_weights=ranking_weights
+        )
+        
+        # Generate match explanations and add to results
+        explanations = generate_match_explanations(ranked_results, query)
+        for result in ranked_results:
+            if result.file_path in explanations:
+                result.match_reasons = explanations[result.file_path]
+        
+        # Return top k results after advanced ranking
+        return ranked_results[:k]
+
+    except Exception as e:
+        logger.error(
+            f"Advanced ranking search failed for query '{query}' with k={k}. "
+            f"Database connection: {db_manager is not None}. "
+            f"Embedder: {embedder is not None}. "
+            f"Error: {e}",
+            exc_info=True
+        )
+        # Fallback to basic enhanced search
+        logger.info("Falling back to basic enhanced search")
+        return search_index_enhanced(db_manager, embedder, query, k)
 
 
 def search_index_enhanced(
@@ -329,12 +396,15 @@ def search_with_comprehensive_response(
     k: int = 10,
     include_clusters: bool = True,
     include_suggestions: bool = True,
-    include_query_analysis: bool = True
+    include_query_analysis: bool = True,
+    enable_advanced_ranking: bool = True,
+    repo_path: Optional[str] = None,
+    ranking_weights: Optional[RankingWeights] = None
 ) -> SearchResponse:
     """
     Perform enhanced search and return comprehensive structured response.
 
-    This function combines semantic search with rich metadata, clustering,
+    This function combines semantic search with advanced ranking, rich metadata, clustering,
     and suggestions to provide Claude with comprehensive search information.
 
     Args:
@@ -345,6 +415,9 @@ def search_with_comprehensive_response(
         include_clusters: Whether to include result clustering
         include_suggestions: Whether to include query suggestions
         include_query_analysis: Whether to analyze the query
+        enable_advanced_ranking: Whether to use advanced multi-factor ranking
+        repo_path: Optional repository path for enhanced ranking context
+        ranking_weights: Optional custom ranking weights
 
     Returns:
         SearchResponse with comprehensive metadata and suggestions
@@ -352,8 +425,13 @@ def search_with_comprehensive_response(
     start_time = time.time()
 
     try:
-        # Perform the enhanced search
-        results = search_index_enhanced(db_manager, embedder, query, k)
+        # Perform the search with optional advanced ranking
+        if enable_advanced_ranking:
+            results = search_index_with_advanced_ranking(
+                db_manager, embedder, query, k, repo_path, ranking_weights
+            )
+        else:
+            results = search_index_enhanced(db_manager, embedder, query, k)
         execution_time = time.time() - start_time
 
         # Create the base response
@@ -669,6 +747,96 @@ def generate_cross_references(results: List[CodeSearchResult]) -> List[str]:
             )
 
     return cross_refs[:response_config.MAX_CROSS_REFERENCES]  # Limit to top cross-references
+
+
+def format_advanced_search_results(
+    results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None
+) -> str:
+    """
+    Format advanced search results with match explanations and ranking information.
+
+    Args:
+        results: List of CodeSearchResult objects with advanced ranking
+        query: Original search query
+        repo_path: Optional repository path for relative path display
+
+    Returns:
+        Formatted string representation of advanced search results
+    """
+    if not results:
+        return f"No results found for query: '{query}'"
+
+    formatted_lines = []
+    formatted_lines.append(f"🔍 Found {len(results)} results for: '{query}' (with advanced ranking)")
+    formatted_lines.append("=" * 60)
+
+    for i, result in enumerate(results, 1):
+        # Format path (use relative path if repo_path provided)
+        display_path = result.get_relative_path(repo_path) if repo_path else result.file_path
+
+        # Display enhanced information with ranking score
+        ranking_score = result.ranking_score or result.similarity_score
+        formatted_lines.append(f"{i}. {display_path}")
+        formatted_lines.append(
+            f"   📊 Ranking: {ranking_score:.3f} | Similarity: {result.similarity_percentage:.1f}% "
+            f"({result.confidence_level} confidence)")
+
+        # Show ranking factors if available
+        if result.ranking_factors:
+            factors = result.ranking_factors
+            formatted_lines.append(
+                f"   🎯 Factors: similarity={factors.get('embedding_similarity', 0):.2f}, "
+                f"file_type={factors.get('file_type_relevance', 0):.2f}, "
+                f"construct={factors.get('construct_type_matching', 0):.2f}"
+            )
+
+        # Show file metadata if available
+        if result.file_metadata:
+            metadata = result.file_metadata
+            lang = metadata.get('language', 'unknown')
+            size = metadata.get('size', 0)
+            if size > 0:
+                size_str = f"{size} bytes" if size < 1024 else f"{size/1024:.1f}KB"
+                formatted_lines.append(f"   📄 Type: {lang} ({size_str})")
+            else:
+                formatted_lines.append(f"   📄 Type: {lang}")
+
+        # Show primary snippet with line information
+        snippet = result.snippet
+        if snippet.start_line == snippet.end_line:
+            line_info = f"Line {snippet.start_line}"
+        else:
+            line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
+
+        formatted_lines.append(f"   💻 {line_info}: {snippet.text.strip()}")
+
+        # Show match reasons if available
+        if result.match_reasons:
+            formatted_lines.append(f"   🎯 Why this matches:")
+            for reason in result.match_reasons[:3]:  # Show top 3 reasons
+                formatted_lines.append(f"      • {reason}")
+
+        # Show additional snippets if present
+        if result.additional_snippets:
+            formatted_lines.append(f"   ➕ Additional snippets ({len(result.additional_snippets)}):")
+            for i, additional_snippet in enumerate(result.additional_snippets[:2], 1):  # Show first 2
+                if additional_snippet.start_line == additional_snippet.end_line:
+                    add_line_info = f"Line {additional_snippet.start_line}"
+                else:
+                    add_line_info = (
+                        f"Lines {additional_snippet.start_line}-{additional_snippet.end_line}"
+                    )
+
+                # Truncate additional snippets for display
+                add_text = additional_snippet.text.strip()
+                if len(add_text) > 100:
+                    add_text = add_text[:100] + "..."
+
+                formatted_lines.append(f"     {i}. {add_line_info}: {add_text}")
+
+        formatted_lines.append("")
+
+    return "\n".join(formatted_lines)
 
 
 def format_enhanced_search_results(
