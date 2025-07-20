@@ -19,14 +19,15 @@ setup_apple_silicon_compatibility()
 # Imports must be placed after environment variables are set for Apple Silicon MPS
 # compatibility
 # This ensures PyTorch uses CPU backend instead of problematic MPS backend
-import numpy as np  # noqa: E402
 
-# torch import removed - not directly used in this module
+# Third-party imports
+import numpy as np  # noqa: E402
 from sentence_transformers import SentenceTransformer  # noqa: E402
 
-# Force PyTorch to use CPU backend on Apple Silicon
-from apple_silicon_compat import configure_torch_backend
+# Local imports  
+from apple_silicon_compat import configure_torch_backend  # noqa: E402
 from config import config  # noqa: E402
+from exceptions import EmbeddingError, EmbeddingModelError  # noqa: E402
 
 configure_torch_backend()
 
@@ -49,9 +50,9 @@ class EmbeddingGenerator:
             # Ensure model is on the correct device
             self.model = self.model.to(device)
             print(f"✅ Initialized {self.model_name} on {device} device", file=sys.stderr)
-        except Exception as e:
-            print(f"❌ Failed to initialize model: {e}", file=sys.stderr)
-            raise
+        except Exception as error:
+            print(f"❌ Failed to initialize model: {error}", file=sys.stderr)
+            raise EmbeddingModelError(f"Failed to initialize embedding model {self.model_name}: {error}") from error
 
     def encode(self, text):
         """Generate embedding for text"""
@@ -64,9 +65,9 @@ class EmbeddingGenerator:
             # Ensure it's a numpy array and convert to float32
             embedding = np.array(embedding).astype(np.float32)
             return embedding
-        except Exception as e:
-            print(f"❌ Failed to encode text: {e}", file=sys.stderr)
-            raise
+        except Exception as error:
+            print(f"❌ Failed to encode text: {error}", file=sys.stderr)
+            raise EmbeddingError(f"Failed to encode text: {error}") from error
 
     def encode_batch(self, texts, batch_size=None, show_progress=False):
         """Generate embeddings for a batch of texts with configurable batch size"""
@@ -91,9 +92,9 @@ class EmbeddingGenerator:
             # Ensure it's a numpy array and convert to float32
             embeddings = np.array(embeddings).astype(np.float32)
             return embeddings
-        except Exception as e:
-            print(f"❌ Failed to encode batch: {e}", file=sys.stderr)
-            raise
+        except Exception as error:
+            print(f"❌ Failed to encode batch: {error}", file=sys.stderr)
+            raise EmbeddingError(f"Failed to encode batch: {error}") from error
 
     def _encode_large_batch(self, texts, batch_size, show_progress=False):
         """Process a large collection of texts in chunks"""
@@ -127,9 +128,9 @@ class EmbeddingGenerator:
 
             return final_embeddings
 
-        except Exception as e:
-            print(f"❌ Failed to encode large batch: {e}", file=sys.stderr)
-            raise
+        except Exception as error:
+            print(f"❌ Failed to encode large batch: {error}", file=sys.stderr)
+            raise EmbeddingError(f"Failed to encode large batch: {error}") from error
 
     def encode_batch_with_retry(
         self, texts, batch_size=None, max_retries=None, show_progress=False
@@ -144,16 +145,16 @@ class EmbeddingGenerator:
         for attempt in range(effective_max_retries):
             try:
                 return self.encode_batch(texts, effective_batch_size, show_progress)
-            except Exception as e:
+            except Exception as error:
                 if attempt == effective_max_retries - 1:
                     print(
-                        f"❌ Failed to encode batch after {effective_max_retries} attempts: {e}",
+                        f"❌ Failed to encode batch after {effective_max_retries} attempts: {error}",
                         file=sys.stderr
                     )
-                    raise
+                    raise EmbeddingError(f"Failed to encode batch after {effective_max_retries} attempts: {error}") from error
                 else:
                     print(
-                        f"⚠️ Batch encoding attempt {attempt + 1} failed, retrying: {e}",
+                        f"⚠️ Batch encoding attempt {attempt + 1} failed, retrying: {error}",
                         file=sys.stderr
                     )
                     # Exponential backoff
@@ -165,23 +166,23 @@ class EmbeddingGenerator:
     def generate_embeddings(self, texts, batch_size=None, show_progress=False):
         """
         Generate embeddings for a list of texts.
-        
+
         This method provides API compatibility for components expecting a generate_embeddings method.
-        
+
         Args:
             texts: List of text strings to encode
             batch_size: Optional batch size for processing
             show_progress: Whether to show progress for large batches
-            
+
         Returns:
             List of numpy arrays, one embedding per input text
         """
         if isinstance(texts, str):
             texts = [texts]
-        
+
         # Use encode_batch to process the texts
         embeddings = self.encode_batch(texts, batch_size=batch_size, show_progress=show_progress)
-        
+
         # Convert to list of individual embeddings for API compatibility
         return [embedding for embedding in embeddings]
 
@@ -202,8 +203,8 @@ def test_embedding_generator():
         print(f"✅ Single text embedding shape: {embedding.shape}")
         print(f"✅ Single text embedding dtype: {embedding.dtype}")
         print(f"✅ Single text embedding first 5 values: {embedding[:5]}")
-    except Exception as e:
-        print(f"❌ Single text test failed: {e}")
+    except Exception as error:
+        print(f"❌ Single text test failed: {error}")
         return False
 
     # Test batch of texts
@@ -219,8 +220,8 @@ def test_embedding_generator():
         print(f"✅ Batch embeddings shape: {embeddings.shape}")
         print(f"✅ Batch embeddings dtype: {embeddings.dtype}")
         print(f"✅ Batch embeddings first row first 5 values: {embeddings[0][:5]}")
-    except Exception as e:
-        print(f"❌ Batch test failed: {e}")
+    except Exception as error:
+        print(f"❌ Batch test failed: {error}")
         return False
 
     print("🎉 All tests passed!")

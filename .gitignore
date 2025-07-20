@@ -110,3 +110,6 @@ uv.lock
 # Scratch directories and temporary files
 .swissarmyhammer/
 CODE_REVIEW.md
+
+# Backup files
+*.bak
