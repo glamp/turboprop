@@ -17,7 +17,7 @@ from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from logging_config import get_logger
 from mcp_tool_schema import generate_tool_id
-from tool_metadata_extractor import ToolMetadataExtractor, MCPToolMetadata
+from tool_metadata_extractor import MCPToolMetadata, ToolMetadataExtractor
 from tool_registry import ToolRegistry
 
 logger = get_logger(__name__)
@@ -103,17 +103,11 @@ class MCPToolDiscovery:
         "bash": {
             "name": "Bash",
             "description": (
-                "Executes bash commands in a persistent shell session "
-                "with timeout and security measures"
+                "Executes bash commands in a persistent shell session " "with timeout and security measures"
             ),
             "category": "execution",
             "parameters": [
-                {
-                    "name": "command",
-                    "type": "string",
-                    "required": True,
-                    "description": "The command to execute"
-                },
+                {"name": "command", "type": "string", "required": True, "description": "The command to execute"},
                 {
                     "name": "timeout",
                     "type": "number",
@@ -124,10 +118,7 @@ class MCPToolDiscovery:
         },
         "read": {
             "name": "Read",
-            "description": (
-                "Reads a file from the local filesystem with line "
-                "offset and limit support"
-            ),
+            "description": ("Reads a file from the local filesystem with line " "offset and limit support"),
             "category": "file_ops",
             "parameters": [
                 {
@@ -136,12 +127,7 @@ class MCPToolDiscovery:
                     "required": True,
                     "description": "The absolute path to the file to read",
                 },
-                {
-                    "name": "limit",
-                    "type": "number",
-                    "required": False,
-                    "description": "The number of lines to read"
-                },
+                {"name": "limit", "type": "number", "required": False, "description": "The number of lines to read"},
                 {
                     "name": "offset",
                     "type": "number",
@@ -152,10 +138,7 @@ class MCPToolDiscovery:
         },
         "write": {
             "name": "Write",
-            "description": (
-                "Writes content to a file on the local filesystem, "
-                "overwriting existing content"
-            ),
+            "description": ("Writes content to a file on the local filesystem, " "overwriting existing content"),
             "category": "file_ops",
             "parameters": [
                 {
@@ -183,12 +166,7 @@ class MCPToolDiscovery:
                     "required": True,
                     "description": "The absolute path to the file to modify",
                 },
-                {
-                    "name": "old_string",
-                    "type": "string",
-                    "required": True,
-                    "description": "The text to replace"
-                },
+                {"name": "old_string", "type": "string", "required": True, "description": "The text to replace"},
                 {
                     "name": "new_string",
                     "type": "string",
@@ -233,25 +211,14 @@ class MCPToolDiscovery:
                     "required": True,
                     "description": "The regular expression pattern to search for",
                 },
-                {
-                    "name": "path",
-                    "type": "string",
-                    "required": False,
-                    "description": "File or directory to search in"
-                },
-                {
-                    "name": "glob",
-                    "type": "string",
-                    "required": False,
-                    "description": "Glob pattern to filter files"
-                },
+                {"name": "path", "type": "string", "required": False, "description": "File or directory to search in"},
+                {"name": "glob", "type": "string", "required": False, "description": "Glob pattern to filter files"},
             ],
         },
         "glob": {
             "name": "Glob",
             "description": (
-                "Fast file pattern matching tool supporting glob patterns "
-                "and modification time sorting"
+                "Fast file pattern matching tool supporting glob patterns " "and modification time sorting"
             ),
             "category": "search",
             "parameters": [
@@ -261,12 +228,7 @@ class MCPToolDiscovery:
                     "required": True,
                     "description": "The glob pattern to match files against",
                 },
-                {
-                    "name": "path",
-                    "type": "string",
-                    "required": False,
-                    "description": "The directory to search in"
-                },
+                {"name": "path", "type": "string", "required": False, "description": "The directory to search in"},
             ],
         },
         "ls": {
@@ -290,10 +252,7 @@ class MCPToolDiscovery:
         },
         "task": {
             "name": "Task",
-            "description": (
-                "Launches a new agent with access to tools for "
-                "autonomous task completion"
-            ),
+            "description": ("Launches a new agent with access to tools for " "autonomous task completion"),
             "category": "development",
             "parameters": [
                 {
@@ -312,10 +271,7 @@ class MCPToolDiscovery:
         },
         "todowrite": {
             "name": "TodoWrite",
-            "description": (
-                "Creates and manages a structured task list for "
-                "tracking coding session progress"
-            ),
+            "description": ("Creates and manages a structured task list for " "tracking coding session progress"),
             "category": "development",
             "parameters": [
                 {
@@ -331,12 +287,7 @@ class MCPToolDiscovery:
             "description": "Fetches content from URLs and processes it using AI models",
             "category": "web",
             "parameters": [
-                {
-                    "name": "url",
-                    "type": "string",
-                    "required": True,
-                    "description": "The URL to fetch content from"
-                },
+                {"name": "url", "type": "string", "required": True, "description": "The URL to fetch content from"},
                 {
                     "name": "prompt",
                     "type": "string",
@@ -350,12 +301,7 @@ class MCPToolDiscovery:
             "description": "Searches the web and returns formatted search results",
             "category": "web",
             "parameters": [
-                {
-                    "name": "query",
-                    "type": "string",
-                    "required": True,
-                    "description": "The search query to use"
-                },
+                {"name": "query", "type": "string", "required": True, "description": "The search query to use"},
                 {
                     "name": "allowed_domains",
                     "type": "array",
@@ -385,10 +331,7 @@ class MCPToolDiscovery:
         },
         "notebokedit": {
             "name": "NotebookEdit",
-            "description": (
-                "Edits Jupyter notebook cells with support for insert, "
-                "replace, and delete operations"
-            ),
+            "description": ("Edits Jupyter notebook cells with support for insert, " "replace, and delete operations"),
             "category": "notebook",
             "parameters": [
                 {
@@ -403,12 +346,7 @@ class MCPToolDiscovery:
                     "required": True,
                     "description": "The new source for the cell",
                 },
-                {
-                    "name": "cell_id",
-                    "type": "string",
-                    "required": False,
-                    "description": "The ID of the cell to edit"
-                },
+                {"name": "cell_id", "type": "string", "required": False, "description": "The ID of the cell to edit"},
             ],
         },
         "exit_plan_mode": {
@@ -602,10 +540,7 @@ class MCPToolDiscovery:
             )
 
             logger.info(
-                "Cataloging complete: %d stored, %d failed in %.2fs",
-                tools_stored,
-                tools_failed,
-                execution_time
+                "Cataloging complete: %d stored, %d failed in %.2fs", tools_stored, tools_failed, execution_time
             )
 
             return result
@@ -667,10 +602,6 @@ class MCPToolDiscovery:
             "total_execution_time": execution_time,
         }
 
-        logger.info(
-            "Discovery and cataloging complete: %d tools in %.2fs",
-            len(all_tools),
-            execution_time
-        )
+        logger.info("Discovery and cataloging complete: %d tools in %.2fs", len(all_tools), execution_time)
 
         return results

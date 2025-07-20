@@ -80,22 +80,10 @@ class ToolMetadataExtractor:
             r"\b(create|delete|modify|save|load)\b",
             r"\bfilesystem\b",
         ],
-        "execution": [
-            r"\b(bash|shell|command|execute|run|script)\b",
-            r"\b(terminal|console|process)\b"
-        ],
-        "search": [
-            r"\b(search|find|grep|glob|pattern|match)\b",
-            r"\b(query|lookup|filter)\b"
-        ],
-        "development": [
-            r"\b(task|todo|plan|agent|development|coding)\b",
-            r"\b(project|workspace|session)\b"
-        ],
-        "web": [
-            r"\b(web|http|url|fetch|download|internet)\b",
-            r"\b(browser|online|website)\b"
-        ],
+        "execution": [r"\b(bash|shell|command|execute|run|script)\b", r"\b(terminal|console|process)\b"],
+        "search": [r"\b(search|find|grep|glob|pattern|match)\b", r"\b(query|lookup|filter)\b"],
+        "development": [r"\b(task|todo|plan|agent|development|coding)\b", r"\b(project|workspace|session)\b"],
+        "web": [r"\b(web|http|url|fetch|download|internet)\b", r"\b(browser|online|website)\b"],
         "notebook": [r"\b(notebook|jupyter|ipynb|cell)\b", r"\b(python|interactive)\b"],
         "workflow": [r"\b(workflow|plan|mode|exit|transition)\b", r"\b(process|step|stage)\b"],
     }
@@ -144,12 +132,7 @@ class ToolMetadataExtractor:
             constraints=constraints,
         )
 
-        logger.debug(
-            "Extracted metadata for %s: category=%s, %d parameters",
-            name,
-            category,
-            len(parameters)
-        )
+        logger.debug("Extracted metadata for %s: category=%s, %d parameters", name, category, len(parameters))
 
         return metadata
 
@@ -345,9 +328,7 @@ class ToolMetadataExtractor:
 
         return constraints
 
-    def _generate_parameter_examples(
-        self, name: str, param_type: str, description: str
-    ) -> List[str]:
+    def _generate_parameter_examples(self, name: str, param_type: str, description: str) -> List[str]:
         """
         Generate example values for a parameter.
 
@@ -395,9 +376,7 @@ class ToolMetadataExtractor:
 
         return examples[:3]  # Limit to 3 examples
 
-    def _generate_examples(
-        self, name: str, description: str, parameters: List[ParameterMetadata]
-    ) -> List[str]:
+    def _generate_examples(self, name: str, description: str, parameters: List[ParameterMetadata]) -> List[str]:
         """
         Generate usage examples for a tool.
 
@@ -415,23 +394,11 @@ class ToolMetadataExtractor:
         name_lower = name.lower()
 
         if "read" in name_lower:
-            examples.extend([
-                "Read a configuration file",
-                "View source code file",
-                "Check log file contents"
-            ])
+            examples.extend(["Read a configuration file", "View source code file", "Check log file contents"])
         elif "write" in name_lower:
-            examples.extend([
-                "Create a new script file",
-                "Save configuration settings",
-                "Generate output file"
-            ])
+            examples.extend(["Create a new script file", "Save configuration settings", "Generate output file"])
         elif "search" in name_lower or "find" in name_lower:
-            examples.extend([
-                "Find function definitions",
-                "Search for error patterns",
-                "Locate configuration values"
-            ])
+            examples.extend(["Find function definitions", "Search for error patterns", "Locate configuration values"])
         elif "bash" in name_lower or "command" in name_lower:
             examples.extend(["Install dependencies", "Run build scripts", "Check system status"])
 

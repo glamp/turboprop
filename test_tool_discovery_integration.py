@@ -84,9 +84,7 @@ def test_complete_discovery_workflow():
             print(f"   - Tools with embeddings: {tools_with_embeddings}")
 
             # Show a sample of stored tools
-            sample_tools = conn.execute(
-                "SELECT name, category, tool_type FROM mcp_tools LIMIT 5"
-            ).fetchall()
+            sample_tools = conn.execute("SELECT name, category, tool_type FROM mcp_tools LIMIT 5").fetchall()
 
             print(f"\n📋 Sample tools in database:")
             for tool_name, category, tool_type in sample_tools:
@@ -155,10 +153,7 @@ def test_search_functionality():
         print("🔍 Testing semantic search for 'file operations'...")
         query_embedding = embedding_generator.encode("file operations")
 
-        search_results = db_manager.search_mcp_tools_by_embedding(
-            query_embedding=query_embedding.tolist(),
-            limit=5
-        )
+        search_results = db_manager.search_mcp_tools_by_embedding(query_embedding=query_embedding.tolist(), limit=5)
 
         print(f"✅ Found {len(search_results)} tools for 'file operations':")
         for result in search_results:
@@ -168,9 +163,7 @@ def test_search_functionality():
         file_ops_tools = [
             r
             for r in search_results
-            if ("file" in r["name"].lower() or 
-                "read" in r["name"].lower() or 
-                "write" in r["name"].lower())
+            if ("file" in r["name"].lower() or "read" in r["name"].lower() or "write" in r["name"].lower())
         ]
 
         if file_ops_tools:

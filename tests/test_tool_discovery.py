@@ -31,9 +31,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
         import numpy as np
 
         self.embedding_generator = Mock(spec=EmbeddingGenerator)
-        self.embedding_generator.encode.return_value = np.array(
-            [0.1] * 384, dtype=np.float32
-        )  # Mock 384-dim embedding
+        self.embedding_generator.encode.return_value = np.array([0.1] * 384, dtype=np.float32)  # Mock 384-dim embedding
 
     def tearDown(self):
         """Clean up test fixtures."""
@@ -61,11 +59,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
         expected_tools = ["bash", "read", "write", "edit", "multiedit", "grep", "glob"]
 
         for expected_tool in expected_tools:
-            self.assertIn(
-                expected_tool,
-                tool_names,
-                f"Expected tool '{expected_tool}' not found in discovered tools"
-            )
+            self.assertIn(expected_tool, tool_names, f"Expected tool '{expected_tool}' not found in discovered tools")
 
         # All tools should be system type
         for tool in tools:
@@ -104,8 +98,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
             self.assertIsNotNone(tool.name)
             self.assertIsNotNone(tool.description)
             self.assertIn(
-                tool.category,
-                ["file_ops", "execution", "search", "development", "web", "notebook", "workflow"]
+                tool.category, ["file_ops", "execution", "search", "development", "web", "notebook", "workflow"]
             )
             self.assertTrue(len(tool.parameters) >= 0)  # May have no parameters
 
@@ -144,11 +137,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
         end_time = time.time()
 
         execution_time = end_time - start_time
-        self.assertLess(
-            execution_time,
-            10.0,
-            f"Discovery took {execution_time:.2f}s, expected < 10s"
-        )
+        self.assertLess(execution_time, 10.0, f"Discovery took {execution_time:.2f}s, expected < 10s")
 
 
 class TestToolRegistry(unittest.TestCase):
@@ -235,16 +224,8 @@ class TestToolMetadataExtractor(unittest.TestCase):
             "name": "bash",
             "description": "Executes bash commands with timeout and error handling",
             "parameters": {
-                "command": {
-                    "type": "string",
-                    "description": "The command to execute",
-                    "required": True
-                },
-                "timeout": {
-                    "type": "number",
-                    "description": "Optional timeout in milliseconds",
-                    "required": False
-                },
+                "command": {"type": "string", "description": "The command to execute", "required": True},
+                "timeout": {"type": "number", "description": "Optional timeout in milliseconds", "required": False},
             },
         }
 
