@@ -8,7 +8,7 @@ combination examples and building example libraries for each tool.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from logging_config import get_logger
 from mcp_metadata_types import ExampleValidationResult, MCPToolMetadata, ParameterAnalysis, ToolExample
@@ -125,23 +125,51 @@ class ExampleGenerator:
         Returns:
             List of generated ToolExample objects
         """
-        examples = []
+        try:
+            if not tool_metadata or not hasattr(tool_metadata, "name"):
+                logger.error("Invalid tool metadata for synthetic example generation")
+                return []
 
-        # Generate examples based on category
-        category_examples = self._generate_category_examples(tool_metadata)
-        examples.extend(category_examples)
+            tool_name = getattr(tool_metadata, "name", "unknown")
+            examples = []
 
-        # Generate parameter combination examples
-        param_examples = self._generate_parameter_combination_examples(tool_metadata)
-        examples.extend(param_examples)
+            # Generate examples based on category
+            try:
+                category_examples = self._generate_category_examples(tool_metadata)
+                if isinstance(category_examples, list):
+                    examples.extend(category_examples)
+                else:
+                    logger.warning("Category examples is not a list for tool %s", tool_name)
+            except Exception as e:
+                logger.error("Error generating category examples for %s: %s", tool_name, e)
 
-        # Generate edge case examples
-        edge_examples = self._generate_edge_case_examples(tool_metadata)
-        examples.extend(edge_examples)
+            # Generate parameter combination examples
+            try:
+                param_examples = self._generate_parameter_combination_examples(tool_metadata)
+                if isinstance(param_examples, list):
+                    examples.extend(param_examples)
+                else:
+                    logger.warning("Parameter examples is not a list for tool %s", tool_name)
+            except Exception as e:
+                logger.error("Error generating parameter combination examples for %s: %s", tool_name, e)
 
-        logger.debug("Generated %d synthetic examples for %s", len(examples), tool_metadata.name)
+            # Generate edge case examples
+            try:
+                edge_examples = self._generate_edge_case_examples(tool_metadata)
+                if isinstance(edge_examples, list):
+                    examples.extend(edge_examples)
+                else:
+                    logger.warning("Edge case examples is not a list for tool %s", tool_name)
+            except Exception as e:
+                logger.error("Error generating edge case examples for %s: %s", tool_name, e)
 
-        return examples[:5]  # Limit to 5 examples to avoid overwhelming
+            logger.debug("Generated %d synthetic examples for %s", len(examples), tool_name)
+
+            return examples[:5]  # Limit to 5 examples to avoid overwhelming
+
+        except Exception as e:
+            logger.error("Critical error generating synthetic examples: %s", e)
+            return []
 
     def validate_example_value(self, value: str, parameter: ParameterAnalysis) -> ExampleValidationResult:
         """
@@ -330,7 +358,10 @@ class ExampleGenerator:
             examples.append(
                 ToolExample(
                     use_case="Using default values",
-                    example_call=f"# {default_params[0].name} defaults to {default_params[0].default_value}\n{tool_metadata.name.lower()}(...)",
+                    example_call=(
+                        f"# {default_params[0].name} defaults to {default_params[0].default_value}\n"
+                        f"{tool_metadata.name.lower()}(...)"
+                    ),
                     effectiveness_score=0.5,
                 )
             )

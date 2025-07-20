@@ -3,24 +3,17 @@
 MCP Metadata Extractor
 
 This module provides sophisticated metadata extraction capabilities that can parse
-tool definitions, docstrings, and schemas to create rich, searchable metadata for 
-MCP tools. This enables intelligent tool discovery based on functionality, 
+tool definitions, docstrings, and schemas to create rich, searchable metadata for
+MCP tools. This enables intelligent tool discovery based on functionality,
 parameters, and usage patterns.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from docstring_parser import DocstringParser
 from example_generator import ExampleGenerator
 from logging_config import get_logger
-from mcp_metadata_types import (
-    ComplexityAnalysis,
-    DocumentationAnalysis,
-    MCPToolMetadata,
-    ParameterAnalysis,
-    ToolExample,
-    UsagePattern,
-)
+from mcp_metadata_types import DocumentationAnalysis, MCPToolMetadata, ParameterAnalysis, UsagePattern
 from schema_analyzer import SchemaAnalyzer
 from usage_pattern_detector import UsagePatternDetector
 
@@ -49,55 +42,135 @@ class MCPMetadataExtractor:
         Returns:
             MCPToolMetadata object with extracted comprehensive metadata
         """
-        name = tool_def.get("name", "Unknown Tool")
-        description = tool_def.get("description", "")
+        try:
+            if not isinstance(tool_def, dict):
+                logger.error("Tool definition is not a dictionary: %s", tool_def)
+                raise ValueError("Invalid tool definition format")
 
-        logger.debug("Extracting comprehensive metadata for tool: %s", name)
+            name = tool_def.get("name", "Unknown Tool")
+            description = tool_def.get("description", "")
 
-        # Parse tool documentation
-        doc_analysis = self.parse_tool_documentation(description)
+            # Validate basic tool information
+            if not isinstance(name, str):
+                logger.warning("Tool name is not a string: %s", name)
+                name = str(name) if name is not None else "Unknown Tool"
 
-        # Analyze parameter schema - handle both old and new formats
-        parameters_schema = tool_def.get("parameters", {})
-        if isinstance(parameters_schema, list):
-            # Old format - list of parameter definitions
-            parameter_analyses = self.analyze_parameter_schema(parameters_schema)
-        else:
-            # New format - JSON schema object
-            parameter_analyses = self.analyze_parameter_schema(parameters_schema)
+            if not isinstance(description, str):
+                logger.warning("Tool description is not a string: %s", description)
+                description = str(description) if description is not None else ""
 
-        # Create base metadata object
-        metadata = MCPToolMetadata(
-            name=name,
-            description=doc_analysis.description or description,
-            category=self._infer_category(name, description),
-            parameters=parameter_analyses,
-            examples=doc_analysis.examples,
-            documentation_analysis=doc_analysis,
-        )
+            logger.debug("Extracting comprehensive metadata for tool: %s", name)
 
-        # Infer usage patterns
-        usage_patterns = self.infer_usage_patterns(metadata)
-        metadata.usage_patterns = usage_patterns
+            # Parse tool documentation
+            try:
+                doc_analysis = self.parse_tool_documentation(description)
+            except Exception as e:
+                logger.error("Error parsing tool documentation for '%s': %s", name, e)
+                # Create minimal documentation analysis
+                from mcp_metadata_types import DocumentationAnalysis
 
-        # Generate complexity analysis
-        complexity_analysis = self.pattern_detector.analyze_parameter_complexity(parameter_analyses)
-        metadata.complexity_analysis = complexity_analysis
+                doc_analysis = DocumentationAnalysis(description=description)
 
-        # Generate additional examples if needed
-        if len(metadata.examples) < 3:  # Ensure at least 3 examples
-            synthetic_examples = self.example_generator.generate_synthetic_examples(metadata)
-            metadata.examples.extend(synthetic_examples)
+            # Analyze parameter schema - handle both old and new formats
+            try:
+                parameters_schema = tool_def.get("parameters", {})
+                if isinstance(parameters_schema, list):
+                    # Old format - list of parameter definitions
+                    parameter_analyses = self.analyze_parameter_schema(parameters_schema)
+                else:
+                    # New format - JSON schema object
+                    parameter_analyses = self.analyze_parameter_schema(parameters_schema)
+            except Exception as e:
+                logger.error("Error analyzing parameter schema for '%s': %s", name, e)
+                parameter_analyses = []
 
-        logger.debug(
-            "Extracted metadata for %s: %d parameters, %d patterns, %d examples",
-            name,
-            len(parameter_analyses),
-            len(usage_patterns),
-            len(metadata.examples),
-        )
+            # Create base metadata object
+            try:
+                metadata = MCPToolMetadata(
+                    name=name,
+                    description=doc_analysis.description or description,
+                    category=self._infer_category(name, description),
+                    parameters=parameter_analyses,
+                    examples=doc_analysis.examples if hasattr(doc_analysis, "examples") else [],
+                    documentation_analysis=doc_analysis,
+                )
+            except Exception as e:
+                logger.error("Error creating base metadata object for '%s': %s", name, e)
+                # Create minimal metadata object
+                metadata = MCPToolMetadata(
+                    name=name,
+                    description=description,
+                    category="utility",
+                    parameters=parameter_analyses,
+                    examples=[],
+                    documentation_analysis=doc_analysis,
+                )
 
-        return metadata
+            # Infer usage patterns
+            try:
+                usage_patterns = self.infer_usage_patterns(metadata)
+                metadata.usage_patterns = usage_patterns
+            except Exception as e:
+                logger.error("Error inferring usage patterns for '%s': %s", name, e)
+                metadata.usage_patterns = []
+
+            # Generate complexity analysis
+            try:
+                complexity_analysis = self.pattern_detector.analyze_parameter_complexity(parameter_analyses)
+                metadata.complexity_analysis = complexity_analysis
+            except Exception as e:
+                logger.error("Error generating complexity analysis for '%s': %s", name, e)
+                # Create minimal complexity analysis
+                from mcp_metadata_types import ComplexityAnalysis
+
+                metadata.complexity_analysis = ComplexityAnalysis(
+                    overall_complexity=0.5,
+                    parameter_complexity=0.5,
+                    relationship_complexity=0.0,
+                    constraint_complexity=0.0,
+                )
+
+            # Generate additional examples if needed
+            try:
+                current_examples = metadata.examples if metadata.examples else []
+                if len(current_examples) < 3:  # Ensure at least 3 examples
+                    synthetic_examples = self.example_generator.generate_synthetic_examples(metadata)
+                    if isinstance(synthetic_examples, list):
+                        metadata.examples.extend(synthetic_examples)
+            except Exception as e:
+                logger.error("Error generating synthetic examples for '%s': %s", name, e)
+
+            logger.debug(
+                "Extracted metadata for %s: %d parameters, %d patterns, %d examples",
+                name,
+                len(parameter_analyses),
+                len(metadata.usage_patterns),
+                len(metadata.examples),
+            )
+
+            return metadata
+
+        except Exception as e:
+            logger.error("Critical error extracting metadata from tool definition: %s", e)
+            # Return minimal metadata object
+            tool_name = tool_def.get("name", "Unknown Tool") if isinstance(tool_def, dict) else "Unknown Tool"
+            from mcp_metadata_types import ComplexityAnalysis, DocumentationAnalysis
+
+            return MCPToolMetadata(
+                name=tool_name,
+                description="Error processing tool definition",
+                category="utility",
+                parameters=[],
+                examples=[],
+                documentation_analysis=DocumentationAnalysis(description=""),
+                usage_patterns=[],
+                complexity_analysis=ComplexityAnalysis(
+                    overall_complexity=0.5,
+                    parameter_complexity=0.5,
+                    relationship_complexity=0.0,
+                    constraint_complexity=0.0,
+                ),
+            )
 
     def analyze_parameter_schema(self, schema: Dict[str, Any]) -> List[ParameterAnalysis]:
         """

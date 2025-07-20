@@ -7,6 +7,7 @@ analyze parameter complexity, and generate confidence scores for different
 usage scenarios based on tool structure and metadata.
 """
 
+from functools import lru_cache
 from typing import Any, Dict, List
 
 from logging_config import get_logger
@@ -17,6 +18,17 @@ logger = get_logger(__name__)
 
 class UsagePatternDetector:
     """Detect and classify tool usage patterns."""
+
+    # Configuration constants
+    DEFAULT_COMPLEXITY_SCORE = 0.5
+    NO_COMPLEXITY_SCORE = 0.0
+    MAX_COMPLEXITY_SCORE = 1.0
+    COMPLEX_PARAMETER_THRESHOLD = 0.5
+    DEFAULT_SUCCESS_PROBABILITY = 0.7
+
+    # Pattern matching constants
+    MAX_PATTERN_EXAMPLES = 5
+    DEFAULT_PARAMETER_DEPTH = 1
 
     # Complexity factor weights for overall tool scoring
     COMPLEXITY_FACTORS = {
@@ -65,6 +77,31 @@ class UsagePatternDetector:
         """Initialize the usage pattern detector."""
         logger.info("Initialized Usage Pattern Detector")
 
+    @lru_cache(maxsize=128)
+    def _calculate_cached_factor_score(self, value: int, simple_threshold: int, complex_threshold: int) -> float:
+        """
+        Cached calculation of complexity factor score.
+
+        Args:
+            value: Value to calculate score for
+            simple_threshold: Threshold for simple complexity
+            complex_threshold: Threshold for complex complexity
+
+        Returns:
+            Normalized complexity score between 0.0 and 1.0
+        """
+        return self._calculate_factor_score(value, simple_threshold, complex_threshold)
+
+    @lru_cache(maxsize=64)
+    def _get_cached_complexity_factors(self):
+        """
+        Get cached complexity factors dictionary to avoid repeated dictionary access.
+
+        Returns:
+            Complexity factors configuration
+        """
+        return self.COMPLEXITY_FACTORS
+
     def analyze_parameter_complexity(self, parameters: List[ParameterAnalysis]) -> ComplexityAnalysis:
         """
         Analyze tool complexity based on parameters.
@@ -75,72 +112,173 @@ class UsagePatternDetector:
         Returns:
             ComplexityAnalysis object with complexity metrics
         """
-        if not parameters:
+        try:
+            if not parameters or not isinstance(parameters, list):
+                logger.debug("Empty or invalid parameters list for complexity analysis")
+                return ComplexityAnalysis(
+                    total_parameters=0,
+                    required_parameters=0,
+                    optional_parameters=0,
+                    complex_parameters=0,
+                    overall_complexity=self.NO_COMPLEXITY_SCORE,
+                )
+
+            # Filter out invalid parameters and log warnings
+            valid_parameters = []
+            for i, param in enumerate(parameters):
+                try:
+                    if hasattr(param, "required") and hasattr(param, "complexity_score"):
+                        valid_parameters.append(param)
+                    else:
+                        logger.warning("Invalid parameter at index %d, missing required attributes", i)
+                except Exception as e:
+                    logger.warning("Error validating parameter at index %d: %s", i, e)
+                    continue
+
+            if not valid_parameters:
+                logger.warning("No valid parameters found for complexity analysis")
+                return ComplexityAnalysis(
+                    total_parameters=0,
+                    required_parameters=0,
+                    optional_parameters=0,
+                    complex_parameters=0,
+                    overall_complexity=self.NO_COMPLEXITY_SCORE,
+                )
+
+            total_params = len(valid_parameters)
+
+            try:
+                required_params = sum(1 for p in valid_parameters if getattr(p, "required", False))
+            except Exception as e:
+                logger.error("Error counting required parameters: %s", e)
+                required_params = 0
+
+            optional_params = total_params - required_params
+
+            try:
+                complex_params = sum(
+                    1 for p in valid_parameters if getattr(p, "complexity_score", 0) > self.COMPLEX_PARAMETER_THRESHOLD
+                )
+            except Exception as e:
+                logger.error("Error counting complex parameters: %s", e)
+                complex_params = 0
+
+            # Calculate overall complexity
+            complexity_factors = {}
+
+            # Parameter count factor (using cached calculation)
+            try:
+                factors = self._get_cached_complexity_factors()
+                param_count_score = self._calculate_cached_factor_score(
+                    total_params,
+                    factors["parameter_count"]["threshold_simple"],
+                    factors["parameter_count"]["threshold_complex"],
+                )
+                complexity_factors["parameter_count"] = param_count_score
+            except Exception as e:
+                logger.error("Error calculating parameter count score: %s", e)
+                complexity_factors["parameter_count"] = self.DEFAULT_COMPLEXITY_SCORE
+
+            # Required parameters factor (using cached calculation)
+            try:
+                factors = self._get_cached_complexity_factors()
+                required_score = self._calculate_cached_factor_score(
+                    required_params,
+                    factors["required_parameters"]["threshold_simple"],
+                    factors["required_parameters"]["threshold_complex"],
+                )
+                complexity_factors["required_parameters"] = required_score
+            except Exception as e:
+                logger.error("Error calculating required parameters score: %s", e)
+                complexity_factors["required_parameters"] = self.DEFAULT_COMPLEXITY_SCORE
+
+            # Type complexity factor
+            try:
+                param_scores = []
+                for p in valid_parameters:
+                    try:
+                        score = getattr(p, "complexity_score", 0.5)
+                        if isinstance(score, (int, float)) and 0 <= score <= 1:
+                            param_scores.append(score)
+                        else:
+                            logger.warning(
+                                "Invalid complexity score %s for parameter %s", score, getattr(p, "name", "unknown")
+                            )
+                            param_scores.append(0.5)
+                    except Exception as e:
+                        logger.warning("Error getting complexity score for parameter: %s", e)
+                        param_scores.append(0.5)
+
+                avg_param_complexity = sum(param_scores) / len(param_scores) if param_scores else 0.5
+                complexity_factors["type_complexity"] = avg_param_complexity
+            except Exception as e:
+                logger.error("Error calculating type complexity: %s", e)
+                complexity_factors["type_complexity"] = self.DEFAULT_COMPLEXITY_SCORE
+
+            # Schema depth factor (based on nested structures)
+            try:
+                depths = []
+                for p in valid_parameters:
+                    try:
+                        depth = self._calculate_parameter_depth(p)
+                        depths.append(depth)
+                    except Exception as e:
+                        logger.warning("Error calculating depth for parameter %s: %s", getattr(p, "name", "unknown"), e)
+                        depths.append(1)
+
+                max_depth = max(depths) if depths else 1
+                depth_score = self._calculate_cached_factor_score(max_depth, 2, 4)
+                complexity_factors["schema_depth"] = depth_score
+            except Exception as e:
+                logger.error("Error calculating schema depth: %s", e)
+                complexity_factors["schema_depth"] = self.DEFAULT_COMPLEXITY_SCORE
+
+            # Calculate weighted overall complexity
+            try:
+                overall_complexity = 0.0
+                for factor, score in complexity_factors.items():
+                    try:
+                        weight = self.COMPLEXITY_FACTORS.get(factor, {}).get("weight", 0.1)
+                        if isinstance(score, (int, float)) and isinstance(weight, (int, float)):
+                            overall_complexity += score * weight
+                        else:
+                            logger.warning("Invalid score or weight for factor %s: %s, %s", factor, score, weight)
+                    except Exception as e:
+                        logger.warning("Error calculating weighted complexity for factor %s: %s", factor, e)
+                        continue
+
+                # Cap at 1.0
+                overall_complexity = min(overall_complexity, 1.0)
+            except Exception as e:
+                logger.error("Error calculating overall complexity: %s", e)
+                overall_complexity = self.DEFAULT_COMPLEXITY_SCORE
+
+            logger.debug(
+                "Analyzed parameter complexity: %d total, %d required, %.2f overall",
+                total_params,
+                required_params,
+                overall_complexity,
+            )
+
+            return ComplexityAnalysis(
+                total_parameters=total_params,
+                required_parameters=required_params,
+                optional_parameters=optional_params,
+                complex_parameters=complex_params,
+                overall_complexity=overall_complexity,
+                complexity_factors=complexity_factors,
+            )
+
+        except Exception as e:
+            logger.error("Critical error in parameter complexity analysis: %s", e)
             return ComplexityAnalysis(
                 total_parameters=0,
                 required_parameters=0,
                 optional_parameters=0,
                 complex_parameters=0,
-                overall_complexity=0.0,
+                overall_complexity=self.DEFAULT_COMPLEXITY_SCORE,
+                complexity_factors={},
             )
-
-        total_params = len(parameters)
-        required_params = sum(1 for p in parameters if p.required)
-        optional_params = total_params - required_params
-        complex_params = sum(1 for p in parameters if p.complexity_score > 0.5)
-
-        # Calculate overall complexity
-        complexity_factors = {}
-
-        # Parameter count factor
-        param_count_score = self._calculate_factor_score(
-            total_params,
-            self.COMPLEXITY_FACTORS["parameter_count"]["threshold_simple"],
-            self.COMPLEXITY_FACTORS["parameter_count"]["threshold_complex"],
-        )
-        complexity_factors["parameter_count"] = param_count_score
-
-        # Required parameters factor
-        required_score = self._calculate_factor_score(
-            required_params,
-            self.COMPLEXITY_FACTORS["required_parameters"]["threshold_simple"],
-            self.COMPLEXITY_FACTORS["required_parameters"]["threshold_complex"],
-        )
-        complexity_factors["required_parameters"] = required_score
-
-        # Type complexity factor
-        avg_param_complexity = sum(p.complexity_score for p in parameters) / total_params
-        complexity_factors["type_complexity"] = avg_param_complexity
-
-        # Schema depth factor (based on nested structures)
-        max_depth = max((self._calculate_parameter_depth(p) for p in parameters), default=1)
-        depth_score = self._calculate_factor_score(max_depth, 2, 4)
-        complexity_factors["schema_depth"] = depth_score
-
-        # Calculate weighted overall complexity
-        overall_complexity = 0.0
-        for factor, score in complexity_factors.items():
-            weight = self.COMPLEXITY_FACTORS.get(factor, {}).get("weight", 0.1)
-            overall_complexity += score * weight
-
-        # Cap at 1.0
-        overall_complexity = min(overall_complexity, 1.0)
-
-        logger.debug(
-            "Analyzed parameter complexity: %d total, %d required, %.2f overall",
-            total_params,
-            required_params,
-            overall_complexity,
-        )
-
-        return ComplexityAnalysis(
-            total_parameters=total_params,
-            required_parameters=required_params,
-            optional_parameters=optional_params,
-            complex_parameters=complex_params,
-            overall_complexity=overall_complexity,
-            complexity_factors=complexity_factors,
-        )
 
     def identify_common_patterns(self, tool_metadata: MCPToolMetadata) -> List[UsagePattern]:
         """
