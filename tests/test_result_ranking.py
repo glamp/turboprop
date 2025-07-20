@@ -14,11 +14,13 @@ from typing import List
 from unittest.mock import Mock, patch
 
 from result_ranking import (
-    RankingWeights, MatchReason, RankingContext, ResultRanker,
-    FileTypeScorer, ConstructTypeScorer, RecencyScorer, FileSizeScorer,
-    MatchReasonGenerator, ConfidenceScorer, ResultDeduplicator,
+    RankingWeights, ResultRanker,
     rank_search_results, generate_match_explanations, calculate_advanced_confidence
 )
+from ranking_utils import (
+    MatchReason, RankingContext, MatchReasonGenerator, ConfidenceScorer, ResultDeduplicator
+)
+from ranking_scorers import FileTypeScorer, ConstructTypeScorer, RecencyScorer, FileSizeScorer
 from search_result_types import CodeSnippet, CodeSearchResult
 from ranking_exceptions import InvalidRankingWeightsError
 

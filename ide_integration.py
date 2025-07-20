@@ -71,19 +71,19 @@ class IDEIntegration:
         # Input validation
         if not file_path or not isinstance(file_path, str):
             raise ValueError("file_path must be a non-empty string")
-        
+
         if not isinstance(line_number, int) or line_number < 1:
             raise ValueError("line_number must be a positive integer (1-indexed)")
-        
+
         if not isinstance(column, int) or column < 1:
             raise ValueError("column must be a positive integer (1-indexed)")
-        
+
         # Validate file path can be resolved
         try:
             abs_path = Path(file_path).resolve()
         except (OSError, ValueError) as e:
             raise ValueError(f"Invalid file path '{file_path}': {e}")
-        
+
         urls = []
 
         # VS Code
@@ -188,7 +188,7 @@ class IDEIntegration:
             available = False
             # Log the specific error for debugging
             import sys
-            print(f"IDE detection failed for {ide_type.value}: {type(e).__name__}: {e}", 
+            print(f"IDE detection failed for {ide_type.value}: {type(e).__name__}: {e}",
                   file=sys.stderr)
 
         self._ide_cache[ide_type] = available
@@ -238,7 +238,7 @@ class IDEIntegration:
         # Input validation
         if not file_path or not isinstance(file_path, str):
             raise ValueError("file_path must be a non-empty string")
-        
+
         try:
             path = Path(file_path)
         except (ValueError, TypeError) as e:
@@ -249,31 +249,31 @@ class IDEIntegration:
             try:
                 # Convert WSL paths like /mnt/c/... to C:\...
                 parts = path.parts
-                
+
                 # Validate WSL path structure: /mnt/<drive>/<path...>
                 if len(parts) < 3:
                     raise ValueError("WSL path must have at least drive letter: /mnt/<drive>/")
-                
+
                 if parts[0] != "/" or parts[1] != "mnt":
                     raise ValueError("Invalid WSL path format: must start with /mnt/")
-                
+
                 drive_letter = parts[2].lower()
                 if len(drive_letter) != 1 or not drive_letter.isalpha():
                     raise ValueError(f"Invalid WSL drive letter: '{drive_letter}' (must be single letter)")
-                
+
                 # Build Windows path
                 remaining_parts = parts[3:] if len(parts) > 3 else []
                 windows_drive = drive_letter.upper() + ":"
-                
+
                 if remaining_parts:
                     return str(Path(windows_drive).joinpath(*remaining_parts))
                 else:
                     return windows_drive + "\\"
-                    
+
             except (ValueError, IndexError) as e:
                 # If WSL path conversion fails, log warning and fall back to original path
                 import sys
-                print(f"WSL path conversion failed for '{path}': {e}. Using original path.", 
+                print(f"WSL path conversion failed for '{path}': {e}. Using original path.",
                       file=sys.stderr)
                 # Continue to normal path resolution
 
@@ -359,13 +359,13 @@ class IDEIntegration:
         # Input validation
         if not file_path or not isinstance(file_path, str):
             raise ValueError("file_path must be a non-empty string")
-        
+
         if not isinstance(content, str):
             raise ValueError("content must be a string")
-        
+
         if target_line is not None and (not isinstance(target_line, int) or target_line < 1):
             raise ValueError("target_line must be a positive integer (1-indexed) or None")
-        
+
         language = self.get_language_from_extension(file_path)
         hints = []
 

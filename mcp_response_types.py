@@ -389,7 +389,7 @@ def _create_result_clusters(results: List[CodeSearchResult]) -> List[ResultClust
     clusters = []
 
     # Cluster by language
-    language_groups = {}
+    language_groups: Dict[str, List[CodeSearchResult]] = {}
     for result in results:
         if result.file_metadata and 'language' in result.file_metadata:
             lang = result.file_metadata['language']
@@ -409,7 +409,7 @@ def _create_result_clusters(results: List[CodeSearchResult]) -> List[ResultClust
             clusters.append(cluster)
 
     # Cluster by directory if we have multiple results from same directories
-    directory_groups = {}
+    directory_groups: Dict[str, List[CodeSearchResult]] = {}
     for result in results:
         directory = str(Path(result.file_path).parent)
         if directory not in directory_groups:

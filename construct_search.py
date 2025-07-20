@@ -25,7 +25,7 @@ from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from search_result_types import CodeSnippet, CodeSearchResult
 from config import config
-from exceptions import DatabaseError, EmbeddingError, SearchError
+from exceptions import DatabaseError, SearchError
 from error_handling_utils import handle_search_errors, handle_statistics_errors
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class SearchResultMetrics:
     """Search-related metrics and confidence."""
     similarity_score: float
     confidence_level: Optional[str] = None
-    
+
     def __post_init__(self):
         """Initialize confidence level based on similarity score."""
         if self.confidence_level is None:
@@ -88,51 +88,51 @@ class ConstructSearchResult:
     location: ConstructLocation
     metadata: ConstructMetadata
     metrics: SearchResultMetrics
-    
+
     @property
     def construct_id(self) -> str:
         return self.identity.construct_id
-    
+
     @property
     def construct_type(self) -> str:
         return self.identity.construct_type
-    
+
     @property
     def name(self) -> str:
         return self.identity.name
-    
+
     @property
     def signature(self) -> str:
         return self.identity.signature
-    
+
     @property
     def file_path(self) -> str:
         return self.location.file_path
-    
+
     @property
     def start_line(self) -> int:
         return self.location.start_line
-    
+
     @property
     def end_line(self) -> int:
         return self.location.end_line
-    
+
     @property
     def file_id(self) -> Optional[str]:
         return self.location.file_id
-    
+
     @property
     def docstring(self) -> Optional[str]:
         return self.metadata.docstring
-    
+
     @property
     def parent_construct_id(self) -> Optional[str]:
         return self.metadata.parent_construct_id
-    
+
     @property
     def similarity_score(self) -> float:
         return self.metrics.similarity_score
-    
+
     @property
     def confidence_level(self) -> Optional[str]:
         return self.metrics.confidence_level

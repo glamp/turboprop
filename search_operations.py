@@ -9,7 +9,6 @@ This module contains functions for searching the code index:
 """
 
 import logging
-import math
 import sys
 import time
 from pathlib import Path
@@ -18,8 +17,7 @@ from typing import Dict, List, Optional, Tuple
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from search_result_types import CodeSnippet, CodeSearchResult
-from snippet_extractor import SnippetExtractor
-from search_utils import create_enhanced_snippet, create_multi_snippets, extract_file_metadata, detect_file_language, search_index_enhanced
+from search_utils import create_enhanced_snippet, extract_file_metadata, detect_file_language, search_index_enhanced
 from config import config
 from mcp_response_types import (
     SearchResponse, QueryAnalysis, ResultCluster,
@@ -29,8 +27,7 @@ import response_config
 from construct_search import ConstructSearchOperations, ConstructSearchResult
 from result_ranking import rank_search_results, RankingWeights, generate_match_explanations
 from hybrid_search import (
-    HybridSearchEngine, SearchMode, FusionWeights, QueryAnalyzer,
-    search_hybrid as search_hybrid_new, search_hybrid_with_details, HybridSearchFormatter
+    HybridSearchEngine, SearchMode, FusionWeights, QueryAnalyzer
 )
 
 # Constants
@@ -1026,13 +1023,13 @@ def search_with_hybrid_fusion(
 ) -> List[CodeSearchResult]:
     """
     Enhanced hybrid search combining semantic similarity with exact text matching.
-    
+
     This function implements the new hybrid search algorithm that combines:
     - Semantic search using embeddings for conceptual matches
     - Full-text search for exact keyword and phrase matching
     - Intelligent query routing based on query characteristics
     - Result fusion using Reciprocal Rank Fusion (RRF) and weighted scoring
-    
+
     Args:
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance
@@ -1041,7 +1038,7 @@ def search_with_hybrid_fusion(
         mode: Search mode - "auto", "hybrid", "semantic", "text"
         fusion_weights: Optional custom fusion weights
         enable_query_expansion: Whether to expand queries for better semantic matches
-        
+
     Returns:
         List of CodeSearchResult objects with fused rankings
     """
@@ -1054,7 +1051,7 @@ def search_with_hybrid_fusion(
             search_mode = SearchMode.SEMANTIC_ONLY
         elif mode == "text":
             search_mode = SearchMode.TEXT_ONLY
-        
+
         # Create custom fusion weights if provided
         weights = None
         if fusion_weights:
@@ -1065,19 +1062,19 @@ def search_with_hybrid_fusion(
                 boost_exact_matches=fusion_weights.get('boost_exact_matches', True),
                 exact_match_boost=fusion_weights.get('exact_match_boost', 1.5)
             )
-        
+
         # Use the hybrid search engine
         engine = HybridSearchEngine(db_manager, embedder, weights)
         hybrid_results = engine.search(
             query, k, search_mode, weights, enable_query_expansion
         )
-        
+
         # Extract CodeSearchResult objects
         results = [hr.code_result for hr in hybrid_results]
-        
+
         logger.info(f"Hybrid fusion search for '{query}' returned {len(results)} results")
         return results
-        
+
     except Exception as e:
         logger.error(f"Hybrid fusion search failed for query '{query}': {e}")
         return []
@@ -1085,14 +1082,14 @@ def search_with_hybrid_fusion(
 
 def search_with_intelligent_routing(
     db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator, 
+    embedder: EmbeddingGenerator,
     query: str,
     k: int = 10,
     enable_advanced_features: bool = True
 ) -> List[CodeSearchResult]:
     """
     Intelligent search with automatic query routing and preprocessing.
-    
+
     This function analyzes the query to determine the optimal search strategy:
     - Quoted phrases → exact text matching
     - Boolean operators → full-text search with operators
@@ -1100,14 +1097,14 @@ def search_with_intelligent_routing(
     - Natural language → semantic search
     - Technical terms → hybrid search with text bias
     - Mixed queries → full hybrid search
-    
+
     Args:
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance
         query: Search query string
         k: Number of results to return
         enable_advanced_features: Whether to enable regex and wildcard search
-        
+
     Returns:
         List of CodeSearchResult objects from the optimal search method
     """
@@ -1115,35 +1112,35 @@ def search_with_intelligent_routing(
         # Analyze query characteristics
         analyzer = QueryAnalyzer()
         characteristics = analyzer.analyze_query(query)
-        
+
         logger.debug(f"Query routing analysis for '{query}': {characteristics}")
-        
+
         # Route to specialized search based on query type
-        
+
         # Handle regex patterns
         if characteristics.has_regex_patterns and enable_advanced_features:
             return _search_regex_with_results(db_manager, query, k)
-        
+
         # Handle quoted phrases - prefer exact matching
         if characteristics.has_quoted_phrases:
             return _search_exact_phrases(db_manager, embedder, query, k)
-        
+
         # Handle Boolean operators
         if characteristics.has_boolean_operators:
             return _search_boolean_query(db_manager, embedder, query, k)
-        
+
         # Handle file type filtering
         file_types = _extract_file_type_filters(query)
         if file_types:
             return _search_with_file_type_filter(
                 db_manager, embedder, query, k, file_types
             )
-        
+
         # Use hybrid search for most queries
         return search_with_hybrid_fusion(
             db_manager, embedder, query, k, mode="auto"
         )
-        
+
     except Exception as e:
         logger.error(f"Intelligent routing search failed for query '{query}': {e}")
         # Fallback to standard enhanced search
@@ -1157,12 +1154,12 @@ def _search_regex_with_results(
     try:
         # Use database manager's regex search
         regex_results = db_manager.search_regex(pattern, k)
-        
+
         results = []
         for file_id, path, content, relevance_score in regex_results:
             snippet = create_enhanced_snippet(content, path, pattern)
-            file_metadata = extract_file_metadata(path, content) 
-            
+            file_metadata = extract_file_metadata(path, content)
+
             result = CodeSearchResult(
                 file_path=path,
                 snippet=snippet,
@@ -1171,9 +1168,9 @@ def _search_regex_with_results(
             )
             result.match_reasons = ["Regex pattern match"]
             results.append(result)
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Regex search failed for pattern '{pattern}': {e}")
         return []
@@ -1182,7 +1179,7 @@ def _search_regex_with_results(
 def _search_exact_phrases(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
-    query: str, 
+    query: str,
     k: int
 ) -> List[CodeSearchResult]:
     """Search for exact phrases using text search with semantic fallback."""
@@ -1190,23 +1187,23 @@ def _search_exact_phrases(
         # Extract phrases from quotes
         import re
         phrases = re.findall(r'"([^"]*)"', query)
-        
+
         if not phrases:
             # No actual quotes found, use hybrid search
             return search_with_hybrid_fusion(db_manager, embedder, query, k, "text")
-        
+
         # Search for each phrase using text search
         all_results = []
         seen_paths = set()
-        
+
         for phrase in phrases:
             phrase_results = db_manager.search_full_text(phrase, limit=k * 2)
-            
+
             for file_id, path, content, relevance_score in phrase_results:
                 if path not in seen_paths:
                     snippet = create_enhanced_snippet(content, path, phrase)
                     file_metadata = extract_file_metadata(path, content)
-                    
+
                     result = CodeSearchResult(
                         file_path=path,
                         snippet=snippet,
@@ -1216,11 +1213,11 @@ def _search_exact_phrases(
                     result.match_reasons = [f"Exact phrase match: '{phrase}'"]
                     all_results.append(result)
                     seen_paths.add(path)
-        
+
         # Sort by relevance and return top k
         all_results.sort(key=lambda r: r.similarity_score, reverse=True)
         return all_results[:k]
-        
+
     except Exception as e:
         logger.error(f"Exact phrase search failed for query '{query}': {e}")
         return []
@@ -1236,23 +1233,23 @@ def _search_boolean_query(
     try:
         # Use full-text search for Boolean operators
         boolean_results = db_manager.search_full_text(query, limit=k, enable_fuzzy=False)
-        
+
         results = []
         for file_id, path, content, relevance_score in boolean_results:
             snippet = create_enhanced_snippet(content, path, query)
             file_metadata = extract_file_metadata(path, content)
-            
+
             result = CodeSearchResult(
                 file_path=path,
-                snippet=snippet, 
+                snippet=snippet,
                 similarity_score=relevance_score,
                 file_metadata=file_metadata
             )
             result.match_reasons = ["Boolean operator match"]
             results.append(result)
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Boolean query search failed for query '{query}': {e}")
         return []
@@ -1261,22 +1258,22 @@ def _search_boolean_query(
 def _extract_file_type_filters(query: str) -> List[str]:
     """Extract file type filters from query (e.g., 'filetype:py' or 'ext:js')."""
     import re
-    
+
     # Look for filetype: or ext: patterns
     file_type_patterns = [
-        r'\bfiletype:(\w+)', 
+        r'\bfiletype:(\w+)',
         r'\bext:(\w+)',
         r'\.(\w+)\s+files?',
         r'(\w+)\s+files?'
     ]
-    
+
     file_types = []
     for pattern in file_type_patterns:
         matches = re.findall(pattern, query.lower())
         for match in matches:
             if match in ['py', 'js', 'ts', 'java', 'cpp', 'c', 'go', 'rs', 'rb', 'php']:
                 file_types.append(f'.{match}')
-    
+
     return list(set(file_types))  # Remove duplicates
 
 
@@ -1295,18 +1292,18 @@ def _search_with_file_type_filter(
         for pattern in [r'\bfiletype:\w+', r'\bext:\w+', r'\.\w+\s+files?', r'\w+\s+files?']:
             clean_query = re.sub(pattern, '', clean_query, flags=re.IGNORECASE)
         clean_query = clean_query.strip()
-        
+
         if not clean_query:
             clean_query = "code"  # Default search term
-        
+
         # Use database manager's file type search
         type_results = db_manager.search_by_file_type_fts(clean_query, file_types, k)
-        
+
         results = []
         for file_id, path, content, relevance_score in type_results:
             snippet = create_enhanced_snippet(content, path, clean_query)
             file_metadata = extract_file_metadata(path, content)
-            
+
             result = CodeSearchResult(
                 file_path=path,
                 snippet=snippet,
@@ -1315,9 +1312,9 @@ def _search_with_file_type_filter(
             )
             result.match_reasons = [f"File type filter: {', '.join(file_types)}"]
             results.append(result)
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"File type filtered search failed: {e}")
         return []
@@ -1334,7 +1331,7 @@ def search_with_date_range(
 ) -> List[CodeSearchResult]:
     """
     Search with date range filtering for recently modified files.
-    
+
     Args:
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance
@@ -1343,7 +1340,7 @@ def search_with_date_range(
         days_back: Number of days back to search (alternative to start/end dates)
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
-        
+
     Returns:
         List of CodeSearchResult objects filtered by modification date
     """
@@ -1351,7 +1348,7 @@ def search_with_date_range(
         # Build date filter SQL clause
         date_filter = ""
         params = []
-        
+
         if days_back:
             date_filter = "AND file_mtime >= datetime('now', '-{} days')".format(days_back)
         elif start_date or end_date:
@@ -1364,13 +1361,13 @@ def search_with_date_range(
             elif end_date:
                 date_filter = "AND file_mtime <= ?"
                 params = [end_date]
-        
+
         # Perform enhanced search first
         base_results = search_index_enhanced(db_manager, embedder, query, k * 2)
-        
+
         if not date_filter:
             return base_results[:k]
-        
+
         # Filter by date if date filter is specified
         filtered_results = []
         for result in base_results:
@@ -1379,69 +1376,77 @@ def search_with_date_range(
                 check_sql = f"SELECT file_mtime FROM {TABLE_NAME} WHERE path = ? {date_filter}"
                 check_params = [result.file_path] + params
                 date_result = db_manager.execute_with_retry(check_sql, tuple(check_params))
-                
+
                 if date_result:
                     filtered_results.append(result)
                     if len(filtered_results) >= k:
                         break
-                        
+
             except Exception as e:
                 logger.warning(f"Date filtering failed for {result.file_path}: {e}")
                 continue
-        
+
         return filtered_results
-        
+
     except Exception as e:
         logger.error(f"Date range search failed: {e}")
         return []
 
 
 def format_hybrid_search_results(
-    results: List[CodeSearchResult], 
+    results: List[CodeSearchResult],
     query: str,
     show_fusion_details: bool = False,
+    show_construct_context: bool = True,
     repo_path: Optional[str] = None
 ) -> str:
     """
     Format hybrid search results with enhanced information display.
-    
+
     Args:
         results: List of search results
         query: Original search query
         show_fusion_details: Whether to show detailed fusion scoring
+        show_construct_context: Whether to show construct context information
         repo_path: Repository path for relative path display
-        
+
     Returns:
         Formatted string representation of hybrid search results
     """
     if not results:
         return f"No hybrid search results found for query: '{query}'"
-    
+
     lines = []
     lines.append(f"🔀 Found {len(results)} hybrid search results for: '{query}'")
     lines.append("=" * 60)
-    
+
     for i, result in enumerate(results, 1):
         # Format path
         display_path = result.file_path
         if repo_path and display_path.startswith(repo_path):
             display_path = display_path[len(repo_path):].lstrip('/')
-        
-        # Result header with enhanced info
-        lines.append(f"[{i}] {display_path}")
-        
+
+        # Result header with confidence emoji
+        confidence_emoji = {
+            'high': '🎯',
+            'medium': '✅',
+            'low': '⚠️'
+        }.get(result.confidence_level, '❓')
+
+        lines.append(f"{confidence_emoji} [{i}] {display_path}")
+
         # Show confidence and similarity
         lines.append(
             f"   📊 Similarity: {result.similarity_percentage:.1f}% "
             f"({result.confidence_level} confidence)"
         )
-        
+
         # Show match reasons if available
         if hasattr(result, 'match_reasons') and result.match_reasons:
             lines.append("   🎯 Match reasons:")
             for reason in result.match_reasons[:3]:
                 lines.append(f"      • {reason}")
-        
+
         # Show file metadata
         if result.file_metadata:
             metadata = result.file_metadata
@@ -1452,17 +1457,35 @@ def format_hybrid_search_results(
                 lines.append(f"   📄 Type: {lang} ({size_str})")
             else:
                 lines.append(f"   📄 Type: {lang}")
-        
+
         # Show snippet with line information
         snippet = result.snippet
         if snippet.start_line == snippet.end_line:
             line_info = f"Line {snippet.start_line}"
         else:
             line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
-        
+
         lines.append(f"   💻 {line_info}: {snippet.text.strip()}")
+
+        # Show construct context if available and requested
+        if (show_construct_context and result.file_metadata and
+            'construct_context' in result.file_metadata):
+
+            context = result.file_metadata['construct_context']
+            construct_count = context['related_constructs']
+            construct_types = ', '.join(context['construct_types'])
+
+            lines.append(f"   🔧 {construct_count} constructs: {construct_types}")
+
+            # Show top constructs
+            for construct in context['top_constructs']:
+                lines.append(
+                    f"      • {construct['type']}: {construct['name']} "
+                    f"(line {construct['line']})"
+                )
+
         lines.append("")
-    
+
     return "\n".join(lines)
 
 
@@ -1579,10 +1602,10 @@ def search_hybrid(
 ) -> List[CodeSearchResult]:
     """
     Backward compatible hybrid search function that combines construct and file searches.
-    
+
     This function maintains compatibility with existing tests and code that expect
     construct+file hybrid search behavior.
-    
+
     Args:
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance
@@ -1591,7 +1614,7 @@ def search_hybrid(
         construct_weight: Weight for construct-level matches (0.0 to 1.0)
         file_weight: Weight for file-level matches (0.0 to 1.0)
         construct_types: Optional filter for construct types
-        
+
     Returns:
         List of CodeSearchResult objects with merged and ranked results
     """
@@ -1685,70 +1708,6 @@ def _add_construct_context(
     result.file_metadata['construct_context'] = construct_summary
     return result
 
-
-def format_hybrid_search_results(
-    results: List[CodeSearchResult],
-    query: str,
-    show_construct_context: bool = True
-) -> str:
-    """
-    Format hybrid search results with construct context.
-
-    Args:
-        results: List of CodeSearchResult objects
-        query: Original search query
-        show_construct_context: Whether to show construct context information
-
-    Returns:
-        Formatted string representation of hybrid search results
-    """
-    if not results:
-        return f"No hybrid search results found for query: '{query}'"
-
-    formatted_lines = [f"🔍 Found {len(results)} hybrid results for: '{query}'\n"]
-
-    for i, result in enumerate(results, 1):
-        # Result header with confidence and type information
-        confidence_emoji = {
-            'high': '🎯',
-            'medium': '✅',
-            'low': '⚠️'
-        }.get(result.confidence_level, '❓')
-
-        formatted_lines.append(
-            f"{confidence_emoji} [{i}] {result.file_path} "
-            f"(similarity: {result.similarity_score:.3f})"
-        )
-
-        # Show main snippet
-        snippet = result.snippet
-        if snippet.start_line == snippet.end_line:
-            line_info = f"Line {snippet.start_line}"
-        else:
-            line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
-
-        formatted_lines.append(f"   📄 {line_info}: {snippet.text.strip()[:150]}...")
-
-        # Show construct context if available and requested
-        if (show_construct_context and result.file_metadata and
-            'construct_context' in result.file_metadata):
-
-            context = result.file_metadata['construct_context']
-            construct_count = context['related_constructs']
-            construct_types = ', '.join(context['construct_types'])
-
-            formatted_lines.append(f"   🔧 {construct_count} constructs: {construct_types}")
-
-            # Show top constructs
-            for construct in context['top_constructs']:
-                formatted_lines.append(
-                    f"      • {construct['type']}: {construct['name']} "
-                    f"(line {construct['line']})"
-                )
-
-        formatted_lines.append("")  # Empty line between results
-
-    return "\n".join(formatted_lines)
 
 
 def search_constructs_with_file_context(

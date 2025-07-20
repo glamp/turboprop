@@ -14,13 +14,13 @@ Classes:
 import logging
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass
 from collections import defaultdict
 
 from search_result_types import CodeSearchResult
-from ranking_scorers import FileTypeScorer, ConstructTypeScorer
-from ranking_exceptions import MatchReasonGenerationError, ConfidenceScoringError, ResultDeduplicationError, InvalidSearchResultError, RankingContextError
+from ranking_scorers import ConstructTypeScorer
+from ranking_exceptions import MatchReasonGenerationError, ResultDeduplicationError, InvalidSearchResultError, RankingContextError
 from ranking_config import get_ranking_config, FileTypeConstants, QueryTypeConstants
 
 logger = logging.getLogger(__name__)
@@ -74,16 +74,16 @@ class MatchReasonGenerator:
             # Validate inputs
             if not result:
                 raise InvalidSearchResultError("Search result cannot be None")
-            
+
             if not context:
                 raise RankingContextError("Ranking context cannot be None")
-            
+
             if not hasattr(result, 'file_path') or not result.file_path:
                 raise InvalidSearchResultError("Search result must have a valid file_path")
-            
+
             if not hasattr(result, 'snippet') or not result.snippet:
                 raise InvalidSearchResultError("Search result must have a valid snippet")
-            
+
             if not context.query or not isinstance(context.query, str):
                 raise RankingContextError("Context must have a valid query string")
 
@@ -95,8 +95,8 @@ class MatchReasonGenerator:
             if not keywords:
                 config = get_ranking_config()
                 words = re.findall(r'\b\w+\b', query_lower)
-                keywords = [word for word in words 
-                           if word not in QueryTypeConstants.STOP_WORDS 
+                keywords = [word for word in words
+                           if word not in QueryTypeConstants.STOP_WORDS
                            and len(word) > config.match_reasons.min_keyword_length]
 
             # Analyze filename and path matching
@@ -196,7 +196,7 @@ class MatchReasonGenerator:
 
             # Return top reasons (avoid overwhelming output)
             return reasons[:5]
-            
+
         except (InvalidSearchResultError, RankingContextError):
             raise  # Re-raise specific errors
         except Exception as e:
@@ -289,7 +289,7 @@ class ResultDeduplicator:
                 similarity_threshold = config.similarity.deduplication_threshold
 
             deduplicated = []
-            seen_signatures = set()
+            seen_signatures: Set[str] = set()
 
             for result in results:
                 # Create a signature for the result
@@ -308,7 +308,7 @@ class ResultDeduplicator:
 
             logger.info(f"Deduplicated {len(results)} results to {len(deduplicated)}")
             return deduplicated
-            
+
         except Exception as e:
             logger.error(f"Error deduplicating results: {e}")
             raise ResultDeduplicationError(f"Failed to deduplicate results: {e}") from e
@@ -319,7 +319,7 @@ class ResultDeduplicator:
         # Use filename + first few lines of content with configurable length
         config = get_ranking_config()
         preview_length = config.deduplication.signature_preview_length
-        
+
         filename = Path(result.file_path).name
         content_preview = result.snippet.text[:preview_length].strip()
         return f"{filename}:{content_preview}"
@@ -352,7 +352,7 @@ class ResultDeduplicator:
         if max_per_directory is None:
             max_per_directory = config.deduplication.max_results_per_directory
 
-        directory_counts = defaultdict(int)
+        directory_counts: Dict[str, int] = defaultdict(int)
         diverse_results = []
 
         for result in results:

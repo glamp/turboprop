@@ -7,7 +7,7 @@ across the turboprop codebase, particularly for database and search operations.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Callable, TypeVar
 from functools import wraps
 
 from exceptions import DatabaseError, EmbeddingError, SearchError
@@ -21,7 +21,7 @@ T = TypeVar('T')
 def handle_search_errors(operation_name: str, return_empty_list: bool = True):
     """
     Decorator to handle common search operation errors.
-    
+
     Args:
         operation_name: Name of the operation for logging
         return_empty_list: If True, returns empty list on error; otherwise returns None
@@ -44,7 +44,7 @@ def handle_search_errors(operation_name: str, return_empty_list: bool = True):
 def handle_database_errors(operation_name: str, return_value: Any = None):
     """
     Decorator to handle database operation errors.
-    
+
     Args:
         operation_name: Name of the operation for logging
         return_value: Value to return on error (default: None)
@@ -67,7 +67,7 @@ def handle_database_errors(operation_name: str, return_value: Any = None):
 def handle_statistics_errors(operation_name: str):
     """
     Decorator specifically for statistics operations that return error dict on failure.
-    
+
     Args:
         operation_name: Name of the operation for logging
     """
@@ -88,13 +88,13 @@ def handle_statistics_errors(operation_name: str):
 
 class ErrorHandler:
     """Context manager and utility class for consistent error handling."""
-    
-    def __init__(self, operation_name: str, 
-                 return_value: Any = None, 
+
+    def __init__(self, operation_name: str,
+                 return_value: Any = None,
                  raise_on_unexpected: bool = True):
         """
         Initialize error handler.
-        
+
         Args:
             operation_name: Name of the operation for logging
             return_value: Value to return on expected errors
@@ -103,14 +103,14 @@ class ErrorHandler:
         self.operation_name = operation_name
         self.return_value = return_value
         self.raise_on_unexpected = raise_on_unexpected
-        
+
     def __enter__(self):
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
             return False  # No exception occurred
-            
+
         if issubclass(exc_type, (DatabaseError, EmbeddingError)):
             logger.error("Error in %s: %s", self.operation_name, exc_val)
             return True  # Suppress the exception
@@ -121,21 +121,21 @@ class ErrorHandler:
         else:
             logger.error("Unexpected error in %s: %s", self.operation_name, exc_val)
             return True  # Suppress the exception
-            
+
         return False  # Don't suppress other exceptions
 
 
-def log_and_handle_error(operation_name: str, 
-                        error: Exception, 
+def log_and_handle_error(operation_name: str,
+                        error: Exception,
                         return_value: Any = None) -> Any:
     """
     Utility function to log and handle errors consistently.
-    
+
     Args:
         operation_name: Name of the operation for logging
         error: The exception that occurred
         return_value: Value to return for expected errors
-    
+
     Returns:
         The return_value for expected errors, raises SearchError for unexpected ones
     """

@@ -41,7 +41,6 @@ from watchdog.observers import Observer  # noqa: E402
 
 from database_manager import DatabaseManager  # noqa: E402
 from embedding_helper import EmbeddingGenerator  # noqa: E402
-from search_operations import search_index_enhanced, format_enhanced_search_results  # noqa: E402
 from logging_config import get_logger  # noqa: E402
 
 # Global database manager instance
@@ -62,43 +61,11 @@ def get_version():
         return "0.2.2"
 
 
-# Configuration constants - these control the behavior of the indexing system
-# Name of the table that stores file content and embeddings
-TABLE_NAME = "code_files"
-DIMENSIONS = 384  # Embedding dimensions for all-MiniLM-L6-v2 model
-# SentenceTransformer model name for generating embeddings
-EMBED_MODEL = "all-MiniLM-L6-v2"
+# Import configuration
+from config import config
+
 # Backward compatibility for tests
 DB_PATH = "code_index.duckdb"
-
-# File extensions that we consider to be code files worth indexing
-# This covers most major programming languages and common config/markup files
-CODE_EXTENSIONS = {
-    ".py",
-    ".js",
-    ".ts",
-    ".tsx",
-    ".jsx",
-    ".java",
-    ".c",
-    ".cpp",
-    ".h",
-    ".cs",
-    ".go",
-    ".rs",
-    ".swift",
-    ".kt",
-    ".m",
-    ".rb",
-    ".php",
-    ".sh",
-    ".html",
-    ".css",
-    ".json",
-    ".yaml",
-    ".yml",
-    ".xml",
-}
 
 
 def compute_id(text: str) -> str:
@@ -151,11 +118,11 @@ def init_db(repo_path: Path = None):
             # Initialize table schema with modification time tracking and metadata columns
             _db_manager.execute_with_retry(
                 f"""
-                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                CREATE TABLE IF NOT EXISTS {config.database.TABLE_NAME} (
                     id VARCHAR PRIMARY KEY,
                     path VARCHAR,
                     content TEXT,
-                    embedding DOUBLE[{DIMENSIONS}],
+                    embedding DOUBLE[{config.embedding.DIMENSIONS}],
                     last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     file_mtime TIMESTAMP,
                     file_type VARCHAR,
@@ -169,7 +136,7 @@ def init_db(repo_path: Path = None):
 
             # Migrate schema to add any missing columns (including legacy and new metadata columns)
             try:
-                _db_manager.migrate_schema(TABLE_NAME)
+                _db_manager.migrate_schema(config.database.TABLE_NAME)
             except Exception as e:
                 logger.warning(f"Schema migration failed, continuing with existing schema: {e}")
 
@@ -260,7 +227,7 @@ def get_existing_file_hashes(db_manager):
         Dict mapping file paths to their content hashes
     """
     try:
-        result = db_manager.execute_with_retry(f"SELECT path, id FROM {TABLE_NAME}")
+        result = db_manager.execute_with_retry(f"SELECT path, id FROM {config.database.TABLE_NAME}")
         return {path: hash_id for path, hash_id in result}
     except Exception:
         return {}
@@ -348,7 +315,7 @@ def embed_and_store(db_manager, embedder, files, max_workers=None, progress_call
         operations = [
             (
                 (
-                    f"INSERT OR REPLACE INTO {TABLE_NAME} "
+                    f"INSERT OR REPLACE INTO {config.database.TABLE_NAME} "
                     f"(id, path, content, embedding, file_mtime) VALUES (?, ?, ?, ?, ?)"
                 ),
                 row,
@@ -374,7 +341,7 @@ def build_full_index(db_manager):
     """
     # Check if we have any embeddings in the database
     result = db_manager.execute_with_retry(
-        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL"
+        f"SELECT COUNT(*) FROM {config.database.TABLE_NAME} WHERE embedding IS NOT NULL"
     )
     return result[0][0] if result and result[0] else 0
 
@@ -413,7 +380,7 @@ def search_index(db_manager, embedder, query: str, k: int):
                 1 - (list_dot_product(embedding, $1) /
                     (sqrt(list_dot_product(embedding, embedding)) *
                      sqrt(list_dot_product($1, $1)))) as distance
-            FROM {TABLE_NAME}
+            FROM {config.database.TABLE_NAME}
             WHERE embedding IS NOT NULL
             ORDER BY distance ASC
             LIMIT {k}
@@ -458,10 +425,10 @@ def embed_and_store_single(db_manager, embedder, path: Path):
 
     # Use transaction for database operations
     operations = [
-        (f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(path),)),
+        (f"DELETE FROM {config.database.TABLE_NAME} WHERE path = ?", (str(path),)),
         (
             (
-                f"INSERT INTO {TABLE_NAME} (id, path, content, embedding, "
+                f"INSERT INTO {config.database.TABLE_NAME} (id, path, content, embedding, "
                 f"file_mtime) VALUES (?, ?, ?, ?, ?)"
             ),
             (uid, str(path), text, emb.tolist(), file_mtime),
@@ -616,7 +583,7 @@ class DebouncedHandler(FileSystemEventHandler):
         elif ev_type == "deleted":
             # Remove deleted file from database
             self.db_manager.execute_with_retry(
-                f"DELETE FROM {TABLE_NAME} WHERE path = ?", (str(p),)
+                f"DELETE FROM {config.database.TABLE_NAME} WHERE path = ?", (str(p),)
             )
             logger.debug(f"[debounce] {p} deleted from database")
 
@@ -648,7 +615,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
     db_manager = init_db(repo)
 
     try:
-        embedder = EmbeddingGenerator(EMBED_MODEL)
+        embedder = EmbeddingGenerator(config.embedding.EMBED_MODEL)
         logger.info("Embedding generator initialized for watch mode")
     except Exception as e:
         logger.error(f"Failed to initialize embedding generator: {e}")
@@ -755,7 +722,7 @@ def remove_orphaned_files(db_manager, current_files):
     # Get all paths currently in the database
     existing_paths = set()
     try:
-        result = db_manager.execute_with_retry(f"SELECT path FROM {TABLE_NAME}")
+        result = db_manager.execute_with_retry(f"SELECT path FROM {config.database.TABLE_NAME}")
         existing_paths = {row[0] for row in result}
     except Exception:
         return 0
@@ -773,7 +740,7 @@ def remove_orphaned_files(db_manager, current_files):
     removed_count = 0
     operations = []
     for path in orphaned_paths:
-        operations.append((f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)))
+        operations.append((f"DELETE FROM {config.database.TABLE_NAME} WHERE path = ?", (path,)))
         removed_count += 1
 
     if operations:
@@ -794,7 +761,7 @@ def get_last_index_time(db_manager):
         datetime or None if no files are indexed
     """
     try:
-        result = db_manager.execute_with_retry(f"SELECT MAX(last_modified) FROM {TABLE_NAME}")
+        result = db_manager.execute_with_retry(f"SELECT MAX(last_modified) FROM {config.database.TABLE_NAME}")
         if result and result[0] and result[0][0]:
             return result[0][0]
         return None
@@ -813,7 +780,7 @@ def get_current_files_safely(repo_path: Path, max_bytes: int):
 def get_existing_files_from_db(db_manager):
     """Get existing files from database with error handling."""
     try:
-        result = db_manager.execute_with_retry(f"SELECT path, file_mtime FROM {TABLE_NAME}")
+        result = db_manager.execute_with_retry(f"SELECT path, file_mtime FROM {config.database.TABLE_NAME}")
         return {row[0]: row[1] for row in result}, None
     except Exception:
         return None, "Database error - need to rebuild index"
@@ -918,7 +885,7 @@ def check_index_freshness(repo_path: Path, max_bytes: int, db_manager):
     """
     # Check if index exists
     try:
-        file_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {TABLE_NAME}")[0][0]
+        file_count = db_manager.execute_with_retry(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}")[0][0]
     except Exception:
         return {
             "is_fresh": False,
@@ -1028,8 +995,8 @@ def reindex_all(
     return len(files), len(files_to_process), elapsed
 
 
-def setup_argument_parser():
-    """Set up the command-line argument parser with all subcommands."""
+def _setup_base_parser() -> argparse.ArgumentParser:
+    """Set up the base argument parser."""
     parser = argparse.ArgumentParser(
         prog="turboprop",
         description="""
@@ -1059,13 +1026,10 @@ Examples:
     # Add version argument
     parser.add_argument("--version", "-v", action="version", version=f"turboprop {get_version()}")
 
-    sub = parser.add_subparsers(
-        dest="cmd",
-        required=True,
-        title="commands",
-        description="Available operations",
-        help="Run 'turboprop <command> --help' for detailed usage",
-    )
+    return parser
+
+def _setup_index_subcommand(sub):
+    """Set up the index subcommand and its arguments."""
 
     # 'index' command: Build initial index from repository
     p_i = sub.add_parser(
@@ -1158,7 +1122,7 @@ Query Examples:
     p_s.add_argument(
         "--mode",
         choices=["auto", "hybrid", "semantic", "text"],
-        default="auto", 
+        default="auto",
         help="Search mode: 'auto' (intelligent routing), 'hybrid' (semantic+text), "
              "'semantic' (embeddings only), 'text' (exact matching only)",
     )
@@ -1171,7 +1135,7 @@ Query Examples:
         "--semantic-weight",
         type=float,
         default=0.6,
-        metavar="WEIGHT", 
+        metavar="WEIGHT",
         help="Weight for semantic search in hybrid mode (0.0-1.0, default: 0.6)"
     )
     p_s.add_argument(
@@ -1299,7 +1263,7 @@ def initialize_embedder():
     """Initialize the embedding generator with error handling."""
     print("⚡ Initializing AI model...")
     try:
-        embedder = EmbeddingGenerator(EMBED_MODEL)
+        embedder = EmbeddingGenerator(config.embedding.EMBED_MODEL)
         logger.info("Embedding generator initialized successfully")
         return embedder
     except Exception as e:
@@ -1381,7 +1345,7 @@ def handle_search_command(args, embedder):
     try:
         # Import hybrid search functions
         from search_operations import search_with_intelligent_routing, search_with_hybrid_fusion
-        
+
         # Create fusion weights if using hybrid mode
         fusion_weights = None
         if args.mode == "hybrid":
@@ -1392,7 +1356,7 @@ def handle_search_command(args, embedder):
                 'boost_exact_matches': True,
                 'exact_match_boost': 1.5
             }
-        
+
         # Use intelligent routing for auto mode, hybrid fusion for others
         if args.mode == "auto":
             results = search_with_intelligent_routing(
@@ -1400,10 +1364,10 @@ def handle_search_command(args, embedder):
             )
         else:
             results = search_with_hybrid_fusion(
-                db_manager, embedder, args.query, args.k, args.mode, 
+                db_manager, embedder, args.query, args.k, args.mode,
                 fusion_weights, enable_query_expansion=True
             )
-        
+
     except Exception as e:
         logger.error(f"Search failed: {e}")
         print("💡 Make sure you've built an index first: turboprop index <repo>")
@@ -1424,7 +1388,7 @@ def handle_search_command(args, embedder):
     # Use hybrid search result formatting for enhanced display
     from search_operations import format_hybrid_search_results
     formatted_results = format_hybrid_search_results(
-        results, args.query, show_fusion_details=(args.mode == "hybrid"), 
+        results, args.query, show_fusion_details=(args.mode == "hybrid"),
         repo_path=str(repo_path)
     )
     print(formatted_results)

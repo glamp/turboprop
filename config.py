@@ -167,6 +167,7 @@ class DatabaseConfig:
     # Database file configuration
     DEFAULT_DB_NAME: str = "code_index.duckdb"
     DEFAULT_DB_DIR: str = ".turboprop"
+    TABLE_NAME: str = "code_files"
 
     # Database optimization settings
     CHECKPOINT_INTERVAL: int = validate_positive_int(
@@ -252,6 +253,13 @@ class FileProcessingConfig:
         os.getenv("TURBOPROP_ENABLE_LANGUAGE_DETECTION", "true"),
         "TURBOPROP_ENABLE_LANGUAGE_DETECTION"
     )
+
+    # File extensions that we consider to be code files worth indexing
+    CODE_EXTENSIONS = {
+        ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".c", ".cpp", ".h", ".cs",
+        ".go", ".rs", ".swift", ".kt", ".m", ".rb", ".php", ".sh", ".html", ".css",
+        ".json", ".yaml", ".yml", ".xml"
+    }
 
     # Language detection fallback map for file extensions
     EXTENSION_TO_LANGUAGE_MAP = {

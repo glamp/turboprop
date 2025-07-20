@@ -19,12 +19,11 @@ Functions:
 import logging
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 from search_result_types import CodeSearchResult
 from ranking_scorers import FileTypeScorer, ConstructTypeScorer, RecencyScorer, FileSizeScorer
-from ranking_utils import MatchReason, MatchReasonGenerator, ConfidenceScorer, ResultDeduplicator, RankingContext
+from ranking_utils import MatchReasonGenerator, ConfidenceScorer, ResultDeduplicator, RankingContext
 from ranking_exceptions import InvalidRankingWeightsError, RankingError, InvalidSearchResultError, RankingContextError
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ class RankingWeights:
     def __post_init__(self):
         """
         Validate that weights are valid and sum to approximately 1.0.
-        
+
         Raises:
             InvalidRankingWeightsError: If weights are invalid
         """
@@ -58,7 +57,7 @@ class RankingWeights:
                 raise InvalidRankingWeightsError(f"{field_name} must be a number, got {type(value)}")
             if not (0.0 <= value <= 1.0):
                 raise InvalidRankingWeightsError(f"{field_name} must be between 0.0 and 1.0, got {value}")
-        
+
         # Validate total weight sum
         total = (
             self.embedding_similarity
@@ -67,7 +66,7 @@ class RankingWeights:
             + self.file_recency
             + self.file_size_optimization
         )
-        
+
         if not (0.95 <= total <= 1.05):  # Allow small floating point errors
             if abs(total - 1.0) > 0.1:  # Large deviation - error
                 raise InvalidRankingWeightsError(f"Ranking weights must sum to approximately 1.0, got {total:.3f}")
@@ -111,16 +110,16 @@ class ResultRanker:
             # Validate inputs
             if results is None:
                 raise InvalidSearchResultError("Results list cannot be None")
-            
+
             if not isinstance(results, list):
                 raise InvalidSearchResultError(f"Results must be a list, got {type(results)}")
-            
+
             if not results:
                 return results
-            
+
             if not context:
                 raise RankingContextError("Ranking context cannot be None")
-            
+
             if not context.query or not isinstance(context.query, str):
                 raise RankingContextError("Context must have a valid query string")
 
@@ -147,11 +146,11 @@ class ResultRanker:
             diverse_results = ResultDeduplicator.ensure_diversity(deduplicated)
 
             # Sort by composite score
-            diverse_results.sort(key=lambda r: r.file_metadata.get('composite_score', 0), reverse=True)
+            diverse_results.sort(key=lambda r: float(r.file_metadata.get('composite_score', 0) if r.file_metadata else 0), reverse=True)
 
             logger.info(f"Ranked results: {len(results)} → {len(diverse_results)} after deduplication/diversity")
             return diverse_results
-            
+
         except (RankingContextError, InvalidSearchResultError):
             raise  # Re-raise specific errors
         except Exception as e:
@@ -263,20 +262,20 @@ def rank_search_results(
     try:
         if not results:
             return results
-            
+
         if not query or not isinstance(query, str):
             raise RankingContextError("Query must be a non-empty string")
 
         context = RankingContext(
             query=query,
-            query_keywords=None,  # Will be extracted by ranker
+            query_keywords=[],  # Will be extracted by ranker
             repo_path=repo_path,
             git_info=git_info
         )
 
         ranker = ResultRanker(ranking_weights)
         return ranker.rank_results(results, context)
-        
+
     except (RankingError, InvalidRankingWeightsError, RankingContextError):
         raise  # Re-raise specific errors
     except Exception as e:
@@ -298,11 +297,11 @@ def generate_match_explanations(
     Returns:
         Dictionary mapping file paths to match explanations
     """
-    context = RankingContext(query=query, query_keywords=None)
+    context = RankingContext(query=query, query_keywords=[])
     explanations = {}
 
     for result in results:
-        if 'match_reasons' in result.file_metadata:
+        if result.file_metadata and 'match_reasons' in result.file_metadata:
             reasons = result.file_metadata['match_reasons']
             explanations[result.file_path] = [reason['description'] for reason in reasons]
         else:
@@ -331,7 +330,7 @@ def calculate_advanced_confidence(
     """
     context = RankingContext(
         query=query,
-        query_keywords=None,
+        query_keywords=[],
         all_results=all_results
     )
 

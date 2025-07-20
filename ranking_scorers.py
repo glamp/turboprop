@@ -14,10 +14,9 @@ Classes:
 
 import logging
 import os
-import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict
 
 from search_result_types import CodeSearchResult
 from ranking_exceptions import FileAccessError, GitInfoError, InvalidSearchResultError
@@ -164,12 +163,12 @@ class RecencyScorer:
             if git_info is not None:
                 if not isinstance(git_info, dict):
                     raise GitInfoError(f"Git info must be a dictionary, got {type(git_info)}")
-                
+
                 if 'file_modifications' in git_info:
                     file_mods = git_info['file_modifications']
                     if not isinstance(file_mods, dict):
                         raise GitInfoError("file_modifications must be a dictionary")
-                    
+
                     git_time = file_mods.get(file_path)
                     if git_time:
                         try:
@@ -181,14 +180,14 @@ class RecencyScorer:
             # Fallback to filesystem modification time
             if not file_path or not isinstance(file_path, str):
                 raise FileAccessError(f"Invalid file path: {file_path}")
-            
+
             try:
                 stat = os.stat(file_path)
                 return datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
             except OSError as e:
                 logger.debug(f"Could not access file {file_path}: {e}")
                 return None
-                
+
         except (GitInfoError, FileAccessError):
             raise  # Re-raise specific errors
         except Exception as e:
@@ -217,7 +216,7 @@ class RecencyScorer:
         # Score based on age with exponential decay using configurable thresholds
         config = get_ranking_config()
         recency_thresholds = config.recency
-        
+
         if age_days <= recency_thresholds.very_recent:
             return 1.0
         elif age_days <= recency_thresholds.recent:
@@ -254,7 +253,7 @@ class FileSizeScorer:
             # Validate result structure
             if not result:
                 raise InvalidSearchResultError("Search result cannot be None")
-            
+
             if not hasattr(result, 'file_metadata'):
                 logger.debug(f"Result for {getattr(result, 'file_path', 'unknown')} missing file_metadata attribute")
                 return 0.5
@@ -264,7 +263,7 @@ class FileSizeScorer:
                 return 0.5  # Neutral score if size is unknown
 
             size_bytes = result.file_metadata['size']
-            
+
             # Validate size value
             if not isinstance(size_bytes, (int, float)) or size_bytes < 0:
                 logger.warning(f"Invalid file size for {getattr(result, 'file_path', 'unknown')}: {size_bytes}")
@@ -297,7 +296,7 @@ class FileSizeScorer:
                     return 0.4
                 else:
                     return 0.2  # Very large files
-                    
+
         except InvalidSearchResultError:
             raise  # Re-raise specific errors
         except Exception as e:

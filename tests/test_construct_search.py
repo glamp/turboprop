@@ -446,7 +446,7 @@ class TestHybridSearch:
         formatted = format_hybrid_search_results(results, "test query", show_construct_context=True)
 
         # Verify formatting
-        assert "hybrid results" in formatted
+        assert "hybrid search results" in formatted
         assert "test query" in formatted
         assert "2 constructs" in formatted
         assert "test_func" in formatted

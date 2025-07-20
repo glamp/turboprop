@@ -24,7 +24,7 @@ setup_apple_silicon_compatibility()
 import numpy as np  # noqa: E402
 from sentence_transformers import SentenceTransformer  # noqa: E402
 
-# Local imports  
+# Local imports
 from apple_silicon_compat import configure_torch_backend  # noqa: E402
 from config import config  # noqa: E402
 from exceptions import EmbeddingError, EmbeddingModelError  # noqa: E402
@@ -151,7 +151,8 @@ class EmbeddingGenerator:
                         f"❌ Failed to encode batch after {effective_max_retries} attempts: {error}",
                         file=sys.stderr
                     )
-                    raise EmbeddingError(f"Failed to encode batch after {effective_max_retries} attempts: {error}") from error
+                    raise EmbeddingError(
+                        f"Failed to encode batch after {effective_max_retries} attempts: {error}") from error
                 else:
                     print(
                         f"⚠️ Batch encoding attempt {attempt + 1} failed, retrying: {error}",
