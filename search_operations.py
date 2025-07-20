@@ -9,14 +9,15 @@ This module contains functions for searching the code index:
 """
 
 import logging
+import math
 import sys
-import os
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from search_result_types import CodeSnippet, CodeSearchResult, SearchMetadata
+from search_result_types import CodeSnippet, CodeSearchResult
+from config import config
 
 # Constants
 TABLE_NAME = "code_files"
@@ -28,70 +29,35 @@ logger = logging.getLogger(__name__)
 
 def _detect_file_language(file_path: str) -> str:
     """
-    Detect programming language from file extension.
-    
+    Detect programming language from file extension using centralized config mapping.
+
     Args:
         file_path: Path to the file
-        
+
     Returns:
         Programming language name or 'unknown'
     """
-    extension_map = {
-        '.py': 'python',
-        '.js': 'javascript', 
-        '.ts': 'typescript',
-        '.tsx': 'typescript',
-        '.jsx': 'javascript',
-        '.java': 'java',
-        '.c': 'c',
-        '.cpp': 'cpp',
-        '.cc': 'cpp',
-        '.cxx': 'cpp',
-        '.h': 'c',
-        '.hpp': 'cpp',
-        '.cs': 'csharp',
-        '.go': 'go',
-        '.rs': 'rust',
-        '.rb': 'ruby',
-        '.php': 'php',
-        '.swift': 'swift',
-        '.kt': 'kotlin',
-        '.m': 'objective-c',
-        '.sh': 'bash',
-        '.bash': 'bash',
-        '.html': 'html',
-        '.css': 'css',
-        '.scss': 'scss',
-        '.json': 'json',
-        '.yaml': 'yaml',
-        '.yml': 'yaml',
-        '.xml': 'xml',
-        '.md': 'markdown',
-        '.rst': 'restructuredtext',
-        '.txt': 'text'
-    }
-    
     ext = Path(file_path).suffix.lower()
-    return extension_map.get(ext, 'unknown')
+    return config.file_processing.EXTENSION_TO_LANGUAGE_MAP.get(ext, 'unknown')
 
 
 def _create_enhanced_snippet(content: str, file_path: str) -> CodeSnippet:
     """
     Create an enhanced code snippet with intelligent extraction.
-    
+
     Args:
         content: File content
         file_path: Path to the file
-        
+
     Returns:
         CodeSnippet with enhanced information
     """
     # For now, use the simple truncation approach with line number calculation
     # TODO: In future iterations, add intelligent function/class boundary detection
-    
+
     lines = content.split('\n')
-    
-    if len(content) <= 200:
+
+    if len(content) <= config.search.SNIPPET_CONTENT_MAX_LENGTH:
         # Short content - include all lines
         return CodeSnippet(
             text=content,
@@ -99,12 +65,12 @@ def _create_enhanced_snippet(content: str, file_path: str) -> CodeSnippet:
             end_line=len(lines)
         )
     else:
-        # Truncated content - use first 200 characters
-        snippet_text = content[:200] + "..."
-        
+        # Truncated content - use first configured characters
+        snippet_text = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..."
+
         # Calculate how many lines the snippet covers
         snippet_lines = snippet_text.count('\n') + 1
-        
+
         return CodeSnippet(
             text=snippet_text,
             start_line=1,
@@ -115,16 +81,16 @@ def _create_enhanced_snippet(content: str, file_path: str) -> CodeSnippet:
 def _extract_file_metadata(file_path: str, content: str) -> dict:
     """
     Extract metadata about a file.
-    
+
     Args:
         file_path: Path to the file
         content: File content
-        
+
     Returns:
         Dictionary with file metadata
     """
     path_obj = Path(file_path)
-    
+
     return {
         'language': _detect_file_language(file_path),
         'extension': path_obj.suffix,
@@ -143,7 +109,7 @@ def search_index_enhanced(
 
     This function:
     1. Generates an embedding for the search query
-    2. Uses DuckDB's array operations to compute cosine similarity  
+    2. Uses DuckDB's array operations to compute cosine similarity
     3. Returns structured search results with rich metadata
 
     Args:
@@ -159,42 +125,54 @@ def search_index_enhanced(
         # Generate embedding for the search query
         query_embedding = embedder.encode(query)
 
-        # Prepare the query embedding as a list for DuckDB
+        # Prepare the query embedding and pre-calculate its norm for optimization
         query_emb_list = query_embedding.tolist()
+        query_norm = math.sqrt(sum(x * x for x in query_emb_list))
 
-        # Use DuckDB's array operations for cosine similarity
-        # Cosine similarity = dot_product / (norm_a * norm_b)
-        # Since embeddings are normalized, we can use dot product directly
+        # Optimized SQL query for semantic similarity search using cosine similarity
+        # 
+        # Mathematical background:
+        # Cosine similarity = dot_product(A, B) / (||A|| × ||B||)
+        # where ||A|| is the L2 norm (magnitude) of vector A
+        #
+        # Optimization: Pre-calculate query norm to avoid redundant SQL calculations
+        # The query calculates:
+        # 1. list_dot_product(embedding, query) - dot product of stored embedding and query
+        # 2. sqrt(list_dot_product(embedding, embedding)) - L2 norm of stored embedding
+        # 3. Uses pre-calculated query_norm instead of sqrt(list_dot_product(query, query))
+        # 4. distance = 1 - cosine_similarity (lower distance = higher similarity)
+        #
+        # DuckDB-specific functions used:
+        # - list_dot_product(): Computes dot product of two arrays/lists
+        # - ?::DOUBLE[384]: Parameter placeholder cast to 384-dimensional double array
+        # - sqrt(): Standard square root function for embedding norm calculation
         sql_query = f"""
         SELECT
             path,
             content,
             1 - (list_dot_product(embedding, ?::DOUBLE[{DIMENSIONS}]) /
-                 (sqrt(list_dot_product(embedding, embedding)) *
-                  sqrt(list_dot_product(
-                      ?::DOUBLE[{DIMENSIONS}], ?::DOUBLE[{DIMENSIONS}]
-                  )))) as distance
+                 (sqrt(list_dot_product(embedding, embedding)) * ?)) as distance
         FROM {TABLE_NAME}
         WHERE embedding IS NOT NULL
         ORDER BY distance ASC
         LIMIT ?
         """
 
-        # Execute the search query
-        results = db_manager.execute_with_retry(sql_query, (query_emb_list, query_emb_list, query_emb_list, k))
+        # Execute the search query with optimized parameters (query embedding once + pre-calculated norm)
+        results = db_manager.execute_with_retry(sql_query, (query_emb_list, query_norm, k))
 
         # Format results as CodeSearchResult objects
         structured_results = []
         for path, content, distance in results:
             # Convert distance to similarity score
             similarity_score = 1.0 - distance
-            
+
             # Create enhanced snippet
             snippet = _create_enhanced_snippet(content, path)
-            
+
             # Extract file metadata
             file_metadata = _extract_file_metadata(path, content)
-            
+
             # Create CodeSearchResult
             search_result = CodeSearchResult(
                 file_path=path,
@@ -202,14 +180,20 @@ def search_index_enhanced(
                 similarity_score=similarity_score,
                 file_metadata=file_metadata
             )
-            
+
             structured_results.append(search_result)
 
         return structured_results
 
     except Exception as e:
-        logger.error(f"Error during enhanced search: {e}")
-        print(f"❌ Search failed: {e}", file=sys.stderr)
+        logger.error(
+            f"Enhanced search failed for query '{query}' with k={k}. "
+            f"Database connection: {db_manager is not None}. "
+            f"Embedder: {embedder is not None}. "
+            f"Error: {e}",
+            exc_info=True
+        )
+        print(f"❌ Search failed for query '{query}': {e}", file=sys.stderr)
         return []
 
 
@@ -218,14 +202,9 @@ def search_index(
 ) -> List[Tuple[str, str, float]]:
     """
     Search the code index for files semantically similar to the given query.
-    
+
     LEGACY COMPATIBILITY VERSION: This function maintains the original tuple-based
     return format for backward compatibility. New code should use search_index_enhanced().
-
-    This function:
-    1. Generates an embedding for the search query
-    2. Uses DuckDB's array operations to compute cosine similarity
-    3. Returns the top k most similar files with their similarity scores
 
     Args:
         db_manager: DatabaseManager instance
@@ -236,16 +215,43 @@ def search_index(
     Returns:
         List of tuples containing (file_path, content_snippet, distance_score)
     """
-    # Use the enhanced search and convert to legacy format
-    enhanced_results = search_index_enhanced(db_manager, embedder, query, k)
-    
-    # Convert to legacy tuple format
-    legacy_results = []
-    for result in enhanced_results:
-        legacy_tuple = result.to_tuple()
-        legacy_results.append(legacy_tuple)
-    
-    return legacy_results
+    try:
+        # Generate embedding for the query
+        query_emb = embedder.generate(query)
+        query_emb_list = query_emb.tolist()
+
+        # Construct SQL query for semantic search with cosine similarity
+        sql_query = f"""
+        SELECT path, content, (1 - array_dot_product(?, embedding) / 
+                              (list_norm(?) * list_norm(embedding))) AS distance
+        FROM {TABLE_NAME}
+        WHERE embedding IS NOT NULL
+        ORDER BY distance ASC
+        LIMIT ?
+        """
+
+        # Execute the search query - direct tuple format, no object creation
+        results = db_manager.execute_with_retry(sql_query, (query_emb_list, query_emb_list, k))
+        
+        # Format results as simple tuples with basic snippets
+        legacy_results = []
+        for path, content, distance in results:
+            # Create simple snippet (no object overhead)
+            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
+            legacy_results.append((path, snippet, distance))
+
+        return legacy_results
+
+    except Exception as e:
+        logger.error(
+            f"Legacy search failed for query '{query}' with k={k}. "
+            f"Database connection: {db_manager is not None}. "
+            f"Embedder: {embedder is not None}. "
+            f"Error: {e}",
+            exc_info=True
+        )
+        print(f"❌ Search failed for query '{query}': {e}", file=sys.stderr)
+        return []
 
 
 def format_enhanced_search_results(results: List[CodeSearchResult], query: str, repo_path: Optional[str] = None) -> str:
@@ -270,11 +276,12 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
     for i, result in enumerate(results, 1):
         # Format path (use relative path if repo_path provided)
         display_path = result.get_relative_path(repo_path) if repo_path else result.file_path
-        
+
         # Display enriched information
         formatted_lines.append(f"{i}. {display_path}")
-        formatted_lines.append(f"   Similarity: {result.similarity_percentage:.1f}% ({result.confidence_level} confidence)")
-        
+        formatted_lines.append(
+            f"   Similarity: {result.similarity_percentage:.1f}% ({result.confidence_level} confidence)")
+
         # Show file metadata if available
         if result.file_metadata:
             metadata = result.file_metadata
@@ -285,14 +292,14 @@ def format_enhanced_search_results(results: List[CodeSearchResult], query: str, 
                 formatted_lines.append(f"   Type: {lang} ({size_str})")
             else:
                 formatted_lines.append(f"   Type: {lang}")
-        
+
         # Show snippet with line information
         snippet = result.snippet
         if snippet.start_line == snippet.end_line:
             line_info = f"Line {snippet.start_line}"
         else:
             line_info = f"Lines {snippet.start_line}-{snippet.end_line}"
-        
+
         formatted_lines.append(f"   {line_info}: {snippet.text.strip()}")
         formatted_lines.append("")
 
@@ -374,17 +381,19 @@ def search_by_file_extension(db_manager: DatabaseManager, extension: str, limit:
         sql_query = f"""
         SELECT path, content
         FROM {TABLE_NAME}
-        WHERE path LIKE '%{extension}'
+        WHERE path LIKE ?
         ORDER BY path
         LIMIT ?
         """
 
-        results = db_manager.execute_with_retry(sql_query, (limit,))
+        # Use parameterized query for the extension pattern
+        extension_pattern = f"%{extension}"
+        results = db_manager.execute_with_retry(sql_query, (extension_pattern, limit))
 
         # Format results with snippets
         formatted_results = []
         for path, content in results:
-            snippet = content[:200] + "..." if len(content) > 200 else content
+            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
             formatted_results.append((path, snippet))
 
         return formatted_results
@@ -420,7 +429,7 @@ def search_by_filename(db_manager: DatabaseManager, filename_pattern: str, limit
         # Format results with snippets
         formatted_results = []
         for path, content in results:
-            snippet = content[:200] + "..." if len(content) > 200 else content
+            snippet = content[:config.search.SNIPPET_CONTENT_MAX_LENGTH] + "..." if len(content) > config.search.SNIPPET_CONTENT_MAX_LENGTH else content
             formatted_results.append((path, snippet))
 
         return formatted_results
@@ -543,13 +552,13 @@ def find_similar_files_enhanced(
         for path, content, distance in results:
             # Convert distance to similarity score
             similarity_score = 1.0 - distance
-            
+
             # Create enhanced snippet
             snippet = _create_enhanced_snippet(content, path)
-            
+
             # Extract file metadata
             file_metadata = _extract_file_metadata(path, content)
-            
+
             # Create CodeSearchResult
             search_result = CodeSearchResult(
                 file_path=path,
@@ -557,7 +566,7 @@ def find_similar_files_enhanced(
                 similarity_score=similarity_score,
                 file_metadata=file_metadata
             )
-            
+
             structured_results.append(search_result)
 
         return structured_results
@@ -575,7 +584,7 @@ def find_similar_files(
 ) -> List[Tuple[str, str, float]]:
     """
     Find files similar to a reference file.
-    
+
     LEGACY COMPATIBILITY VERSION: This function maintains the original tuple-based
     return format for backward compatibility. New code should use find_similar_files_enhanced().
 
@@ -590,11 +599,11 @@ def find_similar_files(
     """
     # Use the enhanced version and convert to legacy format
     enhanced_results = find_similar_files_enhanced(db_manager, embedder, reference_file, k)
-    
+
     # Convert to legacy tuple format
     legacy_results = []
     for result in enhanced_results:
         legacy_tuple = result.to_tuple()
         legacy_results.append(legacy_tuple)
-    
+
     return legacy_results

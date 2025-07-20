@@ -20,6 +20,7 @@ import argparse
 import sys
 import threading
 from pathlib import Path
+from typing import Optional, Dict, Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -38,27 +39,28 @@ from code_index import (
     watch_mode,
 )
 from config import config
+from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 
 # Import enhanced search functionality
 from search_operations import (
     search_index_enhanced,
-    format_enhanced_search_results,
-    find_similar_files_enhanced
+    format_enhanced_search_results
 )
-from search_result_types import CodeSearchResult, SearchMetadata
+from search_result_types import CodeSearchResult
+from format_utils import convert_results_to_legacy_format, convert_legacy_to_enhanced_format
 
 # Global lock for database connection management
-_db_connection_lock = threading.Lock()
+_db_connection_lock: threading.Lock = threading.Lock()
 
 # Initialize the MCP server
 mcp = FastMCP("🚀 Turboprop: Semantic Code Search & AI-Powered Discovery")
 
 # Global variables for shared resources and configuration
-_db_connection = None
-_embedder = None
-_watcher_thread = None
-_config = {
+_db_connection: Optional[DatabaseManager] = None
+_embedder: Optional[EmbeddingGenerator] = None
+_watcher_thread: Optional[threading.Thread] = None
+_config: Dict[str, Any] = {
     "repository_path": None,
     "max_file_size_mb": config.mcp.DEFAULT_MAX_FILE_SIZE_MB,
     "debounce_seconds": config.mcp.DEFAULT_DEBOUNCE_SECONDS,
@@ -269,14 +271,14 @@ def search_code(query: str, max_results: int = None) -> str:
 def search_code_structured(query: str, max_results: int = None) -> str:
     """
     🔍 TURBOPROP: Enhanced semantic search with rich metadata (ADVANCED)
-    
+
     This is the next-generation search that provides detailed metadata about
     results including file types, confidence levels, and enhanced snippets.
-    
+
     Args:
         query: Natural language description of what you're looking for
         max_results: Number of results (default: 5, max: 20)
-    
+
     Returns:
         Enhanced results with rich metadata and improved formatting
     """
@@ -285,15 +287,15 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             max_results = config.search.DEFAULT_MAX_RESULTS
         if max_results > config.search.MAX_RESULTS_LIMIT:
             max_results = config.search.MAX_RESULTS_LIMIT
-            
+
         con = get_db_connection()
         embedder = get_embedder()
-        
+
         # Check if index exists
         file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
         if file_count == 0:
             return "No index found. Please index a repository first using the index_repository tool."
-        
+
         # Perform enhanced semantic search
         results = search_index_enhanced(con, embedder, query, max_results)
         if not results:
@@ -301,16 +303,16 @@ def search_code_structured(query: str, max_results: int = None) -> str:
                 f"No results found for query: '{query}'. "
                 "Try different search terms or make sure the repository is indexed."
             )
-        
-        # Use enhanced formatting 
+
+        # Use enhanced formatting
         repo_path = _config.get("repository_path")
         formatted_output = format_enhanced_search_results(results, query, repo_path)
-        
+
         # Add search metadata
         confidence_counts = {'high': 0, 'medium': 0, 'low': 0}
         for result in results:
             confidence_counts[result.confidence_level] += 1
-        
+
         metadata_lines = [
             "",
             "📊 Search Metadata:",
@@ -318,23 +320,13 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             f"   Results: {len(results)}",
             f"   Confidence: {confidence_counts['high']} high, {confidence_counts['medium']} medium, {confidence_counts['low']} low"
         ]
-        
+
         return formatted_output + "\n" + "\n".join(metadata_lines)
-        
+
     except Exception as e:
         return f"Error in enhanced search: {str(e)}"
 
 
-# Backward compatibility adapter functions
-def convert_results_to_legacy_format(enhanced_results):
-    """Convert CodeSearchResult objects to legacy tuple format."""
-    return [result.to_tuple() for result in enhanced_results]
-
-
-def convert_legacy_to_enhanced_format(legacy_results):
-    """Convert legacy tuple results to CodeSearchResult objects."""
-    from search_result_types import CodeSearchResult
-    return [CodeSearchResult.from_tuple(result) for result in legacy_results]
 
 
 @mcp.tool()
@@ -540,12 +532,37 @@ def watch_repository(repository_path: str, max_file_size_mb: float = 1.0, deboun
 
         # Start new watcher in background thread
         def start_watcher():
+            """
+            File watcher thread function with comprehensive error handling.
+            
+            Error scenarios handled:
+            - KeyboardInterrupt: Normal shutdown, no action needed
+            - FileNotFoundError: Repository path doesn't exist
+            - PermissionError: Insufficient permissions to watch directory
+            - OSError: Various filesystem errors (disk full, network issues)
+            - Exception: Catch-all for unexpected errors
+            
+            Security note: Error messages avoid exposing sensitive path details
+            to prevent information leakage in logs or user-facing messages.
+            """
             try:
                 watch_mode(str(repo_path), max_file_size_mb, debounce_seconds)
             except KeyboardInterrupt:
-                pass  # Normal shutdown
+                # Normal shutdown via Ctrl+C or SIGINT - expected behavior
+                pass
+            except FileNotFoundError:
+                # Repository path no longer exists (deleted, unmounted, etc.)
+                print("❌ Watcher stopped: Repository path not found", file=sys.stderr)
+            except PermissionError:
+                # Insufficient permissions to watch directory or files
+                print("❌ Watcher stopped: Permission denied for directory access", file=sys.stderr)
+            except OSError as e:
+                # Filesystem-level errors (disk full, network mount issues, etc.)
+                print(f"❌ Watcher stopped: Filesystem error (code {e.errno})", file=sys.stderr)
             except Exception as e:
-                print(f"Watcher error: {e}", file=sys.stderr)
+                # Unexpected errors - log type but not full details for security
+                error_type = type(e).__name__
+                print(f"❌ Watcher stopped: Unexpected {error_type} error", file=sys.stderr)
 
         _watcher_thread = threading.Thread(target=start_watcher, daemon=True)
         _watcher_thread.start()

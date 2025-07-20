@@ -325,9 +325,25 @@ class SearchConfig:
         os.getenv("TURBOPROP_MIN_SIMILARITY", "0.1"), "TURBOPROP_MIN_SIMILARITY", 0.0, 1.0
     )
 
+    # Confidence level thresholds for search results
+    HIGH_CONFIDENCE_THRESHOLD: float = validate_range_float(
+        os.getenv("TURBOPROP_HIGH_CONFIDENCE_THRESHOLD", "0.8"), "TURBOPROP_HIGH_CONFIDENCE_THRESHOLD", 0.0, 1.0
+    )
+    MEDIUM_CONFIDENCE_THRESHOLD: float = validate_range_float(
+        os.getenv("TURBOPROP_MEDIUM_CONFIDENCE_THRESHOLD", "0.6"), "TURBOPROP_MEDIUM_CONFIDENCE_THRESHOLD", 0.0, 1.0
+    )
+
     # Display formatting
     SEPARATOR_LENGTH: int = validate_positive_int(
         os.getenv("TURBOPROP_SEPARATOR_LENGTH", "50"), "TURBOPROP_SEPARATOR_LENGTH", 50
+    )
+
+    # Snippet length constants  
+    SNIPPET_DISPLAY_MAX_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_SNIPPET_DISPLAY_LENGTH", "100"), "TURBOPROP_SNIPPET_DISPLAY_LENGTH", 100
+    )
+    SNIPPET_CONTENT_MAX_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_SNIPPET_CONTENT_LENGTH", "200"), "TURBOPROP_SNIPPET_CONTENT_LENGTH", 200
     )
 
 
