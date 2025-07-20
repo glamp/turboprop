@@ -12,7 +12,8 @@ from typing import Any, Dict, List, Optional
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from logging_config import get_logger
-from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample
+from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample, ToolId
+from parameter_utils import calculate_parameter_counts
 from search_result_formatter import SearchResultFormatter
 from tool_matching_algorithms import ToolMatchingAlgorithms
 from tool_query_processor import ToolQueryProcessor
@@ -27,6 +28,12 @@ SEARCH_OPTIMIZATIONS = {
     "max_vector_search_results": 100,  # Limit initial vector search
     "similarity_threshold": 0.1,  # Filter very low similarity results
     "batch_embedding_size": 50,  # Batch size for embedding operations
+}
+
+# Confidence level thresholds for search results
+CONFIDENCE_THRESHOLDS = {
+    "high": 0.7,    # High confidence threshold for combined scores
+    "medium": 0.4,  # Medium confidence threshold for combined scores
 }
 
 # Search strategies
@@ -139,52 +146,24 @@ class MCPToolSearchEngine:
 
             # Check cache first
             cache_key = self._generate_cache_key(query, k, category_filter, tool_type_filter)
-            if self._results_cache:
-                cached_result = self._results_cache.get(cache_key)
-                if cached_result:
-                    logger.debug("Returning cached result for query: '%s'", query)
-                    return cached_result
+            cached_result = self._check_search_cache(cache_key, query)
+            if cached_result:
+                return cached_result
 
-            # Process and expand query
-            processed_query = self.query_processor.process_query(query)
-
-            # Generate query embedding
-            query_embedding = self.embedding_generator.encode(processed_query.cleaned_query).tolist()
-
-            # Perform vector similarity search
-            raw_results = self._perform_vector_search(query_embedding, k * 2, category_filter, tool_type_filter)
-
-            # Convert to ToolSearchResult objects
-            search_results = self._convert_to_search_results(
-                raw_results, processed_query, query_embedding, similarity_threshold
+            # Perform semantic search
+            search_results = self._perform_semantic_search(
+                query, k, category_filter, tool_type_filter, similarity_threshold
             )
 
-            # Apply ranking and filtering
-            final_results = self.matching_algorithms.rank_results(search_results, "relevance")[:k]
-
-            # Generate suggestions
-            suggestions = self.query_processor.suggest_query_refinements(query, len(final_results))
-
-            # Create response
-            execution_time = time.time() - start_time
-            response = ToolSearchResponse(
-                query=query,
-                results=final_results,
-                total_results=len(final_results),
-                execution_time=execution_time,
-                processed_query=processed_query,
-                suggested_refinements=suggestions,
-                search_strategy="semantic_only",
+            # Create final response with ranking and suggestions
+            response = self._create_search_response(
+                query, search_results, k, start_time, cache_key
             )
-
-            # Cache result
-            if self._results_cache:
-                self._results_cache.put(cache_key, response)
 
             logger.info(
                 "Functionality search completed: %d results in %.2fs",
-                len(final_results),
-                execution_time,
+                len(response.results),
+                response.execution_time,
             )
 
             return response
@@ -336,7 +315,7 @@ class MCPToolSearchEngine:
             execution_time = time.time() - start_time
             return self._create_error_response(capability_description, str(e), execution_time)
 
-    def get_tool_alternatives(self, tool_id: str, k: int = 5) -> ToolSearchResponse:
+    def get_tool_alternatives(self, tool_id: ToolId, k: int = 5) -> ToolSearchResponse:
         """
         Find alternative tools to a given tool.
 
@@ -435,7 +414,7 @@ class MCPToolSearchEngine:
 
     def _perform_keyword_search(self, query: str, limit: int) -> List[tuple]:
         """
-        Perform keyword-based search using full-text search.
+        Perform keyword-based search using enhanced full-text search with ranking.
 
         Args:
             query: Search query string
@@ -445,8 +424,96 @@ class MCPToolSearchEngine:
             List of tuples (tool_id, keyword_score, tool_data)
         """
         try:
-            # Use database full-text search capabilities
-            # This is a simplified implementation - in practice, you'd use proper FTS
+            with self.db_manager.get_connection() as conn:
+                # Prepare normalized query terms for better matching
+                normalized_terms = self._normalize_search_terms(query)
+                
+                # Enhanced full-text search with better ranking
+                search_results = self._execute_enhanced_keyword_search(conn, normalized_terms, limit)
+                
+                # Convert to expected format
+                keyword_results = []
+                for row in search_results:
+                    tool_data = {
+                        "id": row[0],
+                        "name": row[1],
+                        "description": row[2],
+                        "category": row[3],
+                        "tool_type": row[4],
+                        "metadata_json": row[5],
+                    }
+                    keyword_results.append((row[0], row[6], tool_data))
+
+                logger.debug("Enhanced keyword search returned %d results", len(keyword_results))
+                return keyword_results
+
+        except Exception as e:
+            logger.error("Error in enhanced keyword search: %s", e)
+            # Fallback to basic search
+            return self._perform_basic_keyword_search(query, limit)
+    
+    def _normalize_search_terms(self, query: str) -> List[str]:
+        """Normalize search terms for better matching with stemming and expansion."""
+        import re
+        
+        # Clean and split query into terms
+        terms = re.findall(r'\b\w+\b', query.lower())
+        
+        # Remove very short terms
+        terms = [term for term in terms if len(term) > 2]
+        
+        # Basic stemming - remove common suffixes
+        normalized_terms = []
+        for term in terms:
+            # Remove common programming suffixes
+            stemmed = term
+            suffixes = ['ing', 'ed', 'er', 'ly', 'ion', 'tion', 'ness']
+            for suffix in suffixes:
+                if stemmed.endswith(suffix) and len(stemmed) > len(suffix) + 2:
+                    stemmed = stemmed[:-len(suffix)]
+                    break
+            normalized_terms.append(stemmed)
+        
+        return list(set(normalized_terms))  # Remove duplicates
+    
+    def _execute_enhanced_keyword_search(self, conn, terms: List[str], limit: int) -> List:
+        """Execute enhanced keyword search with improved ranking algorithm."""
+        # Build dynamic search query with weighted scoring
+        search_conditions = []
+        score_conditions = []
+        params = []
+        
+        for i, term in enumerate(terms):
+            pattern = f"%{term}%"
+            search_conditions.append(f"(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)")
+            score_conditions.append(f"""
+                CASE 
+                    WHEN LOWER(name) LIKE ? THEN 2.0
+                    WHEN LOWER(description) LIKE ? THEN 1.0
+                    ELSE 0.0
+                END
+            """)
+            # Add parameters for conditions and scoring
+            params.extend([pattern, pattern, pattern, pattern])
+        
+        if not search_conditions:
+            return []
+        
+        search_sql = f"""
+            SELECT id, name, description, category, tool_type, metadata_json,
+                   ({' + '.join(score_conditions)}) / {len(terms)} as keyword_score
+            FROM mcp_tools
+            WHERE {' OR '.join(search_conditions)}
+            ORDER BY keyword_score DESC, name ASC
+            LIMIT ?
+        """
+        
+        params.append(limit)
+        return conn.execute(search_sql, params).fetchall()
+    
+    def _perform_basic_keyword_search(self, query: str, limit: int) -> List[tuple]:
+        """Fallback to basic keyword search when enhanced search fails."""
+        try:
             with self.db_manager.get_connection() as conn:
                 search_sql = """
                     SELECT id, name, description, category, tool_type, metadata_json,
@@ -466,25 +533,11 @@ class MCPToolSearchEngine:
                 results = conn.execute(
                     search_sql, (query_pattern, query_pattern, query_pattern, query_pattern, limit)
                 ).fetchall()
-
-                # Convert to expected format
-                keyword_results = []
-                for row in results:
-                    tool_data = {
-                        "id": row[0],
-                        "name": row[1],
-                        "description": row[2],
-                        "category": row[3],
-                        "tool_type": row[4],
-                        "metadata_json": row[5],
-                    }
-                    keyword_results.append((row[0], row[6], tool_data))
-
-                logger.debug("Keyword search returned %d results", len(keyword_results))
-                return keyword_results
+                
+                return results
 
         except Exception as e:
-            logger.error("Error in keyword search: %s", e)
+            logger.error("Error in basic keyword search fallback: %s", e)
             return []
 
     def _combine_search_results(
@@ -557,59 +610,69 @@ class MCPToolSearchEngine:
 
         for tool_id, similarity_score, tool_data in raw_results:
             try:
-                # Skip if below threshold
-                if similarity_score < similarity_threshold:
-                    continue
-
-                # Get tool metadata
-                tool_metadata = self._build_tool_metadata_from_db_result(tool_data)
-
-                # Calculate relevance score
-                relevance_score = self.matching_algorithms.calculate_relevance_score(
-                    similarity_score, tool_metadata, processed_query
+                search_result = self._process_single_search_result(
+                    tool_id, similarity_score, tool_data, processed_query, similarity_threshold
                 )
-
-                # Determine confidence level
-                confidence_level = self._determine_confidence_level(similarity_score, relevance_score)
-
-                # Generate match reasons
-                scores = {
-                    "semantic_similarity": similarity_score,
-                    "relevance_score": relevance_score,
-                }
-                match_reasons = self.matching_algorithms.explain_match_reasons(tool_metadata, processed_query, scores)
-
-                # Get parameters and examples
-                parameters = self._get_tool_parameters(tool_id)
-                examples = self._get_tool_examples(tool_id)
-
-                # Create search result
-                search_result = ToolSearchResult(
-                    tool_id=tool_id,
-                    name=tool_data.get("name", "Unknown"),
-                    description=tool_data.get("description", ""),
-                    category=tool_data.get("category", "unknown"),
-                    tool_type=tool_data.get("tool_type", "unknown"),
-                    similarity_score=similarity_score,
-                    relevance_score=relevance_score,
-                    confidence_level=confidence_level,
-                    match_reasons=match_reasons,
-                    parameters=parameters,
-                    parameter_count=len(parameters),
-                    required_parameter_count=sum(1 for p in parameters if p.required),
-                    complexity_score=tool_metadata.complexity_analysis.overall_complexity
-                    if tool_metadata.complexity_analysis
-                    else 0.0,
-                    examples=examples,
-                )
-
-                search_results.append(search_result)
-
+                if search_result:
+                    search_results.append(search_result)
             except Exception as e:
                 logger.error("Error converting result for tool %s: %s", tool_id, e)
                 continue
 
         return search_results
+    
+    def _process_single_search_result(
+        self,
+        tool_id: str,
+        similarity_score: float,
+        tool_data: Dict[str, Any],
+        processed_query: ProcessedQuery,
+        similarity_threshold: float,
+    ) -> Optional[ToolSearchResult]:
+        """Process a single search result and return ToolSearchResult if it meets criteria."""
+        # Skip if below threshold
+        if similarity_score < similarity_threshold:
+            return None
+
+        # Get tool metadata
+        tool_metadata = self._build_tool_metadata_from_db_result(tool_data)
+
+        # Calculate scores and confidence
+        relevance_score = self.matching_algorithms.calculate_relevance_score(
+            similarity_score, tool_metadata, processed_query
+        )
+        confidence_level = self._determine_confidence_level(similarity_score, relevance_score)
+
+        # Generate match reasons
+        scores = {
+            "semantic_similarity": similarity_score,
+            "relevance_score": relevance_score,
+        }
+        match_reasons = self.matching_algorithms.explain_match_reasons(tool_metadata, processed_query, scores)
+
+        # Get parameters and examples
+        parameters = self._get_tool_parameters(ToolId(tool_id))
+        examples = self._get_tool_examples(ToolId(tool_id))
+
+        # Create and return search result
+        return ToolSearchResult(
+            tool_id=ToolId(tool_id),
+            name=tool_data.get("name", "Unknown"),
+            description=tool_data.get("description", ""),
+            category=tool_data.get("category", "unknown"),
+            tool_type=tool_data.get("tool_type", "unknown"),
+            similarity_score=similarity_score,
+            relevance_score=relevance_score,
+            confidence_level=confidence_level,
+            match_reasons=match_reasons,
+            parameters=parameters,
+            parameter_count=calculate_parameter_counts(parameters)[0],
+            required_parameter_count=calculate_parameter_counts(parameters)[1],
+            complexity_score=tool_metadata.complexity_analysis.overall_complexity
+            if tool_metadata.complexity_analysis
+            else 0.0,
+            examples=examples,
+        )
 
     def _build_tool_metadata_from_db_result(self, tool_data: Dict[str, Any]) -> MCPToolMetadata:
         """Build MCPToolMetadata from database result."""
@@ -620,7 +683,7 @@ class MCPToolSearchEngine:
             category=tool_data.get("category", "unknown"),
         )
 
-    def _get_tool_parameters(self, tool_id: str) -> List[ParameterAnalysis]:
+    def _get_tool_parameters(self, tool_id: ToolId) -> List[ParameterAnalysis]:
         """Get parameter analysis for a tool."""
         try:
             param_dicts = self.db_manager.get_tool_parameters(tool_id)
@@ -640,7 +703,7 @@ class MCPToolSearchEngine:
             logger.error("Error getting parameters for tool %s: %s", tool_id, e)
             return []
 
-    def _get_tool_examples(self, tool_id: str) -> List[ToolExample]:
+    def _get_tool_examples(self, tool_id: ToolId) -> List[ToolExample]:
         """Get examples for a tool."""
         try:
             example_dicts = self.db_manager.get_tool_examples(tool_id)
@@ -665,9 +728,9 @@ class MCPToolSearchEngine:
         """Determine confidence level based on scores."""
         combined_score = (similarity_score + relevance_score) / 2
 
-        if combined_score > 0.7:
+        if combined_score > CONFIDENCE_THRESHOLDS["high"]:
             return "high"
-        elif combined_score > 0.4:
+        elif combined_score > CONFIDENCE_THRESHOLDS["medium"]:
             return "medium"
         else:
             return "low"
@@ -677,6 +740,80 @@ class MCPToolSearchEngine:
     ) -> str:
         """Generate cache key for search parameters."""
         return f"{hash(query)}_{k}_{category_filter}_{tool_type_filter}"
+    
+    def _check_search_cache(self, cache_key: str, query: str) -> Optional[ToolSearchResponse]:
+        """Check if search results are cached and return them if found."""
+        if self._results_cache:
+            cached_result = self._results_cache.get(cache_key)
+            if cached_result:
+                # Validate that cached result is actually a ToolSearchResponse
+                if isinstance(cached_result, ToolSearchResponse):
+                    logger.debug("Returning cached result for query: '%s'", query)
+                    return cached_result
+                else:
+                    # Cache corruption detected, remove invalid entry
+                    logger.warning("Cache corruption detected for query: '%s', removing invalid entry", query)
+                    # Note: we can't directly remove from cache here since we don't have access to the cache's internals
+        return None
+    
+    def _perform_semantic_search(
+        self, 
+        query: str, 
+        k: int, 
+        category_filter: Optional[str], 
+        tool_type_filter: Optional[str], 
+        similarity_threshold: float
+    ) -> List[ToolSearchResult]:
+        """Perform semantic search and convert results to ToolSearchResult objects."""
+        # Process and expand query
+        processed_query = self.query_processor.process_query(query)
+
+        # Generate query embedding
+        query_embedding = self.embedding_generator.encode(processed_query.cleaned_query).tolist()
+
+        # Perform vector similarity search
+        raw_results = self._perform_vector_search(query_embedding, k * 2, category_filter, tool_type_filter)
+
+        # Convert to ToolSearchResult objects
+        return self._convert_to_search_results(
+            raw_results, processed_query, query_embedding, similarity_threshold
+        )
+    
+    def _create_search_response(
+        self, 
+        query: str, 
+        search_results: List[ToolSearchResult], 
+        k: int, 
+        start_time: float,
+        cache_key: str
+    ) -> ToolSearchResponse:
+        """Create final search response with ranking, suggestions, and caching."""
+        # Apply ranking and filtering
+        final_results = self.matching_algorithms.rank_results(search_results, "relevance")[:k]
+
+        # Get processed query for suggestions
+        processed_query = self.query_processor.process_query(query)
+
+        # Generate suggestions
+        suggestions = self.query_processor.suggest_query_refinements(query, len(final_results))
+
+        # Create response
+        execution_time = time.time() - start_time
+        response = ToolSearchResponse(
+            query=query,
+            results=final_results,
+            total_results=len(final_results),
+            execution_time=execution_time,
+            processed_query=processed_query,
+            suggested_refinements=suggestions,
+            search_strategy="semantic_only",
+        )
+
+        # Cache result
+        if self._results_cache:
+            self._results_cache.put(cache_key, response)
+            
+        return response
 
     def _filter_by_parameter_requirements(
         self, raw_results: List[tuple], required_params: List[str], optional_params: List[str]

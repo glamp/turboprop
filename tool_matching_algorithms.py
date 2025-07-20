@@ -23,6 +23,12 @@ PARAMETER_COMPATIBILITY_BOOST = 0.05
 COMPLEXITY_PREFERENCE_BOOST = 0.08
 EXAMPLE_QUALITY_BOOST = 0.03
 
+# Cosine similarity normalization constants
+COSINE_SIMILARITY_MIN_BOUND = 0.0
+COSINE_SIMILARITY_MAX_BOUND = 1.0
+COSINE_SIMILARITY_RANGE_OFFSET = 1.0
+COSINE_SIMILARITY_RANGE_DIVISOR = 2.0
+
 # Ranking strategy configurations
 RANKING_STRATEGIES = {
     "relevance": {"semantic_weight": 0.6, "metadata_weight": 0.25, "quality_weight": 0.15},
@@ -79,12 +85,22 @@ class ToolMatchingAlgorithms:
             similarity = dot_product / (query_magnitude * tool_magnitude)
 
             # Normalize to [0, 1] range (cosine similarity is in [-1, 1])
-            normalized_similarity = max(0.0, min(1.0, (similarity + 1.0) / 2.0))
+            normalized_similarity = max(
+                COSINE_SIMILARITY_MIN_BOUND, 
+                min(COSINE_SIMILARITY_MAX_BOUND, 
+                    (similarity + COSINE_SIMILARITY_RANGE_OFFSET) / COSINE_SIMILARITY_RANGE_DIVISOR)
+            )
 
             return normalized_similarity
 
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            logger.error("Error calculating semantic similarity - invalid embedding data: %s", e)
+            return 0.0
+        except (AttributeError, IndexError) as e:
+            logger.error("Error calculating semantic similarity - malformed embedding structure: %s", e)
+            return 0.0
         except Exception as e:
-            logger.error("Error calculating semantic similarity: %s", e)
+            logger.error("Unexpected error calculating semantic similarity: %s", e)
             return 0.0
 
     def calculate_relevance_score(
@@ -148,8 +164,14 @@ class ToolMatchingAlgorithms:
 
             return relevance
 
+        except (AttributeError, KeyError) as e:
+            logger.error("Error calculating relevance score - missing metadata attributes: %s", e)
+            return semantic_score  # Fall back to semantic score
+        except (TypeError, ValueError) as e:
+            logger.error("Error calculating relevance score - invalid numeric values: %s", e)
+            return max(0.0, min(1.0, semantic_score))
         except Exception as e:
-            logger.error("Error calculating relevance score: %s", e)
+            logger.error("Unexpected error calculating relevance score: %s", e)
             return semantic_score  # Fall back to semantic score
 
     def explain_match_reasons(
@@ -245,8 +267,14 @@ class ToolMatchingAlgorithms:
 
             return reasons[:5]  # Return top 5 reasons
 
+        except (AttributeError, KeyError) as e:
+            logger.error("Error generating match reasons - missing tool or query attributes: %s", e)
+            return ["Tool matched based on semantic similarity"]
+        except (TypeError, ValueError) as e:
+            logger.error("Error generating match reasons - invalid data types in scores: %s", e)
+            return ["Tool matched with limited analysis"]
         except Exception as e:
-            logger.error("Error generating match reasons: %s", e)
+            logger.error("Unexpected error generating match reasons: %s", e)
             return ["Tool matched based on semantic similarity"]
 
     def rank_results(
@@ -303,8 +331,15 @@ class ToolMatchingAlgorithms:
 
             return ranked_results
 
+        except KeyError as e:
+            logger.error("Error ranking results - unknown ranking strategy '%s': %s", ranking_strategy, e)
+            # Fall back to simple relevance score ranking
+            return sorted(results, key=lambda r: r.relevance_score, reverse=True)
+        except (AttributeError, TypeError) as e:
+            logger.error("Error ranking results - invalid result objects or scores: %s", e)
+            return results  # Return unranked results
         except Exception as e:
-            logger.error("Error ranking results: %s", e)
+            logger.error("Unexpected error ranking results: %s", e)
             # Fall back to simple relevance score ranking
             return sorted(results, key=lambda r: r.relevance_score, reverse=True)
 
@@ -407,8 +442,14 @@ class ToolMatchingAlgorithms:
 
             return min(compatibility_score, 1.0)
 
+        except (AttributeError, KeyError) as e:
+            logger.error("Error calculating parameter compatibility - missing metadata or constraints: %s", e)
+            return 0.5
+        except (TypeError, ValueError) as e:
+            logger.error("Error calculating parameter compatibility - invalid constraint values: %s", e)
+            return 0.5
         except Exception as e:
-            logger.error("Error calculating parameter compatibility: %s", e)
+            logger.error("Unexpected error calculating parameter compatibility: %s", e)
             return 0.5
 
     def _calculate_complexity_match(self, tool_metadata: MCPToolMetadata, query_context: ProcessedQuery) -> float:
@@ -443,8 +484,14 @@ class ToolMatchingAlgorithms:
                 # Peak at 0.5 complexity, decline toward extremes
                 return 1.0 - abs(tool_complexity - 0.5) * 2
 
+        except (AttributeError, KeyError) as e:
+            logger.error("Error calculating complexity match - missing complexity analysis: %s", e)
+            return 0.5
+        except (TypeError, ValueError) as e:
+            logger.error("Error calculating complexity match - invalid complexity values: %s", e)
+            return 0.5
         except Exception as e:
-            logger.error("Error calculating complexity match: %s", e)
+            logger.error("Unexpected error calculating complexity match: %s", e)
             return 0.5
 
     def _calculate_example_quality_score(self, tool_metadata: MCPToolMetadata) -> float:
@@ -477,6 +524,12 @@ class ToolMatchingAlgorithms:
 
             return min(quality_score, 1.0)
 
+        except (AttributeError, KeyError) as e:
+            logger.error("Error calculating example quality score - missing example data: %s", e)
+            return 0.0
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            logger.error("Error calculating example quality score - invalid example metrics: %s", e)
+            return 0.0
         except Exception as e:
-            logger.error("Error calculating example quality score: %s", e)
+            logger.error("Unexpected error calculating example quality score: %s", e)
             return 0.0

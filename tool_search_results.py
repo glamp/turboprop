@@ -10,7 +10,8 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
-from mcp_metadata_types import ParameterAnalysis, ToolExample
+from mcp_metadata_types import ParameterAnalysis, ToolExample, ToolId
+from parameter_utils import validate_parameter_counts
 
 
 @dataclass
@@ -18,7 +19,7 @@ class ToolSearchResult:
     """Comprehensive tool search result with detailed matching information."""
 
     # Core tool information
-    tool_id: str
+    tool_id: ToolId
     name: str
     description: str
     category: str
@@ -60,12 +61,10 @@ class ToolSearchResult:
         if not 0.0 <= self.complexity_score <= 1.0:
             raise ValueError(f"complexity_score must be between 0.0 and 1.0, got {self.complexity_score}")
 
-        # Compute parameter counts if not provided
-        if self.parameter_count == 0 and self.parameters:
-            self.parameter_count = len(self.parameters)
-
-        if self.required_parameter_count == 0 and self.parameters:
-            self.required_parameter_count = sum(1 for p in self.parameters if p.required)
+        # Validate and compute parameter counts if not provided
+        self.parameter_count, self.required_parameter_count = validate_parameter_counts(
+            self.parameter_count, self.required_parameter_count, self.parameters
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""

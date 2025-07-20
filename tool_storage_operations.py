@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from database_manager import DatabaseManager
 from logging_config import get_logger
-from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample
+from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample, ToolId
 from mcp_tool_schema import generate_tool_id
 
 logger = get_logger(__name__)
@@ -63,7 +63,7 @@ class ToolStorageOperations:
         self.db_manager = db_manager
         logger.info("Initialized ToolStorageOperations")
 
-    def _create_parameter_operations(self, tool_id: str, parameters: List[ParameterAnalysis]) -> List[tuple]:
+    def _create_parameter_operations(self, tool_id: ToolId, parameters: List[ParameterAnalysis]) -> List[tuple]:
         """
         Create database operations for tool parameters.
         
@@ -114,7 +114,7 @@ class ToolStorageOperations:
         
         return operations
 
-    def _create_example_operations(self, tool_id: str, examples: List[ToolExample]) -> List[tuple]:
+    def _create_example_operations(self, tool_id: ToolId, examples: List[ToolExample]) -> List[tuple]:
         """
         Create database operations for tool examples.
         
@@ -307,7 +307,7 @@ class ToolStorageOperations:
                 execution_time=execution_time,
             )
 
-    def store_tool_parameters(self, tool_id: str, parameters: List[ParameterAnalysis]) -> None:
+    def store_tool_parameters(self, tool_id: ToolId, parameters: List[ParameterAnalysis]) -> None:
         """
         Store tool parameters with embeddings.
 
@@ -358,7 +358,7 @@ class ToolStorageOperations:
             self.db_manager.execute_transaction(operations)
             logger.debug("Successfully stored %d parameters for tool %s", len(parameters), tool_id)
 
-    def store_tool_examples(self, tool_id: str, examples: List[ToolExample]) -> None:
+    def store_tool_examples(self, tool_id: ToolId, examples: List[ToolExample]) -> None:
         """
         Store tool usage examples.
 

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from database_manager import DatabaseManager
 from logging_config import get_logger
 from mcp_metadata_types import ComplexityAnalysis, MCPToolMetadata, ParameterAnalysis, ToolExample
+from parameter_utils import calculate_parameter_counts
 
 logger = get_logger(__name__)
 
@@ -386,7 +387,8 @@ class CatalogValidator:
             quality["has_parameters"] = False
             return quality
 
-        quality["parameter_count"] = len(parameters)
+        parameter_total, parameter_required = calculate_parameter_counts(parameters)
+        quality["parameter_count"] = parameter_total
         quality["has_parameters"] = True
 
         # Check parameter completeness
@@ -404,9 +406,8 @@ class CatalogValidator:
 
         quality["parameter_completeness"] = complete_params / len(parameters)
 
-        # Check for required parameters
-        required_params = sum(1 for p in parameters if getattr(p, "required", False))
-        quality["required_parameter_count"] = required_params
+        # Set required parameter count from earlier calculation
+        quality["required_parameter_count"] = parameter_required
 
         return quality
 

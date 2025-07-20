@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 
 from logging_config import get_logger
 from mcp_metadata_types import ComplexityAnalysis, MCPToolMetadata, ParameterAnalysis, UsagePattern
+from parameter_utils import calculate_parameter_counts
 
 logger = get_logger(__name__)
 
@@ -145,13 +146,11 @@ class UsagePatternDetector:
                     overall_complexity=self.NO_COMPLEXITY_SCORE,
                 )
 
-            total_params = len(valid_parameters)
-
             try:
-                required_params = sum(1 for p in valid_parameters if getattr(p, "required", False))
+                total_params, required_params = calculate_parameter_counts(valid_parameters)
             except Exception as e:
-                logger.error("Error counting required parameters: %s", e)
-                required_params = 0
+                logger.error("Error calculating parameter counts: %s", e)
+                total_params, required_params = 0, 0
 
             optional_params = total_params - required_params
 
