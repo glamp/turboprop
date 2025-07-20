@@ -499,10 +499,10 @@ class ConstructSearchOperations:
             """).fetchone()[0]
 
             return {
-            'total_constructs': total_constructs,
-            'embedded_constructs': embedded_constructs,
-            'embedding_coverage': embedded_constructs / total_constructs if total_constructs > 0 else 0,
-            'construct_types': dict(type_counts)
+                'total_constructs': total_constructs,
+                'embedded_constructs': embedded_constructs,
+                'embedding_coverage': embedded_constructs / total_constructs if total_constructs > 0 else 0,
+                'construct_types': dict(type_counts)
             }
 
 

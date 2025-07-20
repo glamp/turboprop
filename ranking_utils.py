@@ -96,8 +96,8 @@ class MatchReasonGenerator:
                 config = get_ranking_config()
                 words = re.findall(r'\b\w+\b', query_lower)
                 keywords = [word for word in words
-                           if word not in QueryTypeConstants.STOP_WORDS
-                           and len(word) > config.match_reasons.min_keyword_length]
+                            if word not in QueryTypeConstants.STOP_WORDS
+                            and len(word) > config.match_reasons.min_keyword_length]
 
             # Analyze filename and path matching
             path_obj = Path(result.file_path)
@@ -336,7 +336,10 @@ class ResultDeduplicator:
         return similarity >= threshold
 
     @classmethod
-    def ensure_diversity(cls, results: List[CodeSearchResult], max_per_directory: Optional[int] = None) -> List[CodeSearchResult]:
+    def ensure_diversity(
+            cls,
+            results: List[CodeSearchResult],
+            max_per_directory: Optional[int] = None) -> List[CodeSearchResult]:
         """
         Ensure result diversity by limiting results per directory.
 

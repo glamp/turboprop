@@ -530,7 +530,7 @@ class TestConfigurationIntegration:
 
         # Check for proper section headers
         section_headers = [
-            line for line in lines 
+            line for line in lines
             if line.endswith(":") and not line.startswith("  ")
         ]
         assert len(section_headers) >= 6  # Should have at least 6 main sections

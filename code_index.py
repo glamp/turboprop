@@ -119,7 +119,7 @@ def init_db(repo_path: Path = None):
                 # Different path requested, reset and reinitialize
                 _db_manager.cleanup()
                 _db_manager = None
-        
+
         if _db_manager is None:
             # Create database in the repository directory or current directory
             if repo_path is None:
@@ -235,7 +235,7 @@ def scan_repo(repo_path: Path, max_bytes: int):
         # Skip .turboprop directory and its contents
         if '.turboprop' in p.parts:
             continue
-            
+
         try:
             # Skip files that are too large to process efficiently
             if p.stat().st_size > max_bytes:
@@ -1070,6 +1070,7 @@ Examples:
 
     return parser
 
+
 def _setup_index_subcommand(sub):
     """Set up the index subcommand and its arguments."""
 
@@ -1123,6 +1124,10 @@ Supported file types: .py, .js, .ts, .java, .go, .rs, .cpp, .h, .json, .yaml, et
         help="Force reprocessing of all files, even if unchanged. "
         "Useful for model updates or index corruption recovery.",
     )
+
+
+def _setup_search_subcommand(sub):
+    """Set up the search subcommand and its arguments."""
 
     # 'search' command: Query the existing index
     p_s = sub.add_parser(
@@ -1188,6 +1193,10 @@ Query Examples:
         help="Weight for text search in hybrid mode (0.0-1.0, default: 0.4)"
     )
 
+
+def _setup_watch_subcommand(sub):
+    """Set up the watch subcommand and its arguments."""
+
     # 'watch' command: Monitor repository for changes
     p_w = sub.add_parser(
         "watch",
@@ -1229,6 +1238,10 @@ Press Ctrl+C to stop watching.
         help="Seconds to wait before processing changes (default: 5.0). "
         "Higher values reduce CPU usage during rapid file changes.",
     )
+
+
+def _setup_mcp_subcommand(sub):
+    """Set up the MCP subcommand and its arguments."""
 
     # 'mcp' command: Start MCP server
     p_m = sub.add_parser(
@@ -1297,6 +1310,21 @@ Examples:
         dest="auto_watch",
         help="Don't automatically watch for file changes",
     )
+
+
+def setup_argument_parser():
+    """Set up the complete argument parser with all subcommands."""
+    parser = _setup_base_parser()
+
+    # Add subcommands
+    sub = parser.add_subparsers(dest="cmd", help="Available commands")
+    sub.required = True
+
+    # Set up all subcommands
+    _setup_index_subcommand(sub)
+    _setup_search_subcommand(sub)
+    _setup_watch_subcommand(sub)
+    _setup_mcp_subcommand(sub)
 
     return parser
 

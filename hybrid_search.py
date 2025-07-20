@@ -255,20 +255,20 @@ class HybridSearchEngine:
             Recommended search mode
         """
         # Prefer exact/text search for specific patterns
-        if (characteristics.has_quoted_phrases or
-            characteristics.has_boolean_operators or
-            characteristics.has_regex_patterns):
+        if (characteristics.has_quoted_phrases
+            or characteristics.has_boolean_operators
+                or characteristics.has_regex_patterns):
             return SearchMode.TEXT_ONLY
 
         # Prefer semantic search for natural language queries
-        if (characteristics.is_natural_language and
-            characteristics.word_count >= 3 and
-            not characteristics.is_technical_term):
+        if (characteristics.is_natural_language
+            and characteristics.word_count >= 3
+                and not characteristics.is_technical_term):
             return SearchMode.SEMANTIC_ONLY
 
         # Prefer text search for short technical queries
-        if (characteristics.is_technical_term and
-            characteristics.word_count <= 2):
+        if (characteristics.is_technical_term
+                and characteristics.word_count <= 2):
             return SearchMode.TEXT_ONLY
 
         # Default to hybrid for balanced results
@@ -499,8 +499,8 @@ class HybridSearchEngine:
 
             # Calculate weighted score
             weighted_score = (
-                semantic_score * weights.semantic_weight +
-                text_score * weights.text_weight
+                semantic_score * weights.semantic_weight
+                + text_score * weights.text_weight
             )
 
             # Boost exact matches if enabled

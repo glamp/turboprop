@@ -146,7 +146,8 @@ class ResultRanker:
             diverse_results = ResultDeduplicator.ensure_diversity(deduplicated)
 
             # Sort by composite score
-            diverse_results.sort(key=lambda r: float(r.file_metadata.get('composite_score', 0) if r.file_metadata else 0), reverse=True)
+            diverse_results.sort(key=lambda r: float(r.file_metadata.get(
+                'composite_score', 0) if r.file_metadata else 0), reverse=True)
 
             logger.info(f"Ranked results: {len(results)} → {len(diverse_results)} after deduplication/diversity")
             return diverse_results

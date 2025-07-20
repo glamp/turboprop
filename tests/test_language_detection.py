@@ -1,6 +1,4 @@
 """Tests for language detection functionality."""
-import pytest
-from pathlib import Path
 from language_detection import LanguageDetector
 
 
@@ -52,12 +50,12 @@ class TestLanguageDetector:
     def test_detect_language_configuration_files(self):
         """Test detecting configuration file types."""
         detector = LanguageDetector()
-        
+
         # JSON
         json_result = detector.detect_language("config.json", '{"key": "value"}')
         assert json_result.language == "JSON"
         assert json_result.file_type == ".json"
-        
+
         # YAML
         yaml_result = detector.detect_language("config.yaml", "key: value")
         assert yaml_result.language == "YAML"
@@ -66,7 +64,7 @@ class TestLanguageDetector:
     def test_detect_language_documentation_files(self):
         """Test detecting documentation file types."""
         detector = LanguageDetector()
-        
+
         # Markdown
         md_result = detector.detect_language("README.md", "# Title\nContent here")
         assert md_result.language == "Markdown"
@@ -75,7 +73,7 @@ class TestLanguageDetector:
     def test_detect_language_build_files(self):
         """Test detecting build and deployment files."""
         detector = LanguageDetector()
-        
+
         # Dockerfile
         dockerfile_result = detector.detect_language("Dockerfile", "FROM python:3.9")
         assert dockerfile_result.language == "Dockerfile"
@@ -84,15 +82,15 @@ class TestLanguageDetector:
     def test_language_categorization(self):
         """Test file categorization into source/config/docs/build."""
         detector = LanguageDetector()
-        
+
         # Source code
         py_result = detector.detect_language("app.py", "print('hello')")
         assert py_result.category == "source"
-        
+
         # Configuration
         json_result = detector.detect_language("config.json", '{"key": "value"}')
         assert json_result.category == "configuration"
-        
+
         # Documentation
         md_result = detector.detect_language("README.md", "# Title")
         assert md_result.category == "documentation"

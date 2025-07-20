@@ -126,8 +126,8 @@ class ErrorHandler:
 
 
 def log_and_handle_error(operation_name: str,
-                        error: Exception,
-                        return_value: Any = None) -> Any:
+                         error: Exception,
+                         return_value: Any = None) -> Any:
     """
     Utility function to log and handle errors consistently.
 

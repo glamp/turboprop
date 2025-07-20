@@ -484,7 +484,7 @@ def search_code_hybrid(
 
         if not results:
             return (f"No results found for hybrid search: '{query}' (mode: {search_mode}). "
-                   "Try different search terms, change the search mode, or check that the repository is indexed.")
+                    "Try different search terms, change the search mode, or check that the repository is indexed.")
 
         # Format results with hybrid search formatting
         repo_path = _config.get("repository_path")
@@ -495,7 +495,7 @@ def search_code_hybrid(
 
         # Add search mode and configuration info
         header_lines = [
-            f"🔀 HYBRID SEARCH RESULTS",
+            "🔀 HYBRID SEARCH RESULTS",
             f"Query: '{query}' | Mode: {search_mode} | Results: {len(results)}",
             f"Weights: semantic={semantic_weight:.2f}, text={text_weight:.2f}",
             "=" * 60,

@@ -48,7 +48,7 @@ class TestRankingWeights:
                 file_recency=0.1,
                 file_size_optimization=0.1
             )
-        
+
         # Test that slightly off weights (sum within 0.1 of 1.0) only log a warning
         with patch('result_ranking.logger') as mock_logger:
             RankingWeights(

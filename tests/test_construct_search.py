@@ -11,10 +11,7 @@ This module tests all aspects of the construct search implementation including:
 """
 
 import pytest
-import tempfile
-import os
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from construct_search import (
     ConstructSearchOperations,
@@ -24,7 +21,6 @@ from construct_search import (
 from exceptions import SearchError
 from search_operations import (
     search_hybrid,
-    search_with_construct_focus,
     format_hybrid_search_results
 )
 from database_manager import DatabaseManager
@@ -367,12 +363,12 @@ class TestHybridSearch:
         """Set up test fixtures."""
         self.mock_db_manager = Mock(spec=DatabaseManager)
         self.mock_embedder = Mock(spec=EmbeddingGenerator)
-        
+
         # Mock embedder methods
         import numpy as np
         self.mock_embedder.encode.return_value = np.array([0.1, 0.2, 0.3] * 128)  # 384-dimensional vector
         self.mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
-        
+
         # Mock database manager methods
         self.mock_db_manager.execute_with_retry.return_value = [
             ("/test/file.py", "test content", 0.2)  # (path, content, distance)
@@ -528,7 +524,7 @@ class TestErrorHandling:
         mock_embedder.generate_embeddings.return_value = [[0.1, 0.2, 0.3]]
 
         construct_ops = ConstructSearchOperations(mock_db_manager, mock_embedder)
-        
+
         # Should raise SearchError for general exceptions
         with pytest.raises(SearchError, match="construct search failed"):
             construct_ops.search_constructs("test query")
@@ -542,7 +538,7 @@ class TestErrorHandling:
         mock_embedder.generate_embeddings.side_effect = Exception("Embedding generation failed")
 
         construct_ops = ConstructSearchOperations(mock_db_manager, mock_embedder)
-        
+
         # Should raise SearchError for general exceptions
         with pytest.raises(SearchError, match="construct search failed"):
             construct_ops.search_constructs("test query")

@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 class FileTypeScorer:
     """Scores results based on file type relevance."""
 
-
     @classmethod
     def score_file_type(cls, file_path: str, query: str) -> float:
         """
@@ -233,7 +232,6 @@ class RecencyScorer:
 
 class FileSizeScorer:
     """Scores results based on file size optimization."""
-
 
     @classmethod
     def score_file_size(cls, result: CodeSearchResult) -> float:

@@ -38,12 +38,6 @@ DIMENSIONS = 384
 logger = logging.getLogger(__name__)
 
 
-
-
-
-
-
-
 def search_index_with_advanced_ranking(
     db_manager: DatabaseManager,
     embedder: EmbeddingGenerator,
@@ -108,8 +102,6 @@ def search_index_with_advanced_ranking(
         # Fallback to basic enhanced search
         logger.info("Falling back to basic enhanced search")
         return search_index_enhanced(db_manager, embedder, query, k)
-
-
 
 
 def search_index(
@@ -1468,8 +1460,8 @@ def format_hybrid_search_results(
         lines.append(f"   💻 {line_info}: {snippet.text.strip()}")
 
         # Show construct context if available and requested
-        if (show_construct_context and result.file_metadata and
-            'construct_context' in result.file_metadata):
+        if (show_construct_context and result.file_metadata
+                and 'construct_context' in result.file_metadata):
 
             context = result.file_metadata['construct_context']
             construct_count = context['related_constructs']
@@ -1707,7 +1699,6 @@ def _add_construct_context(
 
     result.file_metadata['construct_context'] = construct_summary
     return result
-
 
 
 def search_constructs_with_file_context(

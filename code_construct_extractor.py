@@ -503,7 +503,7 @@ class JavaScriptConstructExtractor:
     def _extract_imports_js(self, content: str, lines: List[str]) -> List[CodeConstruct]:
         """Extract JavaScript import/require statements."""
         constructs = []
-        
+
         # Patterns for different types of imports
         patterns = [
             # const express = require('express')
@@ -517,16 +517,15 @@ class JavaScriptConstructExtractor:
             # import * as React from 'react'
             re.compile(r'import\s*\*\s+as\s+(\w+)\s+from\s+["\']([^"\']+)["\']', re.MULTILINE),
         ]
-        
+
         for pattern in patterns:
             for match in pattern.finditer(content):
                 start_line = content[:match.start()].count('\n') + 1
                 imported_name = match.group(1).strip()
-                module_path = match.group(2)
-                
+
                 # Create signature from the matched text
                 signature = match.group(0)
-                
+
                 constructs.append(CodeConstruct(
                     construct_type="import",
                     name=imported_name,
@@ -534,7 +533,7 @@ class JavaScriptConstructExtractor:
                     end_line=start_line,
                     signature=signature
                 ))
-        
+
         return constructs
 
 
@@ -584,27 +583,27 @@ class CodeConstructExtractor:
     def extract_from_content(self, content: str, language: str) -> List[CodeConstruct]:
         """
         Extract constructs from content given an explicit language.
-        
+
         Args:
             content: Source code content
             language: Programming language (e.g., "python", "javascript", "typescript")
-            
+
         Returns:
             List of CodeConstruct objects
         """
         try:
             language_lower = language.lower()
-            
+
             # Choose appropriate extractor based on language
             if language_lower == "python":
-                return self.python_extractor.extract_constructs(content, f"<content>.py")
+                return self.python_extractor.extract_constructs(content, "<content>.py")
             elif language_lower in ["javascript", "typescript", "js", "ts"]:
                 return self.js_extractor.extract_constructs(content, f"<content>.{language_lower}")
             else:
                 # For unsupported languages, return empty list
                 logger.debug("No construct extractor available for language: %s", language)
                 return []
-                
+
         except Exception as error:
             logger.error("Error extracting constructs from content (language: %s): %s", language, error)
             return []
@@ -614,11 +613,11 @@ class CodeConstructExtractor:
 def extract_constructs_from_content(content: str, language: str) -> List[CodeConstruct]:
     """
     Extract programming constructs from code content with specified language.
-    
+
     Args:
         content: Source code content
         language: Programming language (e.g., "python", "javascript", "typescript")
-        
+
     Returns:
         List of CodeConstruct objects
     """

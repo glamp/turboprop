@@ -378,11 +378,11 @@ class LanguageDetector:
 
         # Score each language based on pattern matches
         language_scores = {}
-        
+
         for language, patterns in self._content_patterns.items():
             score = 0
             matches = 0
-            
+
             for pattern in patterns:
                 if pattern.search(content):
                     matches += 1
@@ -391,11 +391,11 @@ class LanguageDetector:
                     if len(pattern.pattern) > 20:  # More specific patterns
                         pattern_weight = 2
                     score += pattern_weight
-            
+
             # Only consider languages that have at least one match
             if matches > 0:
                 language_scores[language] = score
-        
+
         # Return language with highest score
         if language_scores:
             best_language = max(language_scores, key=language_scores.get)
@@ -407,8 +407,8 @@ class LanguageDetector:
                 self._last_confidence = 0.9
             else:
                 self._last_confidence = 0.8
-                
-            # Require at least a score of 2 for confident detection  
+
+            # Require at least a score of 2 for confident detection
             if best_score >= 2:
                 return best_language
             # For single pattern matches, check for discriminating patterns
@@ -417,7 +417,7 @@ class LanguageDetector:
                 return self._validate_single_match(content, best_language)
 
         return None
-        
+
     def _validate_single_match(self, content: str, language: str) -> Optional[str]:
         """Validate a single pattern match with additional checks."""
         # For languages that might be confused, do additional validation
@@ -432,7 +432,7 @@ class LanguageDetector:
                 self._last_confidence = 0.85
                 return language
         elif language == 'Python':
-            # Check for Python-specific features  
+            # Check for Python-specific features
             if any(pattern in content for pattern in ['def ', 'class ', ':', '__']):
                 self._last_confidence = 0.85
                 return language
@@ -446,7 +446,7 @@ class LanguageDetector:
             if any(pattern in content for pattern in ['fn ', 'use ', 'let ', '::', 'match ']):
                 self._last_confidence = 0.85
                 return language
-                
+
         return None
 
     def get_supported_languages(self) -> List[str]:
@@ -458,28 +458,28 @@ class LanguageDetector:
     def get_supported_extensions(self) -> List[str]:
         """Get list of all supported file extensions."""
         return sorted(list(self._extension_to_language.keys()))
-    
+
     def detect_from_content(self, content: str) -> str:
         """
         Detect language based solely on content analysis.
-        
+
         Args:
             content: Code content to analyze
-            
+
         Returns:
             Detected language name (lowercase)
         """
         detected_language = self._detect_by_content(content)
         if detected_language:
             return detected_language.lower()
-        
+
         self._last_confidence = 0.0
         return "unknown"
-    
+
     def get_confidence(self) -> float:
         """
         Get confidence score of the last detection operation.
-        
+
         Returns:
             Confidence score between 0.0 and 1.0
         """
@@ -490,10 +490,10 @@ class LanguageDetector:
 def detect_language_from_content(content: str) -> str:
     """
     Detect programming language from code content only.
-    
+
     Args:
         content: Code content to analyze
-        
+
     Returns:
         Detected language name (lowercase)
     """
@@ -504,27 +504,27 @@ def detect_language_from_content(content: str) -> str:
 def detect_language_from_extension(filename: str) -> str:
     """
     Detect programming language from file extension only.
-    
+
     Args:
         filename: Filename or path to analyze
-        
+
     Returns:
         Detected language name (lowercase)
     """
     path = Path(filename)
     extension = path.suffix.lower()
-    
+
     # Create detector and get extension mapping
     detector = LanguageDetector()
     language = detector._extension_to_language.get(extension)
-    
+
     if language:
         return language.lower()
-    
+
     # Check special files without extensions
     file_name = path.name
     special_language = detector._special_files.get(file_name)
     if special_language:
         return special_language.lower()
-    
+
     return "unknown"

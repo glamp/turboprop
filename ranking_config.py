@@ -7,7 +7,7 @@ used throughout the ranking system to make them easily adjustable.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Optional
+from typing import Dict, List, Set
 
 
 @dataclass
@@ -84,7 +84,6 @@ class RankingConstants:
     match_reasons: MatchReasonLimits = field(default_factory=MatchReasonLimits)
     deduplication: DeduplicationConfig = field(default_factory=DeduplicationConfig)
     confidence_weights: ConfidenceWeights = field(default_factory=ConfidenceWeights)
-
 
 
 # File type constants

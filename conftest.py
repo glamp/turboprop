@@ -16,8 +16,8 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
-from unittest.mock import Mock, MagicMock
+from typing import List
+from unittest.mock import Mock
 
 import pytest
 import numpy as np
@@ -37,11 +37,11 @@ from typing import List, Dict, Optional
 
 class DataProcessor:
     \"\"\"Process and transform data.\"\"\"
-    
+
     def __init__(self, config: Dict):
         self.config = config
         self.cache = {}
-    
+
     def process_data(self, data: List[Dict]) -> List[Dict]:
         \"\"\"Process raw data into structured format.\"\"\"
         results = []
@@ -50,18 +50,18 @@ class DataProcessor:
             if processed:
                 results.append(processed)
         return results
-    
+
     def _transform_item(self, item: Dict) -> Optional[Dict]:
         \"\"\"Transform a single data item.\"\"\"
         if not self._validate_item(item):
             return None
-        
+
         return {
             'id': item.get('id'),
             'name': item.get('name', '').strip(),
             'value': float(item.get('value', 0))
         }
-    
+
     def _validate_item(self, item: Dict) -> bool:
         \"\"\"Validate data item structure.\"\"\"
         required_fields = ['id', 'name']
@@ -208,24 +208,24 @@ func (s *UserService) handleCreateUser(w http.ResponseWriter, r *http.Request) {
         Name  string `json:"name"`
         Email string `json:"email"`
     }
-    
+
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         http.Error(w, "Invalid JSON", http.StatusBadRequest)
         return
     }
-    
+
     user := s.CreateUser(req.Name, req.Email)
-    
+
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(user)
 }
 
 func main() {
     service := NewUserService()
-    
+
     r := mux.NewRouter()
     r.HandleFunc("/users", service.handleCreateUser).Methods("POST")
-    
+
     fmt.Println("Server starting on :8080")
     log.Fatal(http.ListenAndServe(":8080", r))
 }
@@ -258,7 +258,7 @@ def temp_db_path(temp_root_dir):
 def mock_db_manager(temp_db_path):
     """Create a real DatabaseManager with temporary database."""
     db_manager = DatabaseManager(temp_db_path)
-    
+
     # Create the main table with full schema
     db_manager.execute_with_retry(f"""
         CREATE TABLE IF NOT EXISTS {config.database.TABLE_NAME} (
@@ -275,7 +275,7 @@ def mock_db_manager(temp_db_path):
             category VARCHAR
         )
     """)
-    
+
     # Create constructs table if needed
     db_manager.execute_with_retry("""
         CREATE TABLE IF NOT EXISTS code_constructs (
@@ -292,7 +292,7 @@ def mock_db_manager(temp_db_path):
             FOREIGN KEY (file_id) REFERENCES code_files(id)
         )
     """)
-    
+
     yield db_manager
     db_manager.cleanup()
 
@@ -301,22 +301,22 @@ def mock_db_manager(temp_db_path):
 def mock_embedder():
     """Create a mock EmbeddingGenerator with consistent test vectors that understand semantic similarity."""
     embedder = Mock(spec=EmbeddingGenerator)
-    
+
     # Generate consistent embeddings based on input with semantic understanding
     def mock_encode(text):
         if isinstance(text, str):
             # Create embeddings that are similar for similar content
             # This creates semantic relationships for test scenarios
             import hashlib
-            
+
             # Base embedding from text hash
             text_hash = int(hashlib.md5(text.encode('utf-8')).hexdigest(), 16)
             np.random.seed(text_hash % 2**32)
             base_embedding = np.random.random(384)
-            
+
             # Create semantic clusters for related terms
             text_lower = text.lower()
-            
+
             # Define semantic groups that should have similar embeddings
             semantic_groups = {
                 'functionality': ['functionality', 'function', 'feature', 'capability', 'method'],
@@ -325,44 +325,44 @@ def mock_embedder():
                 'auth': ['auth', 'authentication', 'login', 'password', 'security'],
                 'search': ['search', 'find', 'query', 'lookup', 'discover']
             }
-            
+
             # Find which semantic group(s) this text belongs to
             group_weights = {}
             for group, keywords in semantic_groups.items():
                 weight = sum(1.0 for keyword in keywords if keyword in text_lower)
                 if weight > 0:
                     group_weights[group] = weight
-            
+
             if group_weights:
                 # Create embedding that's influenced by semantic groups
                 # Use group-specific seeds to ensure similar embeddings for related content
                 group_embedding = np.zeros(384)
                 total_weight = sum(group_weights.values())
-                
+
                 for group, weight in group_weights.items():
                     group_hash = int(hashlib.md5(group.encode('utf-8')).hexdigest(), 16)
                     np.random.seed(group_hash % 2**32)
                     group_specific = np.random.random(384)
                     group_embedding += (weight / total_weight) * group_specific
-                
+
                 # Blend base embedding with semantic group embedding
                 embedding = 0.3 * base_embedding + 0.7 * group_embedding
             else:
                 embedding = base_embedding
-            
+
             # Normalize to unit vector
             embedding = embedding / np.linalg.norm(embedding)
             return embedding  # Return numpy array, let the caller handle .tolist()
         elif isinstance(text, list):
             return [mock_encode(t) for t in text]
         return np.random.random(384)  # Return numpy array
-    
+
     def mock_generate_embeddings(texts):
         return [mock_encode(text).tolist() for text in texts]
-    
+
     embedder.encode.side_effect = mock_encode
     embedder.generate_embeddings.side_effect = mock_generate_embeddings
-    
+
     return embedder
 
 
@@ -371,35 +371,35 @@ def sample_repo(temp_root_dir):
     """Create a sample Git repository with diverse code files."""
     repo_path = temp_root_dir / "sample_repo"
     repo_path.mkdir(exist_ok=True)
-    
+
     # Initialize git repository
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
-    
+
     # Create Python file
     (repo_path / "data_processor.py").write_text(SAMPLE_PYTHON_CODE)
-    
+
     # Create JavaScript file
     (repo_path / "auth.js").write_text(SAMPLE_JAVASCRIPT_CODE)
-    
+
     # Create Go file
     (repo_path / "server.go").write_text(SAMPLE_GO_CODE)
-    
+
     # Create README
     (repo_path / "README.md").write_text("""# Sample Repository
-    
+
 This is a sample repository for testing turboprop functionality.
 
 ## Features
 - Data processing in Python
-- Authentication service in JavaScript  
+- Authentication service in JavaScript
 - HTTP server in Go
 
 ## Usage
 See individual files for usage examples.
 """)
-    
+
     # Create configuration file
     (repo_path / "config.json").write_text("""{
     "database": {
@@ -412,7 +412,7 @@ See individual files for usage examples.
         "file": "app.log"
     }
 }""")
-    
+
     # Create .gitignore
     (repo_path / ".gitignore").write_text("""
 *.log
@@ -424,15 +424,16 @@ node_modules/
 *.duckdb
 *.duckdb.wal
 """)
-    
+
     # Add all files to git
     subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True, check=True)
-    
+
     # Check if there's anything to commit
     status_result = subprocess.run(["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True)
     if status_result.returncode == 0 and status_result.stdout.strip():
         try:
-            commit_result = subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, capture_output=True, text=True)
+            commit_result = subprocess.run(["git", "commit", "-m", "Initial commit"],
+                                           cwd=repo_path, capture_output=True, text=True)
             if commit_result.returncode != 0:
                 # If commit fails, create a simple file and try again
                 (repo_path / "README.md").write_text("# Test repository")
@@ -448,7 +449,7 @@ node_modules/
         (repo_path / "README.md").write_text("# Sample repository placeholder")
         subprocess.run(["git", "add", "README.md"], cwd=repo_path, capture_output=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, capture_output=True)
-    
+
     yield repo_path
 
 
@@ -457,17 +458,17 @@ def large_repo(temp_root_dir):
     """Create a larger repository for performance testing."""
     repo_path = temp_root_dir / "large_repo"
     repo_path.mkdir(exist_ok=True)
-    
+
     # Initialize git repository
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
-    
+
     # Create multiple directories with many files
     for dir_name in ["src", "tests", "utils", "api", "models"]:
         dir_path = repo_path / dir_name
         dir_path.mkdir(exist_ok=True)
-        
+
         # Create 10 files per directory
         for i in range(10):
             file_content = f"""
@@ -483,10 +484,10 @@ def function_{i}_in_{dir_name}():
 
 class Class{i}In{dir_name.capitalize()}:
     \"\"\"Class {i} in {dir_name}.\"\"\"
-    
+
     def __init__(self):
         self.data = function_{i}_in_{dir_name}()
-    
+
     def process(self, input_data):
         \"\"\"Process input data.\"\"\"
         processed = []
@@ -494,7 +495,7 @@ class Class{i}In{dir_name.capitalize()}:
             if isinstance(item, str):
                 processed.append(item.upper())
         return processed
-    
+
     def validate(self, data):
         \"\"\"Validate data format.\"\"\"
         return isinstance(data, list) and len(data) > 0
@@ -509,7 +510,7 @@ def helper_{i}(param):
     return param * 2 + {i}
 """
             (dir_path / f"file_{i}.py").write_text(file_content)
-    
+
     # Create .gitignore
     (repo_path / ".gitignore").write_text("""
 *.log
@@ -518,15 +519,16 @@ __pycache__/
 *.duckdb
 *.duckdb.wal
 """)
-    
+
     # Add all files to git
     subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True, check=True)
-    
+
     # Check if there's anything to commit
     status_result = subprocess.run(["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True)
     if status_result.returncode == 0 and status_result.stdout.strip():
         try:
-            commit_result = subprocess.run(["git", "commit", "-m", "Initial large repo"], cwd=repo_path, capture_output=True, text=True)
+            commit_result = subprocess.run(["git", "commit", "-m", "Initial large repo"],
+                                           cwd=repo_path, capture_output=True, text=True)
             if commit_result.returncode != 0:
                 # If commit fails, create a simple file and try again
                 (repo_path / "README.md").write_text("# Large test repository")
@@ -542,7 +544,7 @@ __pycache__/
         (repo_path / "README.md").write_text("# Large repository placeholder")
         subprocess.run(["git", "add", "README.md"], cwd=repo_path, capture_output=True)
         subprocess.run(["git", "commit", "-m", "Initial large repo"], cwd=repo_path, capture_output=True)
-    
+
     yield repo_path
 
 
@@ -551,33 +553,33 @@ def corrupted_repo(temp_root_dir):
     """Create a repository with corrupted/problematic files."""
     repo_path = temp_root_dir / "corrupted_repo"
     repo_path.mkdir(exist_ok=True)
-    
+
     # Initialize git repository
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
-    
+
     # Create file with invalid UTF-8
     with open(repo_path / "binary.dat", "wb") as f:
         f.write(b'\x80\x81\x82\x83\x84\x85')  # Invalid UTF-8 bytes
-    
+
     # Create extremely large text file (for memory testing)
     large_content = "x" * (1024 * 1024)  # 1MB of 'x'
     (repo_path / "large.txt").write_text(large_content)
-    
+
     # Create file with unusual encoding
     with open(repo_path / "encoding_test.py", "w", encoding="latin1") as f:
         f.write("# -*- coding: latin1 -*-\n")
         f.write("# File with special characters: àáâãäåæçèéêë\n")
         f.write("def test_function():\n    return 'special chars: àáâãäåæçèéêë'\n")
-    
+
     # Create file with very long lines
     long_line = "# " + "a" * 5000 + "\n"
     (repo_path / "long_lines.py").write_text(long_line + "def test(): pass\n")
-    
+
     # Create empty file
     (repo_path / "empty.py").touch()
-    
+
     # Create .gitignore
     (repo_path / ".gitignore").write_text("""
 *.log
@@ -586,15 +588,16 @@ __pycache__/
 *.duckdb
 *.duckdb.wal
 """)
-    
+
     # Add files to git
-    add_result = subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True, check=True)
-    
+    subprocess.run(["git", "add", "."], cwd=repo_path, capture_output=True, check=True)
+
     # Check if there's anything to commit
     status_result = subprocess.run(["git", "status", "--porcelain"], cwd=repo_path, capture_output=True, text=True)
     if status_result.returncode == 0 and status_result.stdout.strip():
         try:
-            commit_result = subprocess.run(["git", "commit", "-m", "Corrupted repo"], cwd=repo_path, capture_output=True, text=True)
+            commit_result = subprocess.run(["git", "commit", "-m", "Corrupted repo"],
+                                           cwd=repo_path, capture_output=True, text=True)
             if commit_result.returncode != 0:
                 # If commit fails, create a simple file and try again
                 (repo_path / "README.md").write_text("# Test repository with problematic files")
@@ -610,7 +613,7 @@ __pycache__/
         (repo_path / "README.md").write_text("# Test repository with problematic files")
         subprocess.run(["git", "add", "README.md"], cwd=repo_path, capture_output=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, capture_output=True)
-    
+
     yield repo_path
 
 
@@ -661,7 +664,7 @@ def test_queries():
 def sample_search_results():
     """Generate sample search results for testing."""
     from search_result_types import CodeSearchResult, CodeSnippet
-    
+
     def create_results(count=5):
         results = []
         for i in range(count):
@@ -670,7 +673,7 @@ def sample_search_results():
                 start_line=i * 10 + 1,
                 end_line=i * 10 + 2
             )
-            
+
             result = CodeSearchResult(
                 file_path=f"/test/file_{i}.py",
                 snippet=snippet,
@@ -678,9 +681,9 @@ def sample_search_results():
                 confidence_level="high" if i < 2 else "medium"
             )
             results.append(result)
-        
+
         return results
-    
+
     return create_results
 
 
@@ -694,7 +697,7 @@ def cleanup_test_files():
         reset_db()
     except ImportError:
         pass
-    
+
     # Remove any temporary turboprop directories
     current_dir = Path.cwd()
     turboprop_dirs = list(current_dir.glob(".turboprop*"))
@@ -707,14 +710,14 @@ def cleanup_test_files():
 def fully_mock_db_manager():
     """Create a fully mocked DatabaseManager for tests that need complete mocking."""
     mock_manager = Mock(spec=DatabaseManager)
-    
+
     # Set up default mock behaviors
     mock_manager.execute_with_retry.return_value = []
     mock_manager.search_full_text.return_value = []
     mock_manager.get_connection.return_value = Mock()
     mock_manager.cleanup.return_value = None
     mock_manager.create_fts_index.return_value = None  # For hybrid search
-    
+
     return mock_manager
 
 
@@ -722,12 +725,12 @@ def fully_mock_db_manager():
 def mock_mcp_server():
     """Mock MCP server for integration testing."""
     from mcp_server import TurbopropServer
-    
+
     server = Mock(spec=TurbopropServer)
     server.index_repository = Mock(return_value={"status": "success", "files": 10})
     server.search_code = Mock(return_value={"results": [], "total": 0})
     server.search_constructs = Mock(return_value={"results": [], "total": 0})
-    
+
     return server
 
 
@@ -735,18 +738,18 @@ def mock_mcp_server():
 def mock_ide_integration():
     """Mock IDE integration for testing."""
     from ide_integration import IDEIntegration
-    
+
     integration = Mock(spec=IDEIntegration)
     integration.get_current_file = Mock(return_value="/test/current.py")
     integration.get_cursor_position = Mock(return_value=(10, 5))
     integration.navigate_to_location = Mock(return_value=True)
-    
+
     return integration
 
 
 class TestDataGenerator:
     """Utility class for generating test data."""
-    
+
     @staticmethod
     def create_test_embedding(dimension=384, seed=None):
         """Create a test embedding vector."""
@@ -754,7 +757,7 @@ class TestDataGenerator:
             np.random.seed(seed)
         embedding = np.random.random(dimension)
         return embedding / np.linalg.norm(embedding)  # Normalize
-    
+
     @staticmethod
     def create_test_files(repo_path: Path, languages: List[str], count_per_lang: int = 3):
         """Create test files for different programming languages."""
@@ -794,19 +797,19 @@ type {name}Struct struct {{
 }}
 """,
         }
-        
+
         files = []
         for lang in languages:
             if lang in templates:
                 for i in range(count_per_lang):
                     name = f"{lang}_{i}"
                     content = templates[lang].format(name=name.replace('_', '').title())
-                    
+
                     ext = {'python': '.py', 'javascript': '.js', 'go': '.go'}[lang]
                     file_path = repo_path / f"{name}{ext}"
                     file_path.write_text(content)
                     files.append(file_path)
-        
+
         return files
 
 
@@ -819,22 +822,22 @@ def test_data_generator():
 # Performance monitoring utilities
 class PerformanceMonitor:
     """Utility class for monitoring test performance."""
-    
+
     def __init__(self):
         self.start_time = None
         self.memory_start = None
-        
+
     def start(self):
         """Start monitoring."""
         self.start_time = time.time()
         # Note: psutil would be needed for memory monitoring
         # For now, we'll use time-based monitoring only
-        
+
     def stop(self):
         """Stop monitoring and return metrics."""
         if self.start_time is None:
             raise RuntimeError("Monitor not started")
-            
+
         elapsed = time.time() - self.start_time
         return {
             'elapsed_time': elapsed,

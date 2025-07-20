@@ -36,7 +36,7 @@ class TestExtractedSnippet:
             relevance_score=0.9,
             snippet_type="function"
         )
-        
+
         assert snippet.text == "def hello():\n    return 'world'"
         assert snippet.start_line == 10
         assert snippet.end_line == 11
@@ -52,9 +52,9 @@ class TestExtractedSnippet:
             relevance_score=0.8,
             snippet_type="class"
         )
-        
+
         code_snippet = extracted.to_code_snippet()
-        
+
         assert isinstance(code_snippet, CodeSnippet)
         assert code_snippet.text == "class Example:\n    pass"
         assert code_snippet.start_line == 5
@@ -76,11 +76,11 @@ import sys
 
 def calculate_sum(a, b):
     """Calculate the sum of two numbers.
-    
+
     Args:
         a: First number
         b: Second number
-        
+
     Returns:
         The sum of a and b
     """
@@ -90,9 +90,9 @@ def calculate_sum(a, b):
 def another_function():
     pass
 '''
-        
+
         snippets = python_extractor.extract_snippets(content, "calculate sum")
-        
+
         assert len(snippets) == 1
         snippet = snippets[0]
         assert snippet.snippet_type == "function"
@@ -107,16 +107,16 @@ def another_function():
         """Test extraction of class with relevant methods."""
         content = '''class Calculator:
     """A simple calculator class."""
-    
+
     def __init__(self):
         self.history = []
-    
+
     def add(self, a, b):
         """Add two numbers."""
         result = a + b
         self.history.append(f"{a} + {b} = {result}")
         return result
-    
+
     def subtract(self, a, b):
         """Subtract two numbers."""
         return a - b
@@ -124,9 +124,9 @@ def another_function():
 class OtherClass:
     pass
 '''
-        
+
         snippets = python_extractor.extract_snippets(content, "add numbers")
-        
+
         assert len(snippets) >= 1
         # Should extract the entire Calculator class or at least the add method
         found_add_method = any("def add(self, a, b):" in s.text for s in snippets)
@@ -145,9 +145,9 @@ def process_data(data: List[Dict]) -> str:
 def unrelated_function():
     print("hello")
 '''
-        
+
         snippets = python_extractor.extract_snippets(content, "process data json")
-        
+
         assert len(snippets) >= 1
         # Should include the import for json
         snippet_text = snippets[0].text
@@ -163,9 +163,9 @@ def unrelated_function():
 def working_function():
     return "this works"
 '''
-        
+
         snippets = python_extractor.extract_snippets(content, "working function")
-        
+
         # Should still extract something, even with syntax errors
         assert len(snippets) >= 1
 
@@ -197,9 +197,9 @@ function anotherFunction() {
 
 module.exports = { calculateTotal };
 '''
-        
+
         snippets = js_extractor.extract_snippets(content, "calculate total")
-        
+
         assert len(snippets) >= 1
         snippet = snippets[0]
         assert "function calculateTotal(items)" in snippet.text
@@ -212,19 +212,19 @@ module.exports = { calculateTotal };
 
 const MyComponent = () => {
     const [count, setCount] = useState(0);
-    
+
     const incrementCounter = () => {
         setCount(count + 1);
     };
-    
+
     return <div>{count}</div>;
 };
 
 export default MyComponent;
 '''
-        
+
         snippets = js_extractor.extract_snippets(content, "increment counter")
-        
+
         assert len(snippets) >= 1
         # Should find the incrementCounter arrow function or the entire component
         found_increment = any("incrementCounter" in s.text for s in snippets)
@@ -236,11 +236,11 @@ export default MyComponent;
     constructor(options) {
         this.options = options;
     }
-    
+
     processItems(items) {
         return items.map(item => this.processItem(item));
     }
-    
+
     processItem(item) {
         return { ...item, processed: true };
     }
@@ -248,9 +248,9 @@ export default MyComponent;
 
 module.exports = DataProcessor;
 '''
-        
+
         snippets = js_extractor.extract_snippets(content, "process items")
-        
+
         assert len(snippets) >= 1
         # Should extract the class or at least the processItems method
         found_process_items = any("processItems" in s.text for s in snippets)
@@ -281,9 +281,9 @@ func main() {
     fmt.Println(sum)
 }
 '''
-        
+
         snippets = generic_extractor.extract_snippets(content, "calculate sum")
-        
+
         assert len(snippets) >= 1
         snippet = snippets[0]
         assert "calculateSum" in snippet.text
@@ -294,19 +294,19 @@ func main() {
         """Test intelligent boundary detection using braces."""
         content = '''public class Calculator {
     private int value;
-    
+
     public int add(int a, int b) {
         return a + b;
     }
-    
+
     public int multiply(int a, int b) {
         return a * b;
     }
 }
 '''
-        
+
         snippets = generic_extractor.extract_snippets(content, "add method")
-        
+
         assert len(snippets) >= 1
         # Should extract the complete add method
         snippet = snippets[0]
@@ -333,19 +333,19 @@ class TestSnippetExtractor:
         language_detector.detect_language.return_value = LanguageDetectionResult(
             language="Python", file_type=".py", confidence=1.0, category="source"
         )
-        
+
         content = '''def hello_world():
     """Print hello world."""
     print("Hello, World!")
     return "success"
 '''
-        
+
         snippets = snippet_extractor.extract_snippets(
             content=content,
             file_path="test.py",
             query="hello world"
         )
-        
+
         assert len(snippets) >= 1
         assert snippets[0].snippet_type in ["function", "generic"]
         assert "hello_world" in snippets[0].text
@@ -355,7 +355,7 @@ class TestSnippetExtractor:
         language_detector.detect_language.return_value = LanguageDetectionResult(
             language="JavaScript", file_type=".js", confidence=1.0, category="source"
         )
-        
+
         content = '''function greetUser(name) {
     return `Hello, ${name}!`;
 }
@@ -364,13 +364,13 @@ const anotherFunction = () => {
     console.log("test");
 };
 '''
-        
+
         snippets = snippet_extractor.extract_snippets(
             content=content,
-            file_path="test.js", 
+            file_path="test.js",
             query="greet user"
         )
-        
+
         assert len(snippets) >= 1
         assert "greetUser" in snippets[0].text
 
@@ -379,19 +379,19 @@ const anotherFunction = () => {
         language_detector.detect_language.return_value = LanguageDetectionResult(
             language="Unknown", file_type=".xyz", confidence=0.0, category="unknown"
         )
-        
+
         content = '''some random content
 with multiple lines
 that contains search terms
 and more content
 '''
-        
+
         snippets = snippet_extractor.extract_snippets(
             content=content,
             file_path="test.xyz",
             query="search terms"
         )
-        
+
         assert len(snippets) >= 1
         assert "search terms" in snippets[0].text
 
@@ -400,17 +400,17 @@ and more content
         language_detector.detect_language.return_value = LanguageDetectionResult(
             language="Python", file_type=".py", confidence=1.0, category="source"
         )
-        
+
         content = '''def search_function():
     """This function performs searching."""
     return "search result"
 
 class SearchEngine:
     """A search engine class."""
-    
+
     def __init__(self):
         self.index = {}
-    
+
     def search_items(self, query):
         """Search for items."""
         return self.index.get(query, [])
@@ -418,19 +418,19 @@ class SearchEngine:
 def unrelated_function():
     return "nothing"
 '''
-        
+
         snippets = snippet_extractor.extract_snippets(
             content=content,
             file_path="test.py",
             query="search"
         )
-        
+
         # Should extract multiple relevant snippets
         assert len(snippets) >= 2
-        
+
         # Should be ranked by relevance
         assert snippets[0].relevance_score >= snippets[1].relevance_score
-        
+
         # Should contain search-related content
         search_content_found = any("search" in s.text.lower() for s in snippets)
         assert search_content_found
@@ -440,19 +440,19 @@ def unrelated_function():
         language_detector.detect_language.return_value = LanguageDetectionResult(
             language="Python", file_type=".py", confidence=1.0, category="source"
         )
-        
+
         # Create a very long function
         long_content = '''def very_long_function():
     """A very long function for testing."""
 ''' + '    print("line")\n' * 100
-        
+
         snippets = snippet_extractor.extract_snippets(
             content=long_content,
             file_path="test.py",
             query="very long function",
             max_snippet_length=500  # Limit snippet size
         )
-        
+
         assert len(snippets) >= 1
         # Should respect the size limit
         assert len(snippets[0].text) <= 500 + 50  # Allow some buffer for truncation markers
@@ -477,12 +477,12 @@ logger = logging.getLogger(__name__)
 
 def search_index_enhanced(db_manager: DatabaseManager, query: str, k: int) -> List:
     """Enhanced search with structured results.
-    
+
     Args:
         db_manager: Database manager instance
         query: Search query
         k: Number of results
-        
+
     Returns:
         List of search results
     """
@@ -496,31 +496,31 @@ def search_index_enhanced(db_manager: DatabaseManager, query: str, k: int) -> Li
 
 class SearchManager:
     """Manages search operations."""
-    
+
     def __init__(self, db_manager):
         self.db_manager = db_manager
-    
+
     def perform_search(self, query):
         """Perform a search operation."""
         return search_index_enhanced(self.db_manager, query, 5)
 '''
-        
+
         extractor = SnippetExtractor()
         snippets = extractor.extract_snippets(
             content=content,
-            file_path="search_operations.py", 
+            file_path="search_operations.py",
             query="enhanced search"
         )
-        
+
         assert len(snippets) >= 1
-        
+
         # Should extract the search_index_enhanced function
         enhanced_search_found = any(
-            "search_index_enhanced" in s.text and "def " in s.text 
+            "search_index_enhanced" in s.text and "def " in s.text
             for s in snippets
         )
         assert enhanced_search_found
-        
+
         # Should include proper line numbers
         for snippet in snippets:
             assert snippet.start_line > 0
