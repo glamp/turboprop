@@ -225,6 +225,66 @@ class FileProcessingConfig:
         os.getenv("TURBOPROP_PARALLEL_CHUNK_SIZE", "50"), "TURBOPROP_PARALLEL_CHUNK_SIZE", 50
     )
 
+    # Language detection settings
+    ENABLE_LANGUAGE_DETECTION: bool = validate_boolean(
+        os.getenv("TURBOPROP_ENABLE_LANGUAGE_DETECTION", "true"), "TURBOPROP_ENABLE_LANGUAGE_DETECTION"
+    )
+    
+    # Language detection fallback map for file extensions
+    EXTENSION_TO_LANGUAGE_MAP = {
+        ".py": "python",
+        ".js": "javascript", 
+        ".ts": "typescript",
+        ".jsx": "javascript",
+        ".tsx": "typescript",
+        ".java": "java",
+        ".cpp": "cpp",
+        ".cc": "cpp", 
+        ".cxx": "cpp",
+        ".c": "c",
+        ".h": "c",
+        ".hpp": "cpp",
+        ".rs": "rust",
+        ".go": "go",
+        ".php": "php",
+        ".rb": "ruby",
+        ".swift": "swift",
+        ".kt": "kotlin",
+        ".scala": "scala",
+        ".sh": "bash",
+        ".bash": "bash",
+        ".zsh": "zsh",
+        ".fish": "fish",
+        ".ps1": "powershell",
+        ".sql": "sql",
+        ".html": "html",
+        ".htm": "html",
+        ".css": "css",
+        ".scss": "scss",
+        ".sass": "sass",
+        ".less": "less",
+        ".xml": "xml",
+        ".json": "json",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".toml": "toml",
+        ".ini": "ini",
+        ".cfg": "ini",
+        ".conf": "ini",
+        ".md": "markdown",
+        ".markdown": "markdown",
+        ".rst": "restructuredtext",
+        ".tex": "latex",
+        ".r": "r",
+        ".R": "r",
+        ".m": "matlab",
+        ".pl": "perl",
+        ".lua": "lua",
+        ".vim": "vimscript",
+        ".dockerfile": "dockerfile",
+        ".makefile": "makefile",
+    }
+
 
 class SearchConfig:
     """Search-related configuration constants."""
@@ -393,6 +453,7 @@ File Processing:
   Max File Size: {cls.file_processing.MAX_FILE_SIZE_MB}MB
   Debounce: {cls.file_processing.DEBOUNCE_SECONDS}s
   Preview Length: {cls.file_processing.PREVIEW_LENGTH} chars
+  Language Detection: {cls.file_processing.ENABLE_LANGUAGE_DETECTION}
 
 Search:
   Default Max Results: {cls.search.DEFAULT_MAX_RESULTS}

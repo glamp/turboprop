@@ -358,5 +358,68 @@ class DatabaseManager:
     def __enter__(self):
         return self
 
+    def migrate_schema(self, table_name: str) -> None:
+        """
+        Migrate database schema to add new metadata columns if they don't exist.
+        
+        Adds the following columns:
+        - file_type VARCHAR - file extension (.py, .js, .md, etc.)
+        - language VARCHAR - detected programming language 
+        - size_bytes INTEGER - file size in bytes
+        - line_count INTEGER - number of lines in the file
+        
+        Args:
+            table_name: Name of the table to migrate
+        """
+        logger.info(f"Starting schema migration for table {table_name}")
+        
+        # Define all columns to add (includes legacy columns for backward compatibility)
+        new_columns = {
+            'last_modified': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            'file_mtime': 'TIMESTAMP',
+            'file_type': 'VARCHAR',
+            'language': 'VARCHAR', 
+            'size_bytes': 'INTEGER',
+            'line_count': 'INTEGER'
+        }
+        
+        try:
+            # Get existing columns using DuckDB's information_schema
+            with self.get_connection() as conn:
+                result = conn.execute(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
+                    (table_name,)
+                ).fetchall()
+                
+                existing_columns = [row[0].lower() for row in result]
+                logger.debug(f"Existing columns: {existing_columns}")
+                
+                # Check if table exists (if no columns found, table likely doesn't exist)
+                if not existing_columns:
+                    raise DatabaseError(f"Table {table_name} does not exist or has no columns")
+                
+                # Add new columns that don't exist
+                columns_added = []
+                for column_name, column_type in new_columns.items():
+                    if column_name.lower() not in existing_columns:
+                        try:
+                            alter_query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                            conn.execute(alter_query)
+                            columns_added.append(column_name)
+                            logger.info(f"Added column: {column_name} {column_type}")
+                        except Exception as e:
+                            logger.warning(f"Failed to add column {column_name}: {e}")
+                    else:
+                        logger.debug(f"Column {column_name} already exists, skipping")
+                        
+                if columns_added:
+                    logger.info(f"Schema migration completed successfully. Added columns: {columns_added}")
+                else:
+                    logger.info("Schema migration completed - no columns needed to be added")
+                    
+        except Exception as e:
+            logger.error(f"Schema migration failed: {e}")
+            raise DatabaseError(f"Failed to migrate schema for table {table_name}: {e}") from e
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cleanup()

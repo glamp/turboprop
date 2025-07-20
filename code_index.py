@@ -147,7 +147,7 @@ def init_db(repo_path: Path = None):
 
             _db_manager = DatabaseManager(db_path)
 
-            # Initialize table schema with modification time tracking
+            # Initialize table schema with modification time tracking and metadata columns
             _db_manager.execute_with_retry(
                 f"""
                 CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
@@ -156,37 +156,20 @@ def init_db(repo_path: Path = None):
                     content TEXT,
                     embedding DOUBLE[{DIMENSIONS}],
                     last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    file_mtime TIMESTAMP
+                    file_mtime TIMESTAMP,
+                    file_type VARCHAR,
+                    language VARCHAR,
+                    size_bytes INTEGER,
+                    line_count INTEGER
                 )
             """
             )
 
-            # Migration logic: Add columns only if they don't exist in the table
-            # Check if columns exist before attempting to add them
+            # Migrate schema to add any missing columns (including legacy and new metadata columns)
             try:
-                # Check if last_modified column exists
-                result = _db_manager.execute_with_retry(f"PRAGMA table_info({TABLE_NAME})")
-                existing_columns = [row[1] for row in result]
-
-                if "last_modified" not in existing_columns:
-                    _db_manager.execute_with_retry(
-                        f"""
-                        ALTER TABLE {TABLE_NAME}
-                        ADD COLUMN last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    """
-                    )
-
-                if "file_mtime" not in existing_columns:
-                    _db_manager.execute_with_retry(
-                        f"""
-                        ALTER TABLE {TABLE_NAME} ADD COLUMN file_mtime TIMESTAMP
-                    """
-                    )
-            except Exception:
-                # If PRAGMA table_info doesn't work with DuckDB,
-                # fall back to the original approach
-                # but suppress the error logging for expected failures
-                pass
+                _db_manager.migrate_schema(TABLE_NAME)
+            except Exception as e:
+                logger.warning(f"Schema migration failed, continuing with existing schema: {e}")
 
         return _db_manager
 
