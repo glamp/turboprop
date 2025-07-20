@@ -40,6 +40,14 @@ from code_index import (
 from config import config
 from embedding_helper import EmbeddingGenerator
 
+# Import enhanced search functionality
+from search_operations import (
+    search_index_enhanced,
+    format_enhanced_search_results,
+    find_similar_files_enhanced
+)
+from search_result_types import CodeSearchResult, SearchMetadata
+
 # Global lock for database connection management
 _db_connection_lock = threading.Lock()
 
@@ -255,6 +263,78 @@ def search_code(query: str, max_results: int = None) -> str:
 
     except Exception as e:
         return f"Error searching code: {str(e)}"
+
+
+@mcp.tool()
+def search_code_structured(query: str, max_results: int = None) -> str:
+    """
+    🔍 TURBOPROP: Enhanced semantic search with rich metadata (ADVANCED)
+    
+    This is the next-generation search that provides detailed metadata about
+    results including file types, confidence levels, and enhanced snippets.
+    
+    Args:
+        query: Natural language description of what you're looking for
+        max_results: Number of results (default: 5, max: 20)
+    
+    Returns:
+        Enhanced results with rich metadata and improved formatting
+    """
+    try:
+        if max_results is None:
+            max_results = config.search.DEFAULT_MAX_RESULTS
+        if max_results > config.search.MAX_RESULTS_LIMIT:
+            max_results = config.search.MAX_RESULTS_LIMIT
+            
+        con = get_db_connection()
+        embedder = get_embedder()
+        
+        # Check if index exists
+        file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+        if file_count == 0:
+            return "No index found. Please index a repository first using the index_repository tool."
+        
+        # Perform enhanced semantic search
+        results = search_index_enhanced(con, embedder, query, max_results)
+        if not results:
+            return (
+                f"No results found for query: '{query}'. "
+                "Try different search terms or make sure the repository is indexed."
+            )
+        
+        # Use enhanced formatting 
+        repo_path = _config.get("repository_path")
+        formatted_output = format_enhanced_search_results(results, query, repo_path)
+        
+        # Add search metadata
+        confidence_counts = {'high': 0, 'medium': 0, 'low': 0}
+        for result in results:
+            confidence_counts[result.confidence_level] += 1
+        
+        metadata_lines = [
+            "",
+            "📊 Search Metadata:",
+            f"   Query: '{query}'",
+            f"   Results: {len(results)}",
+            f"   Confidence: {confidence_counts['high']} high, {confidence_counts['medium']} medium, {confidence_counts['low']} low"
+        ]
+        
+        return formatted_output + "\n" + "\n".join(metadata_lines)
+        
+    except Exception as e:
+        return f"Error in enhanced search: {str(e)}"
+
+
+# Backward compatibility adapter functions
+def convert_results_to_legacy_format(enhanced_results):
+    """Convert CodeSearchResult objects to legacy tuple format."""
+    return [result.to_tuple() for result in enhanced_results]
+
+
+def convert_legacy_to_enhanced_format(legacy_results):
+    """Convert legacy tuple results to CodeSearchResult objects."""
+    from search_result_types import CodeSearchResult
+    return [CodeSearchResult.from_tuple(result) for result in legacy_results]
 
 
 @mcp.tool()
