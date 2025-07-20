@@ -306,8 +306,14 @@ class DatabaseManager:
 
             try:
                 yield conn
+            except (DatabaseError, DatabaseMigrationError, DatabaseConnectionTimeoutError, 
+                    DatabaseCorruptionError, DatabaseDiskSpaceError, DatabaseLockError, 
+                    DatabasePermissionError, DatabaseTimeoutError) as e:
+                # These are already properly typed database exceptions, let them bubble up
+                logger.error("Database operation failed: %s", e)
+                raise
             except Exception as e:
-                # Log error but don't re-raise to allow cleanup
+                # Only wrap generic exceptions that aren't already database-specific
                 logger.error("Database operation failed: %s", e)
                 raise DatabaseError(f"Database operation failed: {e}") from e
 
@@ -1080,7 +1086,7 @@ class DatabaseManager:
     def create_mcp_tool_tables(self) -> None:
         """
         Create all MCP tool-related tables if they don't exist.
-        
+
         This method creates the core MCP tool schema including:
         - mcp_tools: Core tool metadata
         - tool_parameters: Tool parameter definitions
@@ -1089,9 +1095,9 @@ class DatabaseManager:
         - All necessary indexes for efficient querying
         """
         logger.info("Creating MCP tool tables")
-        
+
         from mcp_tool_schema import MCPToolSchema
-        
+
         try:
             with self.get_connection() as conn:
                 # Create all tables
@@ -1102,24 +1108,24 @@ class DatabaseManager:
                     MCPToolSchema.get_tool_examples_table_sql(),
                     MCPToolSchema.get_tool_relationships_table_sql(),
                 ]
-                
+
                 for sql in table_creation_sql:
                     conn.execute(sql)
-                
+
                 # Create all indexes
                 for index_sql in MCPToolSchema.get_index_definitions():
                     conn.execute(index_sql)
-                
+
                 logger.info("Successfully created all MCP tool tables and indexes")
-                
+
         except Exception as e:
             logger.error("Failed to create MCP tool tables: %s", e)
             raise DatabaseError(f"Failed to create MCP tool tables: {e}") from e
 
     def store_mcp_tool(
-        self, 
-        tool_id: str, 
-        name: str, 
+        self,
+        tool_id: str,
+        name: str,
         description: str = None,
         tool_type: str = None,
         provider: str = None,
@@ -1127,11 +1133,11 @@ class DatabaseManager:
         category: str = None,
         embedding: list = None,
         metadata_json: str = None,
-        is_active: bool = True
+        is_active: bool = True,
     ) -> None:
         """
         Store an MCP tool in the database.
-        
+
         Args:
             tool_id: Unique tool identifier
             name: Tool display name
@@ -1164,11 +1170,23 @@ class DatabaseManager:
                     is_active = EXCLUDED.is_active,
                     last_updated = ?
                     """,
-                    (tool_id, name, description, tool_type, provider, version, 
-                     category, embedding, metadata_json, is_active, datetime.now(), datetime.now())
+                    (
+                        tool_id,
+                        name,
+                        description,
+                        tool_type,
+                        provider,
+                        version,
+                        category,
+                        embedding,
+                        metadata_json,
+                        is_active,
+                        datetime.now(),
+                        datetime.now(),
+                    ),
                 )
                 logger.debug("Stored MCP tool: %s", tool_id)
-                
+
         except Exception as e:
             logger.error("Failed to store MCP tool %s: %s", tool_id, e)
             raise DatabaseError(f"Failed to store MCP tool: {e}") from e
@@ -1183,11 +1201,11 @@ class DatabaseManager:
         description: str = None,
         default_value: str = None,
         schema_json: str = None,
-        embedding: list = None
+        embedding: list = None,
     ) -> None:
         """
         Store a tool parameter in the database.
-        
+
         Args:
             parameter_id: Unique parameter identifier
             tool_id: ID of the tool this parameter belongs to
@@ -1216,11 +1234,20 @@ class DatabaseManager:
                     schema_json = EXCLUDED.schema_json,
                     embedding = EXCLUDED.embedding
                     """,
-                    (parameter_id, tool_id, parameter_name, parameter_type, is_required,
-                     description, default_value, schema_json, embedding)
+                    (
+                        parameter_id,
+                        tool_id,
+                        parameter_name,
+                        parameter_type,
+                        is_required,
+                        description,
+                        default_value,
+                        schema_json,
+                        embedding,
+                    ),
                 )
                 logger.debug("Stored tool parameter: %s for tool %s", parameter_name, tool_id)
-                
+
         except Exception as e:
             logger.error("Failed to store tool parameter %s: %s", parameter_name, e)
             raise DatabaseError(f"Failed to store tool parameter: {e}") from e
@@ -1234,11 +1261,11 @@ class DatabaseManager:
         expected_output: str = None,
         context: str = None,
         embedding: list = None,
-        effectiveness_score: float = 0.0
+        effectiveness_score: float = 0.0,
     ) -> None:
         """
         Store a tool usage example in the database.
-        
+
         Args:
             example_id: Unique example identifier
             tool_id: ID of the tool this example belongs to
@@ -1265,11 +1292,19 @@ class DatabaseManager:
                     embedding = EXCLUDED.embedding,
                     effectiveness_score = EXCLUDED.effectiveness_score
                     """,
-                    (example_id, tool_id, use_case, example_call, expected_output,
-                     context, embedding, effectiveness_score)
+                    (
+                        example_id,
+                        tool_id,
+                        use_case,
+                        example_call,
+                        expected_output,
+                        context,
+                        embedding,
+                        effectiveness_score,
+                    ),
                 )
                 logger.debug("Stored tool example: %s for tool %s", example_id, tool_id)
-                
+
         except Exception as e:
             logger.error("Failed to store tool example %s: %s", example_id, e)
             raise DatabaseError(f"Failed to store tool example: {e}") from e
@@ -1281,11 +1316,11 @@ class DatabaseManager:
         tool_b_id: str,
         relationship_type: str,
         strength: float = 0.0,
-        description: str = None
+        description: str = None,
     ) -> None:
         """
         Store a relationship between two tools.
-        
+
         Args:
             relationship_id: Unique relationship identifier
             tool_a_id: ID of the first tool
@@ -1306,11 +1341,10 @@ class DatabaseManager:
                     strength = EXCLUDED.strength,
                     description = EXCLUDED.description
                     """,
-                    (relationship_id, tool_a_id, tool_b_id, relationship_type, strength, description)
+                    (relationship_id, tool_a_id, tool_b_id, relationship_type, strength, description),
                 )
-                logger.debug("Stored tool relationship: %s between %s and %s", 
-                           relationship_type, tool_a_id, tool_b_id)
-                
+                logger.debug("Stored tool relationship: %s between %s and %s", relationship_type, tool_a_id, tool_b_id)
+
         except Exception as e:
             logger.error("Failed to store tool relationship %s: %s", relationship_id, e)
             raise DatabaseError(f"Failed to store tool relationship: {e}") from e
@@ -1318,24 +1352,22 @@ class DatabaseManager:
     def get_mcp_tool(self, tool_id: str) -> Optional[Dict[str, Any]]:
         """
         Get an MCP tool by ID.
-        
+
         Args:
             tool_id: ID of the tool to retrieve
-            
+
         Returns:
             Dictionary with tool data, or None if not found
         """
         try:
             with self.get_connection() as conn:
-                result = conn.execute(
-                    "SELECT * FROM mcp_tools WHERE id = ?", (tool_id,)
-                ).fetchone()
-                
+                result = conn.execute("SELECT * FROM mcp_tools WHERE id = ?", (tool_id,)).fetchone()
+
                 if result:
                     columns = [desc[0] for desc in conn.description]
                     return dict(zip(columns, result))
                 return None
-                
+
         except Exception as e:
             logger.error("Failed to get MCP tool %s: %s", tool_id, e)
             return None
@@ -1343,25 +1375,24 @@ class DatabaseManager:
     def get_tool_parameters(self, tool_id: str) -> List[Dict[str, Any]]:
         """
         Get all parameters for a tool.
-        
+
         Args:
             tool_id: ID of the tool
-            
+
         Returns:
             List of parameter dictionaries
         """
         try:
             with self.get_connection() as conn:
                 results = conn.execute(
-                    "SELECT * FROM tool_parameters WHERE tool_id = ? ORDER BY parameter_name",
-                    (tool_id,)
+                    "SELECT * FROM tool_parameters WHERE tool_id = ? ORDER BY parameter_name", (tool_id,)
                 ).fetchall()
-                
+
                 if results:
                     columns = [desc[0] for desc in conn.description]
                     return [dict(zip(columns, row)) for row in results]
                 return []
-                
+
         except Exception as e:
             logger.error("Failed to get tool parameters for %s: %s", tool_id, e)
             return []
@@ -1369,25 +1400,24 @@ class DatabaseManager:
     def get_tool_examples(self, tool_id: str) -> List[Dict[str, Any]]:
         """
         Get all examples for a tool.
-        
+
         Args:
             tool_id: ID of the tool
-            
+
         Returns:
             List of example dictionaries
         """
         try:
             with self.get_connection() as conn:
                 results = conn.execute(
-                    "SELECT * FROM tool_examples WHERE tool_id = ? ORDER BY effectiveness_score DESC",
-                    (tool_id,)
+                    "SELECT * FROM tool_examples WHERE tool_id = ? ORDER BY effectiveness_score DESC", (tool_id,)
                 ).fetchall()
-                
+
                 if results:
                     columns = [desc[0] for desc in conn.description]
                     return [dict(zip(columns, row)) for row in results]
                 return []
-                
+
         except Exception as e:
             logger.error("Failed to get tool examples for %s: %s", tool_id, e)
             return []
@@ -1395,11 +1425,11 @@ class DatabaseManager:
     def get_related_tools(self, tool_id: str, relationship_type: str = None) -> List[Dict[str, Any]]:
         """
         Get tools related to a given tool.
-        
+
         Args:
             tool_id: ID of the tool to find relationships for
             relationship_type: Optional filter by relationship type
-            
+
         Returns:
             List of related tool dictionaries with relationship info
         """
@@ -1411,44 +1441,44 @@ class DatabaseManager:
                     JOIN mcp_tools mt ON (tr.tool_b_id = mt.id OR tr.tool_a_id = mt.id)
                     WHERE (tr.tool_a_id = ? OR tr.tool_b_id = ?) AND mt.id != ?
                 """
-                
+
                 params = [tool_id, tool_id, tool_id]
-                
+
                 if relationship_type:
                     base_query += " AND tr.relationship_type = ?"
                     params.append(relationship_type)
-                
+
                 base_query += " ORDER BY tr.strength DESC"
-                
+
                 results = conn.execute(base_query, params).fetchall()
-                
+
                 if results:
                     columns = [desc[0] for desc in conn.description]
                     return [dict(zip(columns, row)) for row in results]
                 return []
-                
+
         except Exception as e:
             logger.error("Failed to get related tools for %s: %s", tool_id, e)
             return []
 
     def search_mcp_tools_by_embedding(
-        self, 
-        query_embedding: list, 
-        limit: int = 10, 
+        self,
+        query_embedding: list,
+        limit: int = 10,
         category: str = None,
         tool_type: str = None,
-        is_active: bool = True
+        is_active: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Search MCP tools using semantic similarity.
-        
+
         Args:
             query_embedding: 384-dimension query embedding
             limit: Maximum number of results to return
             category: Optional filter by category
             tool_type: Optional filter by tool type
             is_active: Whether to include only active tools
-            
+
         Returns:
             List of tool dictionaries with similarity scores
         """
@@ -1461,49 +1491,46 @@ class DatabaseManager:
                     FROM mcp_tools 
                     WHERE embedding IS NOT NULL
                 """
-                
+
                 params = [query_embedding]
-                
+
                 if is_active is not None:
                     base_query += " AND is_active = ?"
                     params.append(is_active)
-                    
+
                 if category:
                     base_query += " AND category = ?"
                     params.append(category)
-                    
+
                 if tool_type:
                     base_query += " AND tool_type = ?"
                     params.append(tool_type)
-                
+
                 base_query += " ORDER BY similarity_score DESC LIMIT ?"
                 params.append(limit)
-                
+
                 results = conn.execute(base_query, params).fetchall()
-                
+
                 if results:
                     columns = [desc[0] for desc in conn.description]
                     return [dict(zip(columns, row)) for row in results]
                 return []
-                
+
         except Exception as e:
             logger.error("Failed to search MCP tools by embedding: %s", e)
             return []
 
     def search_tool_parameters_by_embedding(
-        self, 
-        query_embedding: list, 
-        limit: int = 10,
-        tool_id: str = None
+        self, query_embedding: list, limit: int = 10, tool_id: str = None
     ) -> List[Dict[str, Any]]:
         """
         Search tool parameters using semantic similarity.
-        
+
         Args:
             query_embedding: 384-dimension query embedding
             limit: Maximum number of results to return
             tool_id: Optional filter by specific tool
-            
+
         Returns:
             List of parameter dictionaries with similarity scores
         """
@@ -1516,23 +1543,23 @@ class DatabaseManager:
                     JOIN mcp_tools mt ON tp.tool_id = mt.id
                     WHERE tp.embedding IS NOT NULL
                 """
-                
+
                 params = [query_embedding]
-                
+
                 if tool_id:
                     base_query += " AND tp.tool_id = ?"
                     params.append(tool_id)
-                
+
                 base_query += " ORDER BY similarity_score DESC LIMIT ?"
                 params.append(limit)
-                
+
                 results = conn.execute(base_query, params).fetchall()
-                
+
                 if results:
                     columns = [desc[0] for desc in conn.description]
                     return [dict(zip(columns, row)) for row in results]
                 return []
-                
+
         except Exception as e:
             logger.error("Failed to search tool parameters by embedding: %s", e)
             return []
@@ -1540,54 +1567,48 @@ class DatabaseManager:
     def get_mcp_tool_statistics(self) -> Dict[str, Any]:
         """
         Get statistics about MCP tools in the database.
-        
+
         Returns:
             Dictionary with various statistics
         """
         try:
             with self.get_connection() as conn:
                 stats = {}
-                
+
                 # Total tool count
                 result = conn.execute("SELECT COUNT(*) FROM mcp_tools").fetchone()
-                stats['total_tools'] = result[0] if result else 0
-                
+                stats["total_tools"] = result[0] if result else 0
+
                 # Active tool count
                 result = conn.execute("SELECT COUNT(*) FROM mcp_tools WHERE is_active = true").fetchone()
-                stats['active_tools'] = result[0] if result else 0
-                
+                stats["active_tools"] = result[0] if result else 0
+
                 # Tool count by type
-                type_results = conn.execute(
-                    "SELECT tool_type, COUNT(*) FROM mcp_tools GROUP BY tool_type"
-                ).fetchall()
-                stats['tools_by_type'] = {row[0] or 'unknown': row[1] for row in type_results}
-                
+                type_results = conn.execute("SELECT tool_type, COUNT(*) FROM mcp_tools GROUP BY tool_type").fetchall()
+                stats["tools_by_type"] = {row[0] or "unknown": row[1] for row in type_results}
+
                 # Tool count by category
-                category_results = conn.execute(
-                    "SELECT category, COUNT(*) FROM mcp_tools GROUP BY category"
-                ).fetchall()
-                stats['tools_by_category'] = {row[0] or 'unknown': row[1] for row in category_results}
-                
+                category_results = conn.execute("SELECT category, COUNT(*) FROM mcp_tools GROUP BY category").fetchall()
+                stats["tools_by_category"] = {row[0] or "unknown": row[1] for row in category_results}
+
                 # Parameter count
                 result = conn.execute("SELECT COUNT(*) FROM tool_parameters").fetchone()
-                stats['total_parameters'] = result[0] if result else 0
-                
+                stats["total_parameters"] = result[0] if result else 0
+
                 # Example count
                 result = conn.execute("SELECT COUNT(*) FROM tool_examples").fetchone()
-                stats['total_examples'] = result[0] if result else 0
-                
+                stats["total_examples"] = result[0] if result else 0
+
                 # Relationship count
                 result = conn.execute("SELECT COUNT(*) FROM tool_relationships").fetchone()
-                stats['total_relationships'] = result[0] if result else 0
-                
+                stats["total_relationships"] = result[0] if result else 0
+
                 # Tools with embeddings
-                result = conn.execute(
-                    "SELECT COUNT(*) FROM mcp_tools WHERE embedding IS NOT NULL"
-                ).fetchone()
-                stats['tools_with_embeddings'] = result[0] if result else 0
-                
+                result = conn.execute("SELECT COUNT(*) FROM mcp_tools WHERE embedding IS NOT NULL").fetchone()
+                stats["tools_with_embeddings"] = result[0] if result else 0
+
                 return stats
-                
+
         except Exception as e:
             logger.error("Failed to get MCP tool statistics: %s", e)
             return {}
@@ -1595,10 +1616,10 @@ class DatabaseManager:
     def remove_mcp_tool(self, tool_id: str) -> bool:
         """
         Remove an MCP tool and all its related data.
-        
+
         Args:
             tool_id: ID of the tool to remove
-            
+
         Returns:
             True if tool was removed, False if not found
         """
@@ -1609,23 +1630,21 @@ class DatabaseManager:
             ("DELETE FROM tool_relationships WHERE tool_a_id = ? OR tool_b_id = ?", (tool_id, tool_id)),
             ("DELETE FROM mcp_tools WHERE id = ?", (tool_id,)),
         ]
-        
+
         try:
             # Check if tool exists first
             with self.get_connection() as conn:
-                result = conn.execute(
-                    "SELECT COUNT(*) FROM mcp_tools WHERE id = ?", (tool_id,)
-                ).fetchone()
-                
+                result = conn.execute("SELECT COUNT(*) FROM mcp_tools WHERE id = ?", (tool_id,)).fetchone()
+
                 if not result or result[0] == 0:
                     logger.warning("Tool %s not found for removal", tool_id)
                     return False
-            
+
             # Execute all deletion operations in a transaction
             self.execute_transaction(operations)
             logger.info("Removed MCP tool: %s", tool_id)
             return True
-                
+
         except Exception as e:
             logger.error("Failed to remove MCP tool %s: %s", tool_id, e)
             return False
