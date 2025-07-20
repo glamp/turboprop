@@ -86,8 +86,8 @@ class ConnectionManager:
             conn.execute(f"SET threads = {config.database.THREADS}")
 
             # Configure timeout settings
-            if (hasattr(conn, "execute") and
-                config.database.STATEMENT_TIMEOUT > 0):
+            if (hasattr(conn, "execute")
+                    and config.database.STATEMENT_TIMEOUT > 0):
                 # Note: DuckDB doesn't have a direct statement timeout,
                 # but we can use this for logging
                 pass
@@ -116,8 +116,8 @@ class ConnectionManager:
             if "corrupt" in str(e).lower():
                 raise DatabaseCorruptionError(f"Database corruption detected: {e}") from e
             raise DatabaseError(f"Database error when creating connection: {e}") from e
-        except Exception as e:
-            raise DatabaseError(f"Unexpected error when creating database connection: {e}") from e
+        except Exception as error:
+            raise DatabaseError(f"Unexpected error when creating database connection: {error}") from error
 
     def _check_connection_health(self, conn: duckdb.DuckDBPyConnection) -> bool:
         """Check if a connection is healthy and usable."""
@@ -196,7 +196,7 @@ class DatabaseManager:
         self._lock = threading.RLock()
         self._file_lock: Optional[TextIO] = None
         self._lock_file_path = db_path.with_suffix(".lock")
-        
+
         # Use ConnectionManager for connection handling
         self.connection_timeout = connection_timeout or config.database.CONNECTION_TIMEOUT
         self._connection_manager = ConnectionManager(db_path, self.connection_timeout)
@@ -251,8 +251,8 @@ class DatabaseManager:
                 except (IOError, OSError) as e:
                     error_str = str(e)
                     if (
-                        "Resource temporarily unavailable" in error_str or
-                        "temporarily unavailable" in error_str
+                        "Resource temporarily unavailable" in error_str
+                        or "temporarily unavailable" in error_str
                     ):
                         # Lock is held by another process, wait and retry
                         time.sleep(config.database.LOCK_RETRY_INTERVAL)
@@ -481,12 +481,12 @@ class DatabaseManager:
     def create_constructs_table(self) -> None:
         """
         Create the code_constructs table for storing extracted programming constructs.
-        
+
         This table stores individual programming constructs (functions, classes, variables, etc.)
         with their own embeddings for more granular search capabilities.
         """
         logger.info("Creating code_constructs table")
-        
+
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS code_constructs (
             id VARCHAR PRIMARY KEY,
@@ -502,25 +502,25 @@ class DatabaseManager:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
-        
+
         create_indexes_sql = [
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_file_id ON code_constructs(file_id)",
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_type ON code_constructs(construct_type)",
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_name ON code_constructs(name)",
             "CREATE INDEX IF NOT EXISTS idx_code_constructs_parent ON code_constructs(parent_construct_id)"
         ]
-        
+
         try:
             with self.get_connection() as conn:
                 # Create the table
                 conn.execute(create_table_sql)
-                
+
                 # Create indexes
                 for index_sql in create_indexes_sql:
                     conn.execute(index_sql)
-                
+
                 logger.info("Successfully created code_constructs table with indexes")
-                
+
         except Exception as e:
             logger.error("Failed to create code_constructs table: %s", e)
             raise DatabaseError(f"Failed to create code_constructs table: {e}") from e
@@ -528,7 +528,7 @@ class DatabaseManager:
     def store_construct(self, construct, file_id: str, construct_id: str, embedding: list) -> None:
         """
         Store a code construct in the database.
-        
+
         Args:
             construct: CodeConstruct instance to store
             file_id: ID of the file containing this construct
@@ -539,8 +539,8 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO code_constructs 
-                    (id, file_id, construct_type, name, start_line, end_line, 
+                    INSERT OR REPLACE INTO code_constructs
+                    (id, file_id, construct_type, name, start_line, end_line,
                      signature, docstring, parent_construct_id, embedding)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -558,7 +558,7 @@ class DatabaseManager:
                     )
                 )
                 logger.debug("Stored construct %s for file %s", construct.name, file_id)
-                
+
         except Exception as e:
             logger.error("Failed to store construct %s: %s", construct.name, e)
             raise DatabaseError(f"Failed to store construct: {e}") from e
@@ -566,10 +566,10 @@ class DatabaseManager:
     def get_constructs_by_file(self, file_id: str) -> list:
         """
         Get all constructs for a specific file.
-        
+
         Args:
             file_id: ID of the file to get constructs for
-            
+
         Returns:
             List of construct records
         """
@@ -580,7 +580,7 @@ class DatabaseManager:
                     (file_id,)
                 ).fetchall()
                 return result
-                
+
         except Exception as e:
             logger.error("Failed to get constructs for file %s: %s", file_id, e)
             return []
@@ -588,22 +588,29 @@ class DatabaseManager:
     def remove_constructs_for_file(self, file_id: str) -> int:
         """
         Remove all constructs associated with a file.
-        
+
         Args:
             file_id: ID of the file whose constructs should be removed
-            
+
         Returns:
             Number of constructs removed
         """
         try:
             with self.get_connection() as conn:
-                result = conn.execute(
+                # First, count the constructs that will be removed
+                count_result = conn.execute(
+                    "SELECT COUNT(*) FROM code_constructs WHERE file_id = ?",
+                    (file_id,)
+                ).fetchone()
+                construct_count = count_result[0] if count_result else 0
+                
+                # Then delete them
+                conn.execute(
                     "DELETE FROM code_constructs WHERE file_id = ?",
                     (file_id,)
                 )
-                # DuckDB doesn't return affected rows directly, so we'll estimate
-                return 1  # Assume at least one row was affected if no error
-                
+                return construct_count
+
         except Exception as e:
             logger.error("Failed to remove constructs for file %s: %s", file_id, e)
             return 0
@@ -611,7 +618,7 @@ class DatabaseManager:
     def get_construct_count(self) -> int:
         """
         Get the total number of constructs in the database.
-        
+
         Returns:
             Number of constructs stored
         """

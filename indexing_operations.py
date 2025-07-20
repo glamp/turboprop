@@ -33,25 +33,38 @@ TABLE_NAME = "code_files"
 DIMENSIONS = 384
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
-# Global instances for efficient reuse
-_language_detector = None
-_construct_extractor = None
+class InstanceCache:
+    """Cache for expensive-to-create instances used in indexing operations."""
+    
+    def __init__(self):
+        self._language_detector = None
+        self._construct_extractor = None
+    
+    def get_language_detector(self) -> LanguageDetector:
+        """Get a cached LanguageDetector instance for efficient reuse."""
+        if self._language_detector is None:
+            self._language_detector = LanguageDetector()
+        return self._language_detector
+    
+    def get_construct_extractor(self) -> CodeConstructExtractor:
+        """Get a cached CodeConstructExtractor instance for efficient reuse."""
+        if self._construct_extractor is None:
+            self._construct_extractor = CodeConstructExtractor(self.get_language_detector())
+        return self._construct_extractor
+
+
+# Module-level cache instance
+_instance_cache = InstanceCache()
 
 
 def get_language_detector() -> LanguageDetector:
     """Get a cached LanguageDetector instance for efficient reuse."""
-    global _language_detector
-    if _language_detector is None:
-        _language_detector = LanguageDetector()
-    return _language_detector
+    return _instance_cache.get_language_detector()
 
 
 def get_construct_extractor() -> CodeConstructExtractor:
     """Get a cached CodeConstructExtractor instance for efficient reuse."""
-    global _construct_extractor
-    if _construct_extractor is None:
-        _construct_extractor = CodeConstructExtractor(get_language_detector())
-    return _construct_extractor
+    return _instance_cache.get_construct_extractor()
 
 
 def compute_id(text: str) -> str:
@@ -209,8 +222,8 @@ def filter_changed_files(files: List[Path], existing_hashes: Dict[str, str]) -> 
 
             # Check if file is new or changed
             file_path_str = str(file_path)
-            if (file_path_str not in existing_hashes or 
-                existing_hashes[file_path_str] != current_hash):
+            if (file_path_str not in existing_hashes
+                    or existing_hashes[file_path_str] != current_hash):
                 changed_files.append(file_path)
 
         except (OSError, UnicodeDecodeError) as error:
@@ -223,22 +236,22 @@ def filter_changed_files(files: List[Path], existing_hashes: Dict[str, str]) -> 
 def _process_single_file(embedder: EmbeddingGenerator, path: Path) -> Optional[Tuple]:
     """
     Process a single file to create database row data.
-    
+
     Args:
         embedder: EmbeddingGenerator instance
         path: Path to the file to process
-        
+
     Returns:
         Tuple of database row data, or None if processing failed
     """
     try:
         text = path.read_text(encoding="utf-8")
         uid = compute_id(str(path) + text)
-        
+
         emb = embedder.encode(text)
         file_mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime)
         metadata = extract_file_metadata(path, text)
-        
+
         return (
             uid, str(path), text, emb.tolist(), file_mtime,
             metadata["file_type"], metadata["language"],
@@ -252,7 +265,7 @@ def _process_single_file(embedder: EmbeddingGenerator, path: Path) -> Optional[T
 def _batch_insert_rows(db_manager: DatabaseManager, rows: List[Tuple]) -> None:
     """
     Insert processed rows into the database in batch.
-    
+
     Args:
         db_manager: DatabaseManager instance
         rows: List of database row tuples to insert
@@ -279,31 +292,31 @@ def _extract_and_store_constructs(
 ) -> int:
     """
     Extract constructs from a file and store them in the database.
-    
+
     Args:
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator for creating construct embeddings
         file_path: Path to the file
         file_content: Content of the file
         file_id: ID of the file in the database
-        
+
     Returns:
         Number of constructs extracted and stored
     """
     try:
         # Ensure the constructs table exists
         db_manager.create_constructs_table()
-        
+
         # Extract constructs
         extractor = get_construct_extractor()
         constructs = extractor.extract_constructs(file_content, str(file_path))
-        
+
         if not constructs:
             return 0
-        
+
         # Remove existing constructs for this file
         db_manager.remove_constructs_for_file(file_id)
-        
+
         # Process each construct
         stored_count = 0
         for construct in constructs:
@@ -311,28 +324,30 @@ def _extract_and_store_constructs(
                 # Generate embedding for the construct
                 embedding_text = construct.get_embedding_text()
                 construct_embedding = embedder.encode(embedding_text)
-                
+
                 # Generate construct ID
                 construct_id = construct.compute_construct_id(file_id)
-                
+
                 # Store the construct
                 db_manager.store_construct(
-                    construct, 
-                    file_id, 
-                    construct_id, 
+                    construct,
+                    file_id,
+                    construct_id,
                     construct_embedding.tolist()
                 )
                 stored_count += 1
-                
-            except Exception as e:
-                logger.warning(f"Failed to store construct {construct.name} from {file_path}: {e}")
+
+            except Exception as error:
+                # Broad catch needed for database operations that can fail in various ways
+                logger.warning("Failed to store construct %s from %s: %s", construct.name, file_path, error)
                 continue
-        
-        logger.debug(f"Extracted and stored {stored_count} constructs from {file_path}")
+
+        logger.debug("Extracted and stored %d constructs from %s", stored_count, file_path)
         return stored_count
-        
-    except Exception as e:
-        logger.error(f"Failed to extract constructs from {file_path}: {e}")
+
+    except Exception as error:
+        # Broad catch for overall extraction process that involves file I/O, AST parsing, and DB operations
+        logger.error("Failed to extract constructs from %s: %s", file_path, error)
         return 0
 
 
@@ -367,7 +382,7 @@ def embed_and_store(
             row_data = _process_single_file(embedder, path)
             if row_data:
                 rows.append(row_data)
-                
+
                 # Extract constructs if requested
                 if extract_constructs:
                     try:
@@ -377,13 +392,13 @@ def embed_and_store(
                             db_manager, embedder, path, file_content, file_id
                         )
                         total_constructs += construct_count
-                    except Exception as e:
-                        logger.warning(f"Failed to extract constructs from {path}: {e}")
+                    except Exception as error:
+                        logger.warning("Failed to extract constructs from %s: %s", path, error)
             else:
                 failed_count += 1
 
             pbar.update(1)
-            
+
             # Maintain backward compatibility with progress_callback
             if progress_callback:
                 progress_callback(pbar.n, len(files), f"Processed {pbar.n}/{len(files)} files")
@@ -395,7 +410,7 @@ def embed_and_store(
     # Insert all rows in a single batch operation for better performance
     if rows:
         _batch_insert_rows(db_manager, rows)
-    
+
     # Report construct extraction results
     if extract_constructs and total_constructs > 0:
         print(f"🔧 Extracted {total_constructs} code constructs from {len(files)} files", file=sys.stderr)
@@ -455,7 +470,7 @@ def embed_and_store_single(
              metadata["file_type"], metadata["language"],
              metadata["size_bytes"], metadata["line_count"], metadata["category"]),
         )
-        
+
         # Extract constructs if requested
         if extract_constructs:
             try:
@@ -463,10 +478,10 @@ def embed_and_store_single(
                     db_manager, embedder, path, text, uid
                 )
                 if construct_count > 0:
-                    logger.debug(f"Extracted {construct_count} constructs from {path}")
-            except Exception as e:
-                logger.warning(f"Failed to extract constructs from {path}: {e}")
-        
+                    logger.debug("Extracted %d constructs from %s", construct_count, path)
+            except Exception as error:
+                logger.warning("Failed to extract constructs from %s: %s", path, error)
+
         return True
 
     except (OSError, UnicodeDecodeError, RuntimeError) as error:
@@ -506,15 +521,15 @@ def remove_orphaned_files(db_manager: DatabaseManager, current_files: List[Path]
     # Remove orphaned files and their constructs
     if orphaned_files:
         operations = []
-        
+
         # Remove constructs first (foreign key constraint)
         for file_id in orphaned_file_ids:
             operations.append(("DELETE FROM code_constructs WHERE file_id = ?", (file_id,)))
-        
+
         # Remove files
         for path in orphaned_files:
             operations.append((f"DELETE FROM {TABLE_NAME} WHERE path = ?", (path,)))
-        
+
         db_manager.execute_transaction(operations)
         print(
             f"🗑️  Removed {len(orphaned_files)} orphaned files and their constructs from index",

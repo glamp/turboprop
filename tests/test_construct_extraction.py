@@ -9,7 +9,6 @@ variables) from source code files using AST parsing and pattern matching.
 import tempfile
 from pathlib import Path
 
-import pytest
 
 from code_construct_extractor import (
     CodeConstruct,
@@ -106,11 +105,11 @@ def hello_world():
         code = '''
 def calculate_sum(a: int, b: int = 0) -> int:
     """Calculate the sum of two integers.
-    
+
     Args:
         a: First integer
         b: Second integer (default: 0)
-        
+
     Returns:
         Sum of a and b
     """
@@ -131,11 +130,11 @@ def calculate_sum(a: int, b: int = 0) -> int:
         code = '''
 class Calculator:
     """A simple calculator class."""
-    
+
     def __init__(self, initial_value: int = 0):
         """Initialize the calculator."""
         self.value = initial_value
-    
+
     def add(self, number: int) -> int:
         """Add a number to the current value."""
         self.value += number
@@ -145,7 +144,7 @@ class Calculator:
 
         # Should extract class and its methods
         assert len(constructs) == 3
-        
+
         # Check class construct
         class_construct = next(c for c in constructs if c.construct_type == "class")
         assert class_construct.name == "Calculator"
@@ -156,7 +155,7 @@ class Calculator:
         # Check method constructs
         method_constructs = [c for c in constructs if c.construct_type == "method"]
         assert len(method_constructs) == 2
-        
+
         init_method = next(c for c in method_constructs if c.name == "__init__")
         assert init_method.signature == "def __init__(self, initial_value: int = 0):"
         assert init_method.parent_construct_id is not None
@@ -166,7 +165,7 @@ class Calculator:
         code = '''
 class ScientificCalculator(Calculator):
     """Advanced calculator with scientific functions."""
-    
+
     def power(self, exponent: int) -> int:
         """Raise value to the power of exponent."""
         self.value = self.value ** exponent
@@ -288,7 +287,7 @@ const square = x => x * x;
         constructs = self.extractor.extract_constructs(code, "test.js")
 
         assert len(constructs) == 2
-        
+
         multiply_func = next(c for c in constructs if c.name == "multiply")
         assert multiply_func.construct_type == "function"
         assert multiply_func.signature == "const multiply = (x, y) =>"
@@ -300,12 +299,12 @@ class Calculator {
     constructor(initialValue = 0) {
         this.value = initialValue;
     }
-    
+
     add(number) {
         this.value += number;
         return this.value;
     }
-    
+
     static isCalculator(obj) {
         return obj instanceof Calculator;
     }
@@ -339,7 +338,7 @@ def hello():
 
 class Greeter:
     """A greeting class."""
-    
+
     def greet(self, name):
         return f"Hello, {name}!"
 '''
@@ -418,7 +417,7 @@ class TestConstructExtractionIntegration:
                     "SELECT * FROM code_constructs WHERE id = ?",
                     (construct_id,)
                 ).fetchone()
-                
+
                 assert result is not None
                 assert result[2] == "function"  # construct_type
                 assert result[3] == "test_func"  # name
