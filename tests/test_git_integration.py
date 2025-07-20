@@ -6,7 +6,6 @@ This module tests the git repository information extraction, project type detect
 and dependency parsing functionality.
 """
 
-import json
 import subprocess
 import tempfile
 import unittest
@@ -47,7 +46,9 @@ class TestGitRepository(unittest.TestCase):
     @patch('subprocess.run')
     def test_get_current_branch_failure(self, mock_run):
         """Test git branch extraction failure."""
-        mock_run.side_effect = subprocess.CalledProcessError(1, "git", "fatal: not a git repository")
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, "git", "fatal: not a git repository"
+        )
 
         result = self.git_repo.get_current_branch()
         self.assertIsNone(result)
@@ -66,7 +67,10 @@ class TestGitRepository(unittest.TestCase):
     def test_get_remote_urls_success(self, mock_run):
         """Test successful git remote URL extraction."""
         mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "origin\tgit@github.com:user/repo.git (fetch)\norigin\tgit@github.com:user/repo.git (push)\n"
+        mock_run.return_value.stdout = (
+            "origin\tgit@github.com:user/repo.git (fetch)\n"
+            "origin\tgit@github.com:user/repo.git (push)\n"
+        )
         mock_run.return_value.stderr = ""
 
         result = self.git_repo.get_remote_urls()
@@ -190,8 +194,18 @@ dependencies = [
 
         result = self.detector.extract_dependencies()
         expected = [
-            {"name": "express", "version": "^4.17.1", "source": "package.json", "type": "production"},
-            {"name": "lodash", "version": "^4.17.21", "source": "package.json", "type": "production"},
+            {
+                "name": "express",
+                "version": "^4.17.1",
+                "source": "package.json",
+                "type": "production"
+            },
+            {
+                "name": "lodash",
+                "version": "^4.17.21",
+                "source": "package.json",
+                "type": "production"
+            },
             {"name": "jest", "version": "^27.0.0", "source": "package.json", "type": "development"}
         ]
         self.assertEqual(result, expected)
@@ -232,7 +246,7 @@ class TestRepositoryContext(unittest.TestCase):
         """Test repository ID computation from path."""
         repo_path = "/path/to/repo"
         context = RepositoryContext.compute_repository_id(repo_path)
-        
+
         # Should be a 64-character hex string (SHA-256)
         self.assertEqual(len(context), 64)
         self.assertTrue(all(c in '0123456789abcdef' for c in context))

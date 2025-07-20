@@ -148,3 +148,39 @@ class WatcherError(TurbopropError):
     """Raised when file watcher operations fail."""
 
     pass
+
+
+class GitError(TurbopropError):
+    """Base exception class for Git-related operations."""
+
+    pass
+
+
+class GitRepositoryError(GitError):
+    """Raised when Git repository is not found or invalid."""
+
+    pass
+
+
+class GitCommandError(GitError):
+    """Raised when Git command execution fails."""
+
+    pass
+
+
+class GitTimeoutError(GitError):
+    """Raised when Git operations timeout."""
+
+    pass
+
+
+class GitRemoteError(GitError):
+    """Raised when Git remote operations fail."""
+
+    pass
+
+
+class GitBranchError(GitError):
+    """Raised when Git branch operations fail."""
+
+    pass

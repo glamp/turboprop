@@ -175,7 +175,7 @@ def http_index(req: IndexRequest):
     except Exception as e:
         from fastapi import HTTPException
 
-        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}") from e
 
 
 @app.get("/search", response_model=list[SearchResponse])
@@ -227,7 +227,7 @@ def http_search(query: str, k: int = 5):
     except Exception as e:
         from fastapi import HTTPException
 
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}") from e
 
 
 @app.get("/status")

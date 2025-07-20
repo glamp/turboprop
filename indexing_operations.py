@@ -24,7 +24,7 @@ from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from language_detection import LanguageDetector
 from code_construct_extractor import CodeConstructExtractor
-from git_integration import RepositoryContextExtractor
+from git_integration import RepositoryContext, RepositoryContextExtractor
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -69,7 +69,9 @@ def get_construct_extractor() -> CodeConstructExtractor:
     return _instance_cache.get_construct_extractor()
 
 
-def extract_and_store_repository_context(db_manager: DatabaseManager, repo_path: Path) -> Optional[str]:
+def extract_and_store_repository_context(
+    db_manager: DatabaseManager, repo_path: Path
+) -> Optional[str]:
     """
     Extract repository context and store it in the database.
 
@@ -103,23 +105,24 @@ def extract_and_store_repository_context(db_manager: DatabaseManager, repo_path:
             logger.warning("Failed to extract repository context for %s", repo_path)
             return None
 
-    except Exception as error:
+    except (OSError, RuntimeError) as error:
         logger.error("Failed to extract and store repository context: %s", error)
         return None
 
 
-def update_repository_context_if_needed(db_manager: DatabaseManager, repo_path: Path) -> Optional[str]:
+def update_repository_context_if_needed(
+    db_manager: DatabaseManager, repo_path: Path
+) -> Optional[str]:
     """
     Update repository context if it's outdated or doesn't exist.
 
     Args:
-        db_manager: DatabaseManager instance  
+        db_manager: DatabaseManager instance
         repo_path: Path to the repository
 
     Returns:
         Repository ID if successful, None if extraction fails
     """
-    from git_integration import RepositoryContext
 
     repo_path = repo_path.resolve()
     repository_id = RepositoryContext.compute_repository_id(str(repo_path))
@@ -127,7 +130,7 @@ def update_repository_context_if_needed(db_manager: DatabaseManager, repo_path: 
     try:
         # Check if context exists and is current
         existing_context = db_manager.get_repository_context(repository_id)
-        
+
         if existing_context:
             # Update the indexed timestamp to show the repository was recently processed
             db_manager.update_repository_context_indexed_time(repository_id)
@@ -137,7 +140,7 @@ def update_repository_context_if_needed(db_manager: DatabaseManager, repo_path: 
             # Extract and store new context
             return extract_and_store_repository_context(db_manager, repo_path)
 
-    except Exception as error:
+    except (OSError, RuntimeError) as error:
         logger.error("Failed to update repository context: %s", error)
         return None
 
@@ -412,17 +415,23 @@ def _extract_and_store_constructs(
                 )
                 stored_count += 1
 
-            except Exception as error:
-                # Broad catch needed for database operations that can fail in various ways
-                logger.warning("Failed to store construct %s from %s: %s", construct.name, file_path, error)
+            except (OSError, RuntimeError) as error:
+                # Specific catch for database operations that can fail in various ways
+                logger.warning(
+                    "Failed to store construct %s from %s: %s",
+                    construct.name, file_path, error
+                )
                 continue
 
         logger.debug("Extracted and stored %d constructs from %s", stored_count, file_path)
         return stored_count
 
-    except Exception as error:
-        # Broad catch for overall extraction process that involves file I/O, AST parsing, and DB operations
-        logger.error("Failed to extract constructs from %s: %s", file_path, error)
+    except (OSError, RuntimeError, UnicodeDecodeError) as error:
+        # Specific catch for overall extraction process that involves file I/O,
+        # AST parsing, and DB operations
+        logger.error(
+            "Failed to extract constructs from %s: %s", file_path, error
+        )
         return 0
 
 
@@ -458,7 +467,8 @@ def embed_and_store(
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                check=False
             )
             if result.returncode == 0:
                 repo_path = Path(result.stdout.strip())
@@ -491,7 +501,7 @@ def embed_and_store(
                             db_manager, embedder, path, file_content, file_id
                         )
                         total_constructs += construct_count
-                    except Exception as error:
+                    except (OSError, UnicodeDecodeError, RuntimeError) as error:
                         logger.warning("Failed to extract constructs from %s: %s", path, error)
             else:
                 failed_count += 1
@@ -504,7 +514,10 @@ def embed_and_store(
 
     # Report processing results
     if failed_count > 0:
-        print(f"⚠️  Failed to process {failed_count} files out of {len(files)} total", file=sys.stderr)
+        print(
+            f"⚠️  Failed to process {failed_count} files out of {len(files)} total",
+            file=sys.stderr
+        )
 
     # Insert all rows in a single batch operation for better performance
     if rows:
@@ -512,7 +525,10 @@ def embed_and_store(
 
     # Report construct extraction results
     if extract_constructs and total_constructs > 0:
-        print(f"🔧 Extracted {total_constructs} code constructs from {len(files)} files", file=sys.stderr)
+        print(
+            f"🔧 Extracted {total_constructs} code constructs from {len(files)} files",
+            file=sys.stderr
+        )
 
 
 def build_full_index(db_manager: DatabaseManager) -> int:
@@ -535,7 +551,10 @@ def build_full_index(db_manager: DatabaseManager) -> int:
 
 
 def embed_and_store_single(
-    db_manager: DatabaseManager, embedder: EmbeddingGenerator, path: Path, extract_constructs: bool = True
+    db_manager: DatabaseManager,
+    embedder: EmbeddingGenerator,
+    path: Path,
+    extract_constructs: bool = True
 ) -> bool:
     """
     Process a single file by generating embeddings and storing them in the database.
@@ -578,7 +597,7 @@ def embed_and_store_single(
                 )
                 if construct_count > 0:
                     logger.debug("Extracted %d constructs from %s", construct_count, path)
-            except Exception as error:
+            except (OSError, UnicodeDecodeError, RuntimeError) as error:
                 logger.warning("Failed to extract constructs from %s: %s", path, error)
 
         return True

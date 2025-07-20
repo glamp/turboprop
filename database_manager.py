@@ -262,6 +262,9 @@ class DatabaseManager:
                         raise
 
             if not lock_acquired:
+                if self._file_lock:
+                    self._file_lock.close()
+                    self._file_lock = None
                 raise DatabaseTimeoutError(
                     f"Could not acquire database lock within {self.lock_timeout} seconds"
                 )
@@ -581,7 +584,7 @@ class DatabaseManager:
                 ).fetchall()
                 return result
 
-        except Exception as e:
+        except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to get constructs for file %s: %s", file_id, e)
             return []
 
@@ -611,7 +614,7 @@ class DatabaseManager:
                 )
                 return construct_count
 
-        except Exception as e:
+        except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to remove constructs for file %s: %s", file_id, e)
             return 0
 
@@ -625,7 +628,7 @@ class DatabaseManager:
         try:
             result = self.execute_with_retry("SELECT COUNT(*) FROM code_constructs")
             return result[0][0] if result and result[0] else 0
-        except Exception as e:
+        except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to get construct count: %s", e)
             return 0
 
@@ -726,14 +729,14 @@ class DatabaseManager:
                     "SELECT * FROM repository_context WHERE repository_id = ?",
                     (repository_id,)
                 ).fetchone()
-                
+
                 if result:
                     # Convert result to dictionary
                     columns = [desc[0] for desc in conn.description]
                     return dict(zip(columns, result))
                 return None
 
-        except Exception as e:
+        except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to get repository context for %s: %s", repository_id, e)
             return None
 
@@ -753,14 +756,14 @@ class DatabaseManager:
                     "SELECT * FROM repository_context WHERE repository_path = ?",
                     (repository_path,)
                 ).fetchone()
-                
+
                 if result:
-                    # Convert result to dictionary  
+                    # Convert result to dictionary
                     columns = [desc[0] for desc in conn.description]
                     return dict(zip(columns, result))
                 return None
 
-        except Exception as e:
+        except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to get repository context for path %s: %s", repository_path, e)
             return None
 
@@ -779,7 +782,7 @@ class DatabaseManager:
                 )
                 logger.debug("Updated indexed time for repository %s", repository_id)
 
-        except Exception as e:
+        except (duckdb.Error, DatabaseError) as e:
             logger.error("Failed to update repository context indexed time: %s", e)
 
     def __exit__(self, exc_type, exc_val, exc_tb):

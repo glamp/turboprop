@@ -103,7 +103,7 @@ def get_embedder():
             print("✅ Embedding generator initialized successfully", file=sys.stderr)
         except Exception as e:
             print(f"❌ Failed to initialize embedding generator: {e}", file=sys.stderr)
-            raise e
+            raise
     return _embedder
 
 

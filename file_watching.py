@@ -103,6 +103,7 @@ class DebouncedHandler(FileSystemEventHandler):
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
+                check=False
             )
             return result.returncode == 0
         except Exception:

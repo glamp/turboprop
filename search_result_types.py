@@ -187,8 +187,8 @@ class CodeSearchResult:
 
     @classmethod
     def from_tuple(
-        cls, 
-        legacy_tuple: Tuple[str, str, float], 
+        cls,
+        legacy_tuple: Tuple[str, str, float],
         repository_context: Optional[Dict[str, Any]] = None
     ) -> 'CodeSearchResult':
         """

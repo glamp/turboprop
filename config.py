@@ -37,8 +37,8 @@ def validate_positive_int(value: str, var_name: str, default: int) -> int:
     """Validate and convert string to positive integer."""
     try:
         result = int(value)
-    except ValueError:
-        raise ConfigValidationError(f"{var_name} must be a valid integer, got '{value}'")
+    except ValueError as e:
+        raise ConfigValidationError(f"{var_name} must be a valid integer, got '{value}'") from e
 
     if result <= 0:
         raise ConfigValidationError(f"{var_name} must be positive, got {result}")
@@ -49,8 +49,8 @@ def validate_positive_float(value: str, var_name: str, default: float) -> float:
     """Validate and convert string to positive float."""
     try:
         result = float(value)
-    except ValueError:
-        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+    except ValueError as e:
+        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'") from e
 
     if result <= 0:
         raise ConfigValidationError(f"{var_name} must be positive, got {result}")
@@ -61,8 +61,8 @@ def validate_non_negative_float(value: str, var_name: str, default: float) -> fl
     """Validate and convert string to non-negative float."""
     try:
         result = float(value)
-    except ValueError:
-        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+    except ValueError as e:
+        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'") from e
 
     if result < 0:
         raise ConfigValidationError(f"{var_name} must be non-negative, got {result}")
@@ -113,8 +113,8 @@ def validate_range_float(value: str, var_name: str, min_val: float, max_val: flo
     """Validate float is within specified range."""
     try:
         result = float(value)
-    except ValueError:
-        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'")
+    except ValueError as e:
+        raise ConfigValidationError(f"{var_name} must be a valid float, got '{value}'") from e
 
     if result < min_val or result > max_val:
         raise ConfigValidationError(

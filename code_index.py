@@ -574,6 +574,7 @@ class DebouncedHandler(FileSystemEventHandler):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
+                check=False
             )
             # If git check-ignore returns 0, the file is ignored
             if result.returncode == 0:
@@ -651,7 +652,7 @@ def watch_mode(repo_path: str, max_mb: float, debounce_sec: float):
         logger.info("Embedding generator initialized for watch mode")
     except Exception as e:
         logger.error(f"Failed to initialize embedding generator: {e}")
-        raise e
+        raise
 
     # Verify database has embeddings
     embedding_count = build_full_index(db_manager)
@@ -1277,7 +1278,7 @@ def initialize_embedder():
         return embedder
     except Exception as e:
         logger.error(f"Failed to initialize embedding generator: {e}")
-        raise e
+        raise
 
 
 def handle_index_command(args, embedder):
