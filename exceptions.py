@@ -190,3 +190,9 @@ class GitBranchError(GitError):
     """Raised when Git branch operations fail."""
 
     pass
+
+
+class AnalysisError(TurbopropError):
+    """Raised when task analysis operations fail."""
+
+    pass

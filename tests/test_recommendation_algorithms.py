@@ -6,40 +6,43 @@ This module tests the recommendation algorithms that score and rank tools
 based on task requirements and context.
 """
 
-import pytest
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+import pytest
+
+from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolId
 from recommendation_algorithms import (
+    AlternativeRecommendation,
     RecommendationAlgorithms,
     ToolRecommendation,
     ToolSequenceRecommendation,
-    AlternativeRecommendation,
     WorkflowRequirements,
 )
-from task_analyzer import TaskAnalysis, TaskComplexity
-from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolId
 from search_result_types import CodeSearchResult
+from task_analyzer import TaskAnalysis, TaskComplexity
 
 
 # Mock classes for testing
 @dataclass
 class MockToolSearchResult:
     """Mock tool search result for testing."""
+
     tool_id: str
     name: str
     description: str
     score: float
     metadata: Optional[Dict] = None
-    
+
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
 
 
-@dataclass  
+@dataclass
 class MockTaskContext:
     """Mock task context for testing."""
+
     user_skill_level: str = "intermediate"
     project_type: str = "general"
     time_constraints: Dict = field(default_factory=dict)
@@ -71,16 +74,16 @@ class TestRecommendationAlgorithms:
             estimated_steps=1,
             skill_level_required="beginner",
             confidence=0.9,
-            analysis_notes=[]
+            analysis_notes=[],
         )
 
     @pytest.fixture
     def complex_task_analysis(self):
-        """Create a complex task analysis for testing.""" 
+        """Create a complex task analysis for testing."""
         return TaskAnalysis(
             task_description="Analyze data with ML and generate report",
             task_intent="analyze",
-            task_category="machine_learning", 
+            task_category="machine_learning",
             required_capabilities=["analysis", "machine_learning", "reporting"],
             input_specifications=["data"],
             output_specifications=["report"],
@@ -91,7 +94,7 @@ class TestRecommendationAlgorithms:
             estimated_steps=8,
             skill_level_required="advanced",
             confidence=0.85,
-            analysis_notes=[]
+            analysis_notes=[],
         )
 
     @pytest.fixture
@@ -99,15 +102,15 @@ class TestRecommendationAlgorithms:
         """Create a CSV reader tool for testing."""
         return MockToolSearchResult(
             tool_id="csv_reader",
-            name="CSV Reader", 
+            name="CSV Reader",
             description="Read and parse CSV files",
             score=0.9,
             metadata={
                 "category": "file_operation",
                 "complexity": "simple",
                 "input_types": ["csv"],
-                "capabilities": ["read", "parse", "file_handling"]
-            }
+                "capabilities": ["read", "parse", "file_handling"],
+            },
         )
 
     @pytest.fixture
@@ -119,67 +122,59 @@ class TestRecommendationAlgorithms:
             description="Advanced machine learning data analysis",
             score=0.85,
             metadata={
-                "category": "machine_learning", 
+                "category": "machine_learning",
                 "complexity": "complex",
                 "capabilities": ["analysis", "machine_learning", "statistics"],
-                "skill_level": "advanced"
-            }
+                "skill_level": "advanced",
+            },
         )
 
-    def test_calculate_task_tool_fit_perfect_match(self, recommendation_algorithms, simple_task_analysis, csv_reader_tool):
+    def test_calculate_task_tool_fit_perfect_match(
+        self, recommendation_algorithms, simple_task_analysis, csv_reader_tool
+    ):
         """Test task-tool fit calculation for a perfect match."""
-        fit_score = recommendation_algorithms.calculate_task_tool_fit(
-            simple_task_analysis, 
-            csv_reader_tool
-        )
-        
+        fit_score = recommendation_algorithms.calculate_task_tool_fit(simple_task_analysis, csv_reader_tool)
+
         assert 0.8 <= fit_score <= 1.0  # Should be high for perfect match
         assert isinstance(fit_score, float)
 
-    def test_calculate_task_tool_fit_poor_match(self, recommendation_algorithms, simple_task_analysis, ml_analyzer_tool):
+    def test_calculate_task_tool_fit_poor_match(
+        self, recommendation_algorithms, simple_task_analysis, ml_analyzer_tool
+    ):
         """Test task-tool fit calculation for a poor match."""
-        fit_score = recommendation_algorithms.calculate_task_tool_fit(
-            simple_task_analysis,
-            ml_analyzer_tool
-        )
-        
+        fit_score = recommendation_algorithms.calculate_task_tool_fit(simple_task_analysis, ml_analyzer_tool)
+
         assert 0.0 <= fit_score <= 0.5  # Should be low for poor match
 
-    def test_calculate_task_tool_fit_with_context(self, recommendation_algorithms, complex_task_analysis, ml_analyzer_tool):
+    def test_calculate_task_tool_fit_with_context(
+        self, recommendation_algorithms, complex_task_analysis, ml_analyzer_tool
+    ):
         """Test task-tool fit calculation with context."""
         context = MockTaskContext(user_skill_level="advanced")
-        
-        fit_score = recommendation_algorithms.calculate_task_tool_fit(
-            complex_task_analysis,
-            ml_analyzer_tool,
-            context
-        )
-        
+
+        fit_score = recommendation_algorithms.calculate_task_tool_fit(complex_task_analysis, ml_analyzer_tool, context)
+
         assert 0.7 <= fit_score <= 1.0  # Should be high for advanced user + complex tool
 
     def test_apply_ensemble_ranking_single_tool(self, recommendation_algorithms, simple_task_analysis, csv_reader_tool):
         """Test ensemble ranking with a single tool."""
         candidates = [csv_reader_tool]
-        
-        recommendations = recommendation_algorithms.apply_ensemble_ranking(
-            candidates,
-            simple_task_analysis
-        )
-        
+
+        recommendations = recommendation_algorithms.apply_ensemble_ranking(candidates, simple_task_analysis)
+
         assert len(recommendations) == 1
         assert isinstance(recommendations[0], ToolRecommendation)
         assert recommendations[0].tool.name == "CSV Reader"
         assert recommendations[0].recommendation_score > 0
 
-    def test_apply_ensemble_ranking_multiple_tools(self, recommendation_algorithms, simple_task_analysis, csv_reader_tool, ml_analyzer_tool):
+    def test_apply_ensemble_ranking_multiple_tools(
+        self, recommendation_algorithms, simple_task_analysis, csv_reader_tool, ml_analyzer_tool
+    ):
         """Test ensemble ranking with multiple tools."""
         candidates = [csv_reader_tool, ml_analyzer_tool]
-        
-        recommendations = recommendation_algorithms.apply_ensemble_ranking(
-            candidates,
-            simple_task_analysis
-        )
-        
+
+        recommendations = recommendation_algorithms.apply_ensemble_ranking(candidates, simple_task_analysis)
+
         assert len(recommendations) == 2
         # CSV reader should rank higher for simple file operation task
         assert recommendations[0].tool.name == "CSV Reader"
@@ -202,14 +197,11 @@ class TestRecommendationAlgorithms:
             when_to_use="",
             when_not_to_use="",
             recommendation_strategy="",
-            context_factors=[]
+            context_factors=[],
         )
-        
-        confidence = recommendation_algorithms.calculate_recommendation_confidence(
-            recommendation,
-            simple_task_analysis
-        )
-        
+
+        confidence = recommendation_algorithms.calculate_recommendation_confidence(recommendation, simple_task_analysis)
+
         assert 0.8 <= confidence <= 1.0
         assert isinstance(confidence, float)
 
@@ -230,14 +222,11 @@ class TestRecommendationAlgorithms:
             when_to_use="",
             when_not_to_use="",
             recommendation_strategy="",
-            context_factors=[]
+            context_factors=[],
         )
-        
-        confidence = recommendation_algorithms.calculate_recommendation_confidence(
-            recommendation,
-            simple_task_analysis
-        )
-        
+
+        confidence = recommendation_algorithms.calculate_recommendation_confidence(recommendation, simple_task_analysis)
+
         assert 0.0 <= confidence <= 0.5
 
     def test_optimize_tool_sequence_simple_workflow(self, recommendation_algorithms):
@@ -247,14 +236,11 @@ class TestRecommendationAlgorithms:
             steps=["read", "process", "generate"],
             data_flow_requirements={"csv": "processed_data", "processed_data": "report"},
             error_handling_strategy="fail_fast",
-            performance_requirements={}
+            performance_requirements={},
         )
-        
-        optimized_sequence = recommendation_algorithms.optimize_tool_sequence(
-            tool_chain,
-            workflow_requirements
-        )
-        
+
+        optimized_sequence = recommendation_algorithms.optimize_tool_sequence(tool_chain, workflow_requirements)
+
         assert len(optimized_sequence) > 0
         assert isinstance(optimized_sequence[0], ToolSequenceRecommendation)
 
@@ -275,9 +261,9 @@ class TestRecommendationAlgorithms:
             when_to_use="For CSV file operations",
             when_not_to_use="For binary file operations",
             recommendation_strategy="capability_based",
-            context_factors=["user_skill_level"]
+            context_factors=["user_skill_level"],
         )
-        
+
         # Verify all fields are accessible
         assert recommendation.tool.name == "Test"
         assert recommendation.recommendation_score == 0.85
@@ -297,27 +283,27 @@ class TestToolRecommendationScoring:
         """Test capability matching for perfect overlap."""
         required_capabilities = ["read", "parse", "file_handling"]
         tool_capabilities = ["read", "parse", "file_handling", "validation"]
-        
+
         score = algorithms._calculate_capability_match_score(required_capabilities, tool_capabilities)
-        
+
         assert score == 1.0  # Perfect match (all required capabilities present)
 
     def test_capability_match_scoring_partial_match(self, algorithms):
         """Test capability matching for partial overlap."""
-        required_capabilities = ["read", "parse", "file_handling", "validation"] 
+        required_capabilities = ["read", "parse", "file_handling", "validation"]
         tool_capabilities = ["read", "parse"]
-        
+
         score = algorithms._calculate_capability_match_score(required_capabilities, tool_capabilities)
-        
+
         assert 0.4 <= score <= 0.6  # 50% match (2 out of 4 capabilities)
 
     def test_capability_match_scoring_no_match(self, algorithms):
         """Test capability matching for no overlap."""
-        required_capabilities = ["read", "parse"] 
+        required_capabilities = ["read", "parse"]
         tool_capabilities = ["write", "upload"]
-        
+
         score = algorithms._calculate_capability_match_score(required_capabilities, tool_capabilities)
-        
+
         assert score == 0.0  # No match
 
     def test_complexity_alignment_scoring_perfect_match(self, algorithms):
@@ -325,19 +311,19 @@ class TestToolRecommendationScoring:
         task_complexity = "simple"
         tool_complexity = "simple"
         user_skill = "beginner"
-        
+
         score = algorithms._calculate_complexity_alignment_score(task_complexity, tool_complexity, user_skill)
-        
+
         assert score >= 0.9  # Should be very high for perfect alignment
 
     def test_complexity_alignment_scoring_mismatch(self, algorithms):
         """Test complexity alignment for mismatch."""
-        task_complexity = "simple" 
+        task_complexity = "simple"
         tool_complexity = "complex"
         user_skill = "beginner"
-        
+
         score = algorithms._calculate_complexity_alignment_score(task_complexity, tool_complexity, user_skill)
-        
+
         assert score <= 0.4  # Should be low for mismatch
 
 
@@ -350,9 +336,9 @@ class TestWorkflowRequirements:
             steps=["step1", "step2"],
             data_flow_requirements={"input": "output"},
             error_handling_strategy="retry",
-            performance_requirements={"latency": "low"}
+            performance_requirements={"latency": "low"},
         )
-        
+
         assert requirements.steps == ["step1", "step2"]
         assert requirements.data_flow_requirements == {"input": "output"}
         assert requirements.error_handling_strategy == "retry"
