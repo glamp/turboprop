@@ -6,13 +6,91 @@ Transform your codebase into a searchable knowledge base using natural language 
 
 ## ✨ What Makes Turboprop Special
 
-🔍 **Semantic Search** - Find code by meaning, not just keywords ("JWT authentication" finds auth logic across languages)  
+🔍 **Hybrid Search** - Combines semantic understanding with exact text matching using advanced fusion algorithms  
+🎯 **Smart Ranking** - Multi-factor ranking considers file type, recency, construct type, and semantic relevance  
+🧠 **Structured Results** - Rich metadata with confidence scores, match explanations, and IDE navigation links  
 🐆 **Lightning Fast** - DuckDB vector operations deliver sub-second search across massive codebases  
 🔄 **Live Updates** - Watch mode with intelligent debouncing keeps your index fresh as you code  
-🤖 **Claude Code Ready** - Perfect MCP integration with custom slash commands and tools  
+🤖 **Claude Code Enhanced** - Advanced MCP integration with structured responses and query analysis  
 🔒 **Safe Concurrent Access** - Advanced file locking prevents corruption during multi-process operations  
 📁 **Git-Aware** - Respects .gitignore and only indexes what matters  
 💻 **Beautiful CLI** - Rich terminal interface with progress indicators and helpful guidance
+
+## 🆕 Enhanced Search Capabilities
+
+Turboprop's enhanced search system provides sophisticated code discovery that goes far beyond simple semantic similarity:
+
+### 🔄 Hybrid Search Modes
+
+**AUTO Mode** (Recommended) - Automatically chooses the best search strategy for your query
+```bash
+turboprop search "JWT authentication middleware" --mode auto
+```
+
+**HYBRID Mode** - Combines semantic understanding with exact text matching
+```bash  
+turboprop search "error handling patterns" --mode hybrid --explain
+```
+
+**SEMANTIC Mode** - Pure conceptual search for finding similar functionality
+```bash
+turboprop search "user input validation logic" --mode semantic
+```
+
+**TEXT Mode** - Fast exact text matching for specific syntax
+```bash
+turboprop search "def authenticate(" --mode text
+```
+
+### 📊 Rich Search Results
+
+Every result includes comprehensive metadata:
+
+```bash
+# Example enhanced result
+2. src/auth/validators.py:28-35 (confidence: 0.92) 🐍 python [function]
+   def validate_jwt_token(token: str) -> bool:
+       """Validates JWT token signature and expiration."""
+       try:
+           payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+   
+   ✨ Why this matches: Strong semantic match for JWT validation logic
+   💡 Navigate: vscode://file/src/auth/validators.py:28
+   🕒 Modified: 2 days ago
+```
+
+**Rich metadata includes:**
+- 🎯 **Confidence scores** - How well results match your query (0.0-1.0)
+- 🏷️ **Language detection** - Automatic programming language identification  
+- 🧩 **Construct types** - Functions, classes, methods, constants, etc.
+- 💭 **Match explanations** - Clear reasons why each result was selected
+- 🔗 **IDE navigation** - Direct links to VS Code, PyCharm, and other editors
+- ⏰ **File recency** - Git-based modification timestamps
+
+### 🎯 Advanced Ranking System
+
+Multi-factor ranking considers multiple relevance signals:
+
+- **Semantic similarity** (40%) - How well the meaning matches
+- **File type relevance** (20%) - Language and file type matching  
+- **Construct type match** (15%) - Code structure alignment
+- **File recency** (15%) - Recently modified files boost
+- **File size optimization** (10%) - Prefers appropriately-sized files
+
+### 🔧 Powerful Configuration
+
+Fine-tune search behavior with comprehensive configuration:
+
+```bash
+# Environment variables
+export TURBOPROP_SEARCH_MODE=hybrid
+export TURBOPROP_MAX_FILE_SIZE_MB=2.0
+export TURBOPROP_SNIPPET_CONTEXT_LINES=5
+export TURBOPROP_RRF_K=80
+
+# Or use configuration files
+echo '{"search": {"mode": "hybrid", "max_results": 15}}' > .turboprop/config.json
+```
 
 ## 🚀 Quick Start with Claude Code
 
@@ -238,6 +316,31 @@ CREATE TABLE code_files (
 - **Index location**: `.turboprop/code_index.duckdb` in each repository
 - **Git integration**: Uses `git ls-files` for file discovery
 - **Ignore handling**: Respects `.gitignore` automatically
+
+## 📚 Comprehensive Documentation
+
+Turboprop includes extensive documentation to help you master enhanced search capabilities:
+
+### 📖 User Guides
+- **[Enhanced Search Guide](docs/user/search_guide.md)** - Master search modes, query techniques, and result interpretation
+- **[Migration Guide](docs/migration/upgrade_guide.md)** - Step-by-step upgrade from basic to enhanced search system
+
+### 🔧 Developer Resources  
+- **[API Documentation](docs/api/enhanced_search.md)** - Complete API reference with examples for all enhanced features
+- **[Architecture Guide](docs/developer/architecture.md)** - System design, extension patterns, and contribution guidelines
+
+### 🚀 Quick References
+- **Search Modes**: AUTO (recommended), HYBRID, SEMANTIC, TEXT
+- **Result Metadata**: Confidence scores, match explanations, IDE navigation, language detection
+- **Configuration**: Environment variables, config files, response detail levels
+- **MCP Integration**: Structured responses, query analysis, Claude Code prompts
+
+### 💡 Learning Path
+
+1. **Start Here**: Read the [Enhanced Search Guide](docs/user/search_guide.md) for effective query techniques
+2. **Upgrading**: Follow the [Migration Guide](docs/migration/upgrade_guide.md) if coming from basic search
+3. **Deep Dive**: Explore the [API Documentation](docs/api/enhanced_search.md) for programmatic usage
+4. **Contributing**: Check the [Architecture Guide](docs/developer/architecture.md) for development setup
 
 ## 🤝 Contributing
 
