@@ -603,7 +603,7 @@ class DatabaseManager:
                     (file_id,)
                 ).fetchone()
                 construct_count = count_result[0] if count_result else 0
-                
+
                 # Then delete them
                 conn.execute(
                     "DELETE FROM code_constructs WHERE file_id = ?",

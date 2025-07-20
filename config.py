@@ -338,7 +338,7 @@ class SearchConfig:
         os.getenv("TURBOPROP_SEPARATOR_LENGTH", "50"), "TURBOPROP_SEPARATOR_LENGTH", 50
     )
 
-    # Snippet length constants  
+    # Snippet length constants
     SNIPPET_DISPLAY_MAX_LENGTH: int = validate_positive_int(
         os.getenv("TURBOPROP_SNIPPET_DISPLAY_LENGTH", "100"), "TURBOPROP_SNIPPET_DISPLAY_LENGTH", 100
     )

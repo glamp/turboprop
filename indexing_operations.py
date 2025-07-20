@@ -33,19 +33,20 @@ TABLE_NAME = "code_files"
 DIMENSIONS = 384
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
+
 class InstanceCache:
     """Cache for expensive-to-create instances used in indexing operations."""
-    
+
     def __init__(self):
         self._language_detector = None
         self._construct_extractor = None
-    
+
     def get_language_detector(self) -> LanguageDetector:
         """Get a cached LanguageDetector instance for efficient reuse."""
         if self._language_detector is None:
             self._language_detector = LanguageDetector()
         return self._language_detector
-    
+
     def get_construct_extractor(self) -> CodeConstructExtractor:
         """Get a cached CodeConstructExtractor instance for efficient reuse."""
         if self._construct_extractor is None:

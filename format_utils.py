@@ -13,10 +13,10 @@ from search_result_types import CodeSearchResult
 def convert_results_to_legacy_format(enhanced_results: List[CodeSearchResult]) -> List[Tuple[str, str, float]]:
     """
     Convert CodeSearchResult objects to legacy tuple format.
-    
+
     Args:
         enhanced_results: List of CodeSearchResult objects
-        
+
     Returns:
         List of tuples in format (file_path, snippet_text, distance_score)
     """
@@ -26,10 +26,10 @@ def convert_results_to_legacy_format(enhanced_results: List[CodeSearchResult]) -
 def convert_legacy_to_enhanced_format(legacy_results: List[Tuple[str, str, float]]) -> List[CodeSearchResult]:
     """
     Convert legacy tuple results to CodeSearchResult objects.
-    
+
     Args:
         legacy_results: List of tuples in format (file_path, snippet_text, distance_score)
-        
+
     Returns:
         List of CodeSearchResult objects with rich metadata
     """

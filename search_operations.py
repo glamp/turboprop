@@ -24,6 +24,7 @@ from mcp_response_types import (
     SearchResponse, QueryAnalysis, ResultCluster,
     create_search_response_from_results
 )
+import response_config
 
 # Constants
 TABLE_NAME = "code_files"
@@ -322,7 +323,7 @@ def search_index(
 
 def search_with_comprehensive_response(
     db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator, 
+    embedder: EmbeddingGenerator,
     query: str,
     k: int = 10,
     include_clusters: bool = True,
@@ -331,10 +332,10 @@ def search_with_comprehensive_response(
 ) -> SearchResponse:
     """
     Perform enhanced search and return comprehensive structured response.
-    
+
     This function combines semantic search with rich metadata, clustering,
     and suggestions to provide Claude with comprehensive search information.
-    
+
     Args:
         db_manager: DatabaseManager instance
         embedder: EmbeddingGenerator instance
@@ -343,17 +344,17 @@ def search_with_comprehensive_response(
         include_clusters: Whether to include result clustering
         include_suggestions: Whether to include query suggestions
         include_query_analysis: Whether to analyze the query
-        
+
     Returns:
         SearchResponse with comprehensive metadata and suggestions
     """
     start_time = time.time()
-    
+
     try:
         # Perform the enhanced search
         results = search_index_enhanced(db_manager, embedder, query, k)
         execution_time = time.time() - start_time
-        
+
         # Create the base response
         response = create_search_response_from_results(
             query=query,
@@ -362,11 +363,11 @@ def search_with_comprehensive_response(
             add_clusters=include_clusters,
             add_suggestions=include_suggestions
         )
-        
+
         # Add query analysis if requested
         if include_query_analysis:
             response.query_analysis = _analyze_search_query(query, results)
-            
+
         # Add performance notes
         if execution_time > 1.0:
             response.performance_notes.append(
@@ -376,12 +377,12 @@ def search_with_comprehensive_response(
             response.performance_notes.append(
                 f"Fast search in {execution_time:.3f}s - index is well optimized"
             )
-            
+
         return response
-        
+
     except Exception as e:
         logger.error(f"Comprehensive search failed: {e}", exc_info=True)
-        
+
         # Return error response
         return SearchResponse(
             query=query,
@@ -395,16 +396,16 @@ def search_with_comprehensive_response(
 def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryAnalysis:
     """
     Analyze a search query and provide insights and suggestions.
-    
+
     Args:
         query: The search query string
         results: The search results obtained
-        
+
     Returns:
         QueryAnalysis with insights and suggestions
     """
     analysis = QueryAnalysis(original_query=query)
-    
+
     # Analyze query complexity
     query_words = query.lower().split()
     if len(query_words) == 1:
@@ -415,7 +416,7 @@ def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryA
     else:
         analysis.query_complexity = "high"
         analysis.search_hints.append("Complex queries are good for specific searches")
-    
+
     # Estimate result quality and suggest refinements
     if not results:
         analysis.suggested_refinements.extend([
@@ -426,7 +427,7 @@ def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryA
         analysis.search_hints.append("No results found - try different search terms")
     elif len(results) < 3:
         analysis.suggested_refinements.extend([
-            f"Related terms: '{_suggest_related_terms(query)}'", 
+            f"Related terms: '{_suggest_related_terms(query)}'",
             "Try including file type or framework context"
         ])
         analysis.search_hints.append("Few results - consider broader or related terms")
@@ -437,14 +438,14 @@ def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryA
             "Add language context like 'python' or 'javascript'"
         ])
         analysis.search_hints.append("Many results - add more specific terms to narrow down")
-    
+
     # Analyze result confidence
     high_confidence = sum(1 for r in results if r.confidence_level == "high")
     if high_confidence == 0:
         analysis.search_hints.append("Low confidence results - try more specific terms")
     elif high_confidence == len(results):
         analysis.search_hints.append("High confidence results - query matches well")
-    
+
     # Add technical hints based on query content
     if any(term in query.lower() for term in ['function', 'method', 'def']):
         analysis.search_hints.append("Searching for functions - results show function definitions")
@@ -452,7 +453,7 @@ def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryA
         analysis.search_hints.append("Searching for types - results show class/interface definitions")
     elif any(term in query.lower() for term in ['error', 'exception', 'handling']):
         analysis.search_hints.append("Searching for error handling - check try-catch blocks")
-    
+
     analysis.estimated_result_count = len(results)
     return analysis
 
@@ -470,12 +471,12 @@ def _suggest_broader_terms(query: str) -> str:
         'serialization': 'serialize json',
         'initialization': 'init setup start'
     }
-    
+
     query_lower = query.lower()
     for specific, broader in broader_terms.items():
         if specific in query_lower:
             return broader
-    
+
     # If no specific replacement, just use the original
     return query
 
@@ -495,41 +496,41 @@ def _suggest_related_terms(query: str) -> str:
         'file': 'read write stream',
         'cache': 'memory storage redis'
     }
-    
+
     query_lower = query.lower()
     for term, related in related_terms.items():
         if term in query_lower:
             return related
-    
+
     return f"{query} related"
 
 
 def cluster_results_by_language(results: List[CodeSearchResult]) -> List[ResultCluster]:
     """
     Cluster search results by programming language.
-    
+
     Args:
         results: List of search results to cluster
-        
+
     Returns:
         List of ResultCluster objects grouped by language
     """
     language_groups = {}
-    
+
     for result in results:
         lang = 'unknown'
         if result.file_metadata and 'language' in result.file_metadata:
             lang = result.file_metadata['language']
-        
+
         if lang not in language_groups:
             language_groups[lang] = []
         language_groups[lang].append(result)
-    
+
     clusters = []
     for language, lang_results in language_groups.items():
         if len(lang_results) > 1:  # Only cluster multiple results
             avg_score = sum(r.similarity_score for r in lang_results) / len(lang_results)
-            
+
             cluster = ResultCluster(
                 cluster_name=f"{language} Files" if language != 'unknown' else 'Other Files',
                 cluster_type="language",
@@ -538,7 +539,7 @@ def cluster_results_by_language(results: List[CodeSearchResult]) -> List[ResultC
                 cluster_description=f"Search results from {language} source files"
             )
             clusters.append(cluster)
-    
+
     # Sort clusters by score
     clusters.sort(key=lambda c: c.cluster_score, reverse=True)
     return clusters
@@ -547,37 +548,37 @@ def cluster_results_by_language(results: List[CodeSearchResult]) -> List[ResultC
 def cluster_results_by_directory(results: List[CodeSearchResult]) -> List[ResultCluster]:
     """
     Cluster search results by directory structure.
-    
+
     Args:
         results: List of search results to cluster
-        
+
     Returns:
         List of ResultCluster objects grouped by directory
     """
     directory_groups = {}
-    
+
     for result in results:
         directory = str(Path(result.file_path).parent)
-        
+
         if directory not in directory_groups:
             directory_groups[directory] = []
         directory_groups[directory].append(result)
-    
+
     clusters = []
     for directory, dir_results in directory_groups.items():
         if len(dir_results) > 1:  # Only cluster multiple results
             avg_score = sum(r.similarity_score for r in dir_results) / len(dir_results)
             dir_name = Path(directory).name or "root"
-            
+
             cluster = ResultCluster(
                 cluster_name=f"{dir_name}/ directory",
-                cluster_type="directory", 
+                cluster_type="directory",
                 results=dir_results,
                 cluster_score=avg_score,
                 cluster_description=f"Search results from {directory}"
             )
             clusters.append(cluster)
-    
+
     # Sort clusters by score
     clusters.sort(key=lambda c: c.cluster_score, reverse=True)
     return clusters
@@ -586,24 +587,24 @@ def cluster_results_by_directory(results: List[CodeSearchResult]) -> List[Result
 def cluster_results_by_confidence(results: List[CodeSearchResult]) -> List[ResultCluster]:
     """
     Cluster search results by confidence level.
-    
+
     Args:
         results: List of search results to cluster
-        
+
     Returns:
         List of ResultCluster objects grouped by confidence
     """
     confidence_groups = {'high': [], 'medium': [], 'low': []}
-    
+
     for result in results:
         confidence = result.confidence_level or 'low'
         confidence_groups[confidence].append(result)
-    
+
     clusters = []
     for confidence_level, conf_results in confidence_groups.items():
         if conf_results:  # Include all confidence groups that have results
             avg_score = sum(r.similarity_score for r in conf_results) / len(conf_results)
-            
+
             cluster = ResultCluster(
                 cluster_name=f"{confidence_level.title()} Confidence",
                 cluster_type="confidence",
@@ -612,45 +613,45 @@ def cluster_results_by_confidence(results: List[CodeSearchResult]) -> List[Resul
                 cluster_description=f"Results with {confidence_level} confidence level"
             )
             clusters.append(cluster)
-    
+
     # Sort by confidence level (high -> medium -> low)
     confidence_order = {'high': 3, 'medium': 2, 'low': 1}
     clusters.sort(key=lambda c: confidence_order.get(
         c.cluster_name.split()[0].lower(), 0
     ), reverse=True)
-    
+
     return clusters
 
 
 def generate_cross_references(results: List[CodeSearchResult]) -> List[str]:
     """
     Generate cross-references between related code constructs.
-    
+
     Args:
         results: List of search results to analyze
-        
+
     Returns:
         List of cross-reference descriptions
     """
     cross_refs = []
-    
+
     # Group results by directory to find related files
     directory_groups = {}
     for result in results:
-        directory = str(Path(result.file_path).parent) 
+        directory = str(Path(result.file_path).parent)
         if directory not in directory_groups:
             directory_groups[directory] = []
         directory_groups[directory].append(result)
-    
+
     # Find directories with multiple matches
     for directory, dir_results in directory_groups.items():
         if len(dir_results) > 1:
             filenames = [Path(r.file_path).name for r in dir_results]
             cross_refs.append(
-                f"Related files in {Path(directory).name}/: {', '.join(filenames[:3])}"
-                + ("..." if len(filenames) > 3 else "")
+                f"Related files in {Path(directory).name}/: {', '.join(filenames[:response_config.MAX_FILENAMES_IN_CROSS_REF])}"
+                + ("..." if len(filenames) > response_config.MAX_FILENAMES_IN_CROSS_REF else "")
             )
-    
+
     # Find files with similar names
     file_stems = {}
     for result in results:
@@ -658,15 +659,15 @@ def generate_cross_references(results: List[CodeSearchResult]) -> List[str]:
         if stem not in file_stems:
             file_stems[stem] = []
         file_stems[stem].append(result)
-    
+
     for stem, stem_results in file_stems.items():
         if len(stem_results) > 1:
             extensions = [Path(r.file_path).suffix for r in stem_results]
             cross_refs.append(
                 f"Related '{stem}' files: {', '.join(extensions)}"
             )
-    
-    return cross_refs[:5]  # Limit to top 5 cross-references
+
+    return cross_refs[:response_config.MAX_CROSS_REFERENCES]  # Limit to top cross-references
 
 
 def format_enhanced_search_results(
@@ -1055,352 +1056,3 @@ def find_similar_files(
         legacy_results.append(legacy_tuple)
 
     return legacy_results
-
-
-def search_with_comprehensive_response(
-    db_manager: DatabaseManager,
-    embedder: EmbeddingGenerator, 
-    query: str,
-    k: int = 10,
-    include_clusters: bool = True,
-    include_suggestions: bool = True,
-    include_query_analysis: bool = True
-) -> SearchResponse:
-    """
-    Perform enhanced search and return comprehensive structured response.
-    
-    This function combines semantic search with rich metadata, clustering,
-    and suggestions to provide Claude with comprehensive search information.
-    
-    Args:
-        db_manager: DatabaseManager instance
-        embedder: EmbeddingGenerator instance
-        query: Search query string
-        k: Number of results to return
-        include_clusters: Whether to include result clustering
-        include_suggestions: Whether to include query suggestions
-        include_query_analysis: Whether to analyze the query
-        
-    Returns:
-        SearchResponse with comprehensive metadata and suggestions
-    """
-    start_time = time.time()
-    
-    try:
-        # Perform the enhanced search
-        results = search_index_enhanced(db_manager, embedder, query, k)
-        execution_time = time.time() - start_time
-        
-        # Create the base response
-        response = create_search_response_from_results(
-            query=query,
-            results=results,
-            execution_time=execution_time,
-            add_clusters=include_clusters,
-            add_suggestions=include_suggestions
-        )
-        
-        # Add query analysis if requested
-        if include_query_analysis:
-            response.query_analysis = _analyze_search_query(query, results)
-            
-        # Add performance notes
-        if execution_time > 1.0:
-            response.performance_notes.append(
-                f"Search took {execution_time:.2f}s - consider indexing optimization"
-            )
-        elif execution_time < 0.1:
-            response.performance_notes.append(
-                f"Fast search in {execution_time:.3f}s - index is well optimized"
-            )
-            
-        return response
-        
-    except Exception as e:
-        logger.error(f"Comprehensive search failed: {e}", exc_info=True)
-        
-        # Return error response
-        return SearchResponse(
-            query=query,
-            results=[],
-            total_results=0,
-            execution_time=time.time() - start_time,
-            performance_notes=[f"Search failed: {str(e)}"]
-        )
-
-
-def _analyze_search_query(query: str, results: List[CodeSearchResult]) -> QueryAnalysis:
-    """
-    Analyze a search query and provide insights and suggestions.
-    
-    Args:
-        query: The search query string
-        results: The search results obtained
-        
-    Returns:
-        QueryAnalysis with insights and suggestions
-    """
-    analysis = QueryAnalysis(original_query=query)
-    
-    # Analyze query complexity
-    query_words = query.lower().split()
-    if len(query_words) == 1:
-        analysis.query_complexity = "low"
-        analysis.search_hints.append("Single-word queries may be too broad - try adding context")
-    elif len(query_words) <= 3:
-        analysis.query_complexity = "medium"
-    else:
-        analysis.query_complexity = "high"
-        analysis.search_hints.append("Complex queries are good for specific searches")
-    
-    # Estimate result quality and suggest refinements
-    if not results:
-        analysis.suggested_refinements.extend([
-            f"Try broader terms like: '{_suggest_broader_terms(query)}'",
-            "Check spelling and try synonyms",
-            "Consider programming language context"
-        ])
-        analysis.search_hints.append("No results found - try different search terms")
-    elif len(results) < 3:
-        analysis.suggested_refinements.extend([
-            f"Related terms: '{_suggest_related_terms(query)}'", 
-            "Try including file type or framework context"
-        ])
-        analysis.search_hints.append("Few results - consider broader or related terms")
-    elif len(results) >= 8:
-        analysis.suggested_refinements.extend([
-            f"More specific: '{query} function'",
-            f"With context: '{query} implementation'",
-            "Add language context like 'python' or 'javascript'"
-        ])
-        analysis.search_hints.append("Many results - add more specific terms to narrow down")
-    
-    # Analyze result confidence
-    high_confidence = sum(1 for r in results if r.confidence_level == "high")
-    if high_confidence == 0:
-        analysis.search_hints.append("Low confidence results - try more specific terms")
-    elif high_confidence == len(results):
-        analysis.search_hints.append("High confidence results - query matches well")
-    
-    # Add technical hints based on query content
-    if any(term in query.lower() for term in ['function', 'method', 'def']):
-        analysis.search_hints.append("Searching for functions - results show function definitions")
-    elif any(term in query.lower() for term in ['class', 'interface', 'struct']):
-        analysis.search_hints.append("Searching for types - results show class/interface definitions")
-    elif any(term in query.lower() for term in ['error', 'exception', 'handling']):
-        analysis.search_hints.append("Searching for error handling - check try-catch blocks")
-    
-    analysis.estimated_result_count = len(results)
-    return analysis
-
-
-def _suggest_broader_terms(query: str) -> str:
-    """Generate broader search terms from a specific query."""
-    # Simple word replacement for common technical terms
-    broader_terms = {
-        'authentication': 'auth login user',
-        'database': 'db data storage',
-        'configuration': 'config settings',
-        'implementation': 'code function',
-        'optimization': 'performance speed',
-        'validation': 'validate check',
-        'serialization': 'serialize json',
-        'initialization': 'init setup start'
-    }
-    
-    query_lower = query.lower()
-    for specific, broader in broader_terms.items():
-        if specific in query_lower:
-            return broader
-    
-    # If no specific replacement, just use the original
-    return query
-
-
-def _suggest_related_terms(query: str) -> str:
-    """Generate related search terms from a query."""
-    # Simple related term suggestions
-    related_terms = {
-        'login': 'authentication signin user',
-        'auth': 'login token session',
-        'database': 'sql query connection',
-        'config': 'settings environment variables',
-        'error': 'exception handling try catch',
-        'test': 'unittest pytest testing',
-        'api': 'endpoint route http',
-        'json': 'parse serialize data',
-        'file': 'read write stream',
-        'cache': 'memory storage redis'
-    }
-    
-    query_lower = query.lower()
-    for term, related in related_terms.items():
-        if term in query_lower:
-            return related
-    
-    return f"{query} related"
-
-
-def cluster_results_by_language(results: List[CodeSearchResult]) -> List[ResultCluster]:
-    """
-    Cluster search results by programming language.
-    
-    Args:
-        results: List of search results to cluster
-        
-    Returns:
-        List of ResultCluster objects grouped by language
-    """
-    language_groups = {}
-    
-    for result in results:
-        lang = 'unknown'
-        if result.file_metadata and 'language' in result.file_metadata:
-            lang = result.file_metadata['language']
-        
-        if lang not in language_groups:
-            language_groups[lang] = []
-        language_groups[lang].append(result)
-    
-    clusters = []
-    for language, lang_results in language_groups.items():
-        if len(lang_results) > 1:  # Only cluster multiple results
-            avg_score = sum(r.similarity_score for r in lang_results) / len(lang_results)
-            
-            cluster = ResultCluster(
-                cluster_name=f"{language} Files" if language != 'unknown' else 'Other Files',
-                cluster_type="language",
-                results=lang_results,
-                cluster_score=avg_score,
-                cluster_description=f"Search results from {language} source files"
-            )
-            clusters.append(cluster)
-    
-    # Sort clusters by score
-    clusters.sort(key=lambda c: c.cluster_score, reverse=True)
-    return clusters
-
-
-def cluster_results_by_directory(results: List[CodeSearchResult]) -> List[ResultCluster]:
-    """
-    Cluster search results by directory structure.
-    
-    Args:
-        results: List of search results to cluster
-        
-    Returns:
-        List of ResultCluster objects grouped by directory
-    """
-    directory_groups = {}
-    
-    for result in results:
-        directory = str(Path(result.file_path).parent)
-        
-        if directory not in directory_groups:
-            directory_groups[directory] = []
-        directory_groups[directory].append(result)
-    
-    clusters = []
-    for directory, dir_results in directory_groups.items():
-        if len(dir_results) > 1:  # Only cluster multiple results
-            avg_score = sum(r.similarity_score for r in dir_results) / len(dir_results)
-            dir_name = Path(directory).name or "root"
-            
-            cluster = ResultCluster(
-                cluster_name=f"{dir_name}/ directory",
-                cluster_type="directory", 
-                results=dir_results,
-                cluster_score=avg_score,
-                cluster_description=f"Search results from {directory}"
-            )
-            clusters.append(cluster)
-    
-    # Sort clusters by score
-    clusters.sort(key=lambda c: c.cluster_score, reverse=True)
-    return clusters
-
-
-def cluster_results_by_confidence(results: List[CodeSearchResult]) -> List[ResultCluster]:
-    """
-    Cluster search results by confidence level.
-    
-    Args:
-        results: List of search results to cluster
-        
-    Returns:
-        List of ResultCluster objects grouped by confidence
-    """
-    confidence_groups = {'high': [], 'medium': [], 'low': []}
-    
-    for result in results:
-        confidence = result.confidence_level or 'low'
-        confidence_groups[confidence].append(result)
-    
-    clusters = []
-    for confidence_level, conf_results in confidence_groups.items():
-        if conf_results:  # Include all confidence groups that have results
-            avg_score = sum(r.similarity_score for r in conf_results) / len(conf_results)
-            
-            cluster = ResultCluster(
-                cluster_name=f"{confidence_level.title()} Confidence",
-                cluster_type="confidence",
-                results=conf_results,
-                cluster_score=avg_score,
-                cluster_description=f"Results with {confidence_level} confidence level"
-            )
-            clusters.append(cluster)
-    
-    # Sort by confidence level (high -> medium -> low)
-    confidence_order = {'high': 3, 'medium': 2, 'low': 1}
-    clusters.sort(key=lambda c: confidence_order.get(
-        c.cluster_name.split()[0].lower(), 0
-    ), reverse=True)
-    
-    return clusters
-
-
-def generate_cross_references(results: List[CodeSearchResult]) -> List[str]:
-    """
-    Generate cross-references between related code constructs.
-    
-    Args:
-        results: List of search results to analyze
-        
-    Returns:
-        List of cross-reference descriptions
-    """
-    cross_refs = []
-    
-    # Group results by directory to find related files
-    directory_groups = {}
-    for result in results:
-        directory = str(Path(result.file_path).parent) 
-        if directory not in directory_groups:
-            directory_groups[directory] = []
-        directory_groups[directory].append(result)
-    
-    # Find directories with multiple matches
-    for directory, dir_results in directory_groups.items():
-        if len(dir_results) > 1:
-            filenames = [Path(r.file_path).name for r in dir_results]
-            cross_refs.append(
-                f"Related files in {Path(directory).name}/: {', '.join(filenames[:3])}"
-                + ("..." if len(filenames) > 3 else "")
-            )
-    
-    # Find files with similar names
-    file_stems = {}
-    for result in results:
-        stem = Path(result.file_path).stem.lower()
-        if stem not in file_stems:
-            file_stems[stem] = []
-        file_stems[stem].append(result)
-    
-    for stem, stem_results in file_stems.items():
-        if len(stem_results) > 1:
-            extensions = [Path(r.file_path).suffix for r in stem_results]
-            cross_refs.append(
-                f"Related '{stem}' files: {', '.join(extensions)}"
-            )
-    
-    return cross_refs[:5]  # Limit to top 5 cross-references

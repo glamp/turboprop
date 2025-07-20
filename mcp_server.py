@@ -275,72 +275,12 @@ def search_code(query: str, max_results: int = None) -> str:
 @mcp.tool()
 def search_code_structured(query: str, max_results: int = None) -> str:
     """
-    🔍 TURBOPROP: Enhanced semantic search with rich metadata (ADVANCED)
-
-    This is the next-generation search that provides detailed metadata about
-    results including file types, confidence levels, and enhanced snippets.
-
-    Args:
-        query: Natural language description of what you're looking for
-        max_results: Number of results (default: 5, max: 20)
-
-    Returns:
-        Enhanced results with rich metadata and improved formatting
-    """
-    try:
-        if max_results is None:
-            max_results = config.search.DEFAULT_MAX_RESULTS
-        if max_results > config.search.MAX_RESULTS_LIMIT:
-            max_results = config.search.MAX_RESULTS_LIMIT
-
-        con = get_db_connection()
-        embedder = get_embedder()
-
-        # Check if index exists
-        file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
-        if file_count == 0:
-            return "No index found. Please index a repository first using the index_repository tool."
-
-        # Perform enhanced semantic search
-        results = search_index_enhanced(con, embedder, query, max_results)
-        if not results:
-            return (
-                f"No results found for query: '{query}'. "
-                "Try different search terms or make sure the repository is indexed."
-            )
-
-        # Use enhanced formatting
-        repo_path = _config.get("repository_path")
-        formatted_output = format_enhanced_search_results(results, query, repo_path)
-
-        # Add search metadata
-        confidence_counts = {'high': 0, 'medium': 0, 'low': 0}
-        for result in results:
-            confidence_counts[result.confidence_level] += 1
-
-        metadata_lines = [
-            "",
-            "📊 Search Metadata:",
-            f"   Query: '{query}'",
-            f"   Results: {len(results)}",
-            f"   Confidence: {confidence_counts['high']} high, {confidence_counts['medium']} medium, {confidence_counts['low']} low"
-        ]
-
-        return formatted_output + "\n" + "\n".join(metadata_lines)
-
-    except Exception as e:
-        return f"Error in enhanced search: {str(e)}"
-
-
-@mcp.tool()
-def search_code_structured(query: str, max_results: int = None) -> str:
-    """
     🔍 TURBOPROP: Semantic search with comprehensive JSON metadata (STRUCTURED)
-    
+
     NEXT-GENERATION STRUCTURED SEARCH! Returns rich JSON data that Claude can
-    process programmatically, including result clustering, query analysis, 
+    process programmatically, including result clustering, query analysis,
     confidence scoring, and intelligent suggestions.
-    
+
     🎯 WHAT YOU GET (JSON FORMAT):
     • Complete search results with metadata
     • Result clustering by language and directory
@@ -350,17 +290,17 @@ def search_code_structured(query: str, max_results: int = None) -> str:
     • Performance metrics and execution timing
     • Confidence distribution across results
     • Navigation hints for IDE integration
-    
+
     🚀 PERFECT FOR:
     • AI agents that need structured data
     • Advanced IDE integrations
     • Automated code analysis workflows
     • Building custom search interfaces
-    
+
     Args:
         query: Natural language description of what you're looking for
         max_results: Number of results (default: 10, max: 20)
-        
+
     Returns:
         JSON string with comprehensive SearchResponse data
     """
@@ -369,10 +309,10 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             max_results = config.search.DEFAULT_MAX_RESULTS
         if max_results > config.search.MAX_RESULTS_LIMIT:
             max_results = config.search.MAX_RESULTS_LIMIT
-            
+
         con = get_db_connection()
         embedder = get_embedder()
-        
+
         # Check if index exists
         file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
         if file_count == 0:
@@ -384,7 +324,7 @@ def search_code_structured(query: str, max_results: int = None) -> str:
                 performance_notes=["No index found. Please index a repository first using the index_repository tool."]
             )
             return error_response.to_json()
-            
+
         # Perform comprehensive structured search
         response = search_with_comprehensive_response(
             db_manager=con,
@@ -395,14 +335,14 @@ def search_code_structured(query: str, max_results: int = None) -> str:
             include_suggestions=True,
             include_query_analysis=True
         )
-        
+
         # Add repository context if available
         repo_path = _config.get("repository_path")
         if repo_path:
             response.navigation_hints.insert(0, f"Repository: {repo_path}")
-            
+
         return response.to_json()
-        
+
     except Exception as e:
         # Return structured error response
         error_response = SearchResponse(
@@ -422,11 +362,11 @@ def index_repository_structured(
 ) -> str:
     """
     🚀 TURBOPROP: Index repository with comprehensive JSON response (STRUCTURED)
-    
+
     ADVANCED INDEXING WITH DETAILED REPORTING! Returns structured JSON data
     about the indexing operation including file statistics, performance metrics,
     warnings, and recommendations.
-    
+
     🎯 STRUCTURED DATA INCLUDES:
     • Detailed file processing statistics
     • Performance metrics and timing
@@ -434,35 +374,35 @@ def index_repository_structured(
     • Warnings and error details
     • Configuration used for indexing
     • Success/failure status with reasons
-    
+
     Args:
         repository_path: Path to Git repo (optional - uses configured path)
         max_file_size_mb: Max file size in MB (optional - uses configured limit)
         force_all: Force complete reindexing (default: False)
-        
+
     Returns:
         JSON string with comprehensive IndexResponse data
     """
     import time
     start_time = time.time()
-    
+
     try:
         # Use provided path or fall back to configured path
         if repository_path is None:
             repository_path = _config["repository_path"]
-            
+
         if repository_path is None:
             error_response = IndexResponse(
                 operation="index",
-                status="failed", 
+                status="failed",
                 message="No repository path specified",
                 execution_time=time.time() - start_time
             )
             error_response.add_error("Either provide a path or configure one at startup")
             return error_response.to_json()
-            
+
         repo_path = Path(repository_path).resolve()
-        
+
         if not repo_path.exists():
             error_response = IndexResponse(
                 operation="index",
@@ -473,10 +413,10 @@ def index_repository_structured(
             )
             error_response.add_error(f"Path '{repository_path}' does not exist")
             return error_response.to_json()
-            
+
         if not repo_path.is_dir():
             error_response = IndexResponse(
-                operation="index", 
+                operation="index",
                 status="failed",
                 message=f"Path is not a directory",
                 repository_path=repository_path,
@@ -484,18 +424,18 @@ def index_repository_structured(
             )
             error_response.add_error(f"'{repository_path}' is not a directory")
             return error_response.to_json()
-            
+
         # Use provided max file size or fall back to configured value
         if max_file_size_mb is None:
             max_file_size_mb = _config["max_file_size_mb"]
-            
+
         max_bytes = int(max_file_size_mb * 1024 * 1024)
         con = get_db_connection()
         embedder = get_embedder()
-        
+
         # Scan repository for code files
         files = scan_repo(repo_path, max_bytes)
-        
+
         if not files:
             response = IndexResponse(
                 operation="index",
@@ -508,21 +448,21 @@ def index_repository_structured(
             )
             response.add_error("Make sure it's a Git repository with code files")
             return response.to_json()
-            
+
         # Perform indexing
         total_files, processed_files, elapsed = reindex_all(
             repo_path, max_bytes, con, embedder, max_workers=None, force_all=force_all
         )
-        
+
         # Get final embedding count
         embedding_count = build_full_index(con)
-        
+
         # Calculate database size
         db_path = repo_path / ".turboprop" / "code_index.duckdb"
         db_size_mb = 0
         if db_path.exists():
             db_size_mb = db_path.stat().st_size / (1024 * 1024)
-            
+
         # Create successful response
         execution_time = time.time() - start_time
         response = IndexResponse(
@@ -538,15 +478,15 @@ def index_repository_structured(
             repository_path=str(repository_path),
             max_file_size_mb=max_file_size_mb
         )
-        
+
         # Add performance notes
         if execution_time > 30:
             response.add_warning("Indexing took longer than expected - consider optimizing repository size")
         elif execution_time < 5:
             response.performance_notes = [f"Fast indexing completed in {execution_time:.2f}s"]
-            
+
         return response.to_json()
-        
+
     except Exception as e:
         error_response = IndexResponse(
             operation="index",
@@ -564,10 +504,10 @@ def index_repository_structured(
 def get_index_status_structured() -> str:
     """
     📊 TURBOPROP: Comprehensive index status with JSON metadata (STRUCTURED)
-    
+
     DETAILED HEALTH REPORT! Returns structured JSON data about your code index
     including health metrics, recommendations, file statistics, and freshness analysis.
-    
+
     🎯 COMPREHENSIVE DATA INCLUDES:
     • Index health score and readiness status
     • Detailed file and embedding statistics
@@ -576,19 +516,19 @@ def get_index_status_structured() -> str:
     • Freshness analysis and update recommendations
     • Watcher status and configuration details
     • Health recommendations and warnings
-    
+
     Returns:
         JSON string with comprehensive StatusResponse data
     """
     try:
         con = get_db_connection()
-        
+
         # Get basic statistics
         file_count = con.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
         embedding_count = con.execute(
             f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE embedding IS NOT NULL"
         ).fetchone()[0]
-        
+
         # Get database information
         db_path = None
         db_size_mb = 0
@@ -596,14 +536,14 @@ def get_index_status_structured() -> str:
             db_path = Path(_config["repository_path"]) / ".turboprop" / "code_index.duckdb"
         else:
             db_path = Path.cwd() / ".turboprop" / "code_index.duckdb"
-            
+
         if db_path.exists():
             db_size_mb = db_path.stat().st_size / (1024 * 1024)
-            
+
         # Determine status
         is_ready = file_count > 0 and embedding_count > 0
         status = "healthy" if is_ready else ("building" if file_count > 0 else "offline")
-        
+
         # Get file type statistics
         file_types = {}
         try:
@@ -630,17 +570,17 @@ def get_index_status_structured() -> str:
             file_types = {row[0]: row[1] for row in type_results}
         except Exception:
             file_types = {}
-            
+
         # Check watcher status
         watcher_active = _watcher_thread and _watcher_thread.is_alive()
         watcher_status = "active" if watcher_active else "inactive"
-        
+
         # Check freshness if repository is configured
         files_needing_update = 0
         is_fresh = True
         freshness_reason = "Index status unknown"
         last_index_time = None
-        
+
         if _config["repository_path"]:
             try:
                 repo_path = Path(_config["repository_path"])
@@ -653,7 +593,7 @@ def get_index_status_structured() -> str:
                     last_index_time = str(freshness["last_index_time"])
             except Exception as e:
                 freshness_reason = f"Freshness check failed: {str(e)}"
-                
+
         # Create status response
         response = StatusResponse(
             status=status,
@@ -674,7 +614,7 @@ def get_index_status_structured() -> str:
             freshness_reason=freshness_reason,
             file_types=file_types
         )
-        
+
         # Add recommendations
         if not is_ready:
             response.add_recommendation("Run index_repository to build the initial index")
@@ -682,17 +622,17 @@ def get_index_status_structured() -> str:
             response.add_recommendation(f"Run index_repository to update {files_needing_update} changed files")
         elif not watcher_active and _config["repository_path"]:
             response.add_recommendation("Consider starting watch_repository for real-time updates")
-            
+
         # Add warnings
         if embedding_count < file_count:
             missing_embeddings = file_count - embedding_count
             response.add_warning(f"{missing_embeddings} files lack embeddings - reindexing recommended")
-            
+
         if db_size_mb > 100:
             response.add_warning(f"Large database size ({db_size_mb:.1f} MB) - consider cleanup")
-            
+
         return response.to_json()
-        
+
     except Exception as e:
         error_response = StatusResponse(
             status="error",
@@ -703,8 +643,6 @@ def get_index_status_structured() -> str:
         )
         error_response.add_warning(f"Status check failed: {str(e)}")
         return error_response.to_json()
-
-
 
 
 @mcp.tool()
@@ -912,14 +850,14 @@ def watch_repository(repository_path: str, max_file_size_mb: float = 1.0, deboun
         def start_watcher():
             """
             File watcher thread function with comprehensive error handling.
-            
+
             Error scenarios handled:
             - KeyboardInterrupt: Normal shutdown, no action needed
             - FileNotFoundError: Repository path doesn't exist
             - PermissionError: Insufficient permissions to watch directory
             - OSError: Various filesystem errors (disk full, network issues)
             - Exception: Catch-all for unexpected errors
-            
+
             Security note: Error messages avoid exposing sensitive path details
             to prevent information leakage in logs or user-facing messages.
             """
