@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
+from proactive_suggestion_engine import ProactiveSuggestion
+from error_handling import create_error_handler, ErrorSeverity
+from automatic_selection_config import CONFIG
 
 logger = get_logger(__name__)
 
@@ -35,7 +38,7 @@ class AutomaticSelectionResult:
     """Result of automatic tool selection analysis."""
 
     context: Dict[str, Any]
-    suggested_tools: List["ProactiveSuggestion"]
+    suggested_tools: List[ProactiveSuggestion]
     learned_preferences: Dict[str, Any]
     confidence_scores: Dict[str, float]
     reasoning: List[str]
@@ -45,7 +48,7 @@ class AutomaticSelectionResult:
     selection_strategy: str = "automatic"
     context_confidence: float = 0.0
 
-    def get_top_suggestion(self) -> Optional["ProactiveSuggestion"]:
+    def get_top_suggestion(self) -> Optional[ProactiveSuggestion]:
         """Get highest confidence suggestion."""
         if not self.suggested_tools:
             return None
@@ -84,16 +87,17 @@ class SelectionContextManager:
     def _calculate_complexity_score(self, context: Dict[str, Any]) -> float:
         """Calculate complexity score for the context."""
         complexity_factors = 0.0
+        config = CONFIG["complexity_scoring"]
 
         # Task complexity indicators
         if "complex" in str(context.get("task", "")).lower():
-            complexity_factors += 0.3
+            complexity_factors += config["complex_keyword_weight"]
         if "advanced" in str(context.get("user_input", "")).lower():
-            complexity_factors += 0.2
-        if len(str(context.get("user_input", ""))) > 100:
-            complexity_factors += 0.1
+            complexity_factors += config["advanced_keyword_weight"]
+        if len(str(context.get("user_input", ""))) > config["long_input_threshold"]:
+            complexity_factors += config["long_input_weight"]
 
-        return min(1.0, complexity_factors + 0.2)  # Base complexity
+        return min(config["max_complexity"], complexity_factors + config["base_complexity"])
 
 
 class AutomaticToolSelector:
@@ -106,6 +110,7 @@ class AutomaticToolSelector:
         self.learning_system = learning_system
         self.effectiveness_tracker = effectiveness_tracker
         self.context_manager = SelectionContextManager()
+        self.error_handler = create_error_handler("AutomaticToolSelector")
 
         logger.info("Initialized Automatic Tool Selector")
 
@@ -158,14 +163,19 @@ class AutomaticToolSelector:
             return result
 
         except Exception as e:
-            logger.error("Error in analyze_and_suggest: %s", e)
-            # Return empty result on error
-            return AutomaticSelectionResult(
-                context=current_context,
-                suggested_tools=[],
-                learned_preferences={},
-                confidence_scores={},
-                reasoning=[f"Analysis failed: {str(e)}"],
+            # Use standardized error handling with fallback
+            return self.error_handler.handle_with_default(
+                operation="analyze_and_suggest",
+                exception=e,
+                default_value=AutomaticSelectionResult(
+                    context=current_context,
+                    suggested_tools=[],
+                    learned_preferences={},
+                    confidence_scores={},
+                    reasoning=[f"Analysis failed: {str(e)}"],
+                ),
+                severity=ErrorSeverity.HIGH,
+                context={"user_context": current_context}
             )
 
     def pre_rank_tools_for_context(self, available_tools: List[str], context: Dict[str, Any]) -> List[ToolRanking]:
@@ -199,40 +209,53 @@ class AutomaticToolSelector:
             return ranked_tools
 
         except Exception as e:
-            logger.error("Error in pre_rank_tools_for_context: %s", e)
-            # Return default rankings on error
-            return [
-                ToolRanking(tool_id=tool_id, ranking_score=0.5, context=context, factors={"default": 0.5})
-                for tool_id in available_tools
-            ]
+            # Use standardized error handling with fallback
+            return self.error_handler.handle_with_default(
+                operation="pre_rank_tools_for_context",
+                exception=e,
+                default_value=[
+                    ToolRanking(
+                        tool_id=tool_id, 
+                        ranking_score=CONFIG["default_values"]["default_ranking_score"], 
+                        context=context, 
+                        factors={"default": CONFIG["default_values"]["default_score"]}
+                    )
+                    for tool_id in available_tools
+                ],
+                severity=ErrorSeverity.MEDIUM,
+                context={"available_tools": available_tools, "context": context}
+            )
 
-    def _calculate_confidence_scores(self, suggestions: List["ProactiveSuggestion"]) -> Dict[str, float]:
+    def _calculate_confidence_scores(self, suggestions: List[ProactiveSuggestion]) -> Dict[str, float]:
         """Calculate confidence scores for automatic suggestions."""
         scores = {}
+        config = CONFIG["confidence_weights"]
+        defaults = CONFIG["default_values"]
 
         try:
             for suggestion in suggestions:
                 # Base confidence on pattern strength
-                pattern_confidence = getattr(suggestion, "pattern_strength", 0.5)
+                pattern_confidence = getattr(suggestion, "pattern_strength", defaults["default_confidence"])
 
                 # Adjust based on historical effectiveness
                 historical_effectiveness = self.effectiveness_tracker.get_tool_effectiveness(
                     suggestion.tool_id, getattr(suggestion, "context", {})
                 )
 
-                # Combine factors (60% pattern, 40% historical)
-                confidence = pattern_confidence * 0.6 + historical_effectiveness * 0.4
-                scores[suggestion.tool_id] = min(1.0, confidence)
+                # Combine factors using configured weights
+                confidence = (pattern_confidence * config["pattern_weight"] + 
+                            historical_effectiveness * config["historical_weight"])
+                scores[suggestion.tool_id] = min(config["max_confidence"], confidence)
 
         except Exception as e:
             logger.error("Error calculating confidence scores: %s", e)
             # Provide default scores
             for suggestion in suggestions:
-                scores[suggestion.tool_id] = 0.5
+                scores[suggestion.tool_id] = defaults["default_confidence"]
 
         return scores
 
-    def _generate_selection_reasoning(self, suggestions: List["ProactiveSuggestion"], usage_patterns) -> List[str]:
+    def _generate_selection_reasoning(self, suggestions: List[ProactiveSuggestion], usage_patterns) -> List[str]:
         """Generate reasoning for tool selections."""
         reasoning = []
 
@@ -262,48 +285,50 @@ class AutomaticToolSelector:
         self, tool_id: str, context_analysis: Dict[str, Any], user_preferences: Dict[str, float]
     ) -> ToolRanking:
         """Calculate ranking for a specific tool."""
+        weights = CONFIG["ranking_weights"]
+        defaults = CONFIG["default_values"]
+        config = CONFIG["confidence_weights"]
 
         factors = {}
 
-        # User preference factor (40% weight)
-        user_score = user_preferences.get(tool_id, 0.5)
+        # User preference factor
+        user_score = user_preferences.get(tool_id, defaults["default_score"])
         factors["user_preference"] = user_score
 
-        # Context suitability factor (35% weight)
+        # Context suitability factor
         context_score = self._calculate_context_suitability(tool_id, context_analysis)
         factors["context_suitability"] = context_score
 
-        # Historical effectiveness factor (25% weight)
+        # Historical effectiveness factor
         effectiveness_score = self.effectiveness_tracker.get_tool_effectiveness(tool_id, context_analysis)
         factors["historical_effectiveness"] = effectiveness_score
 
-        # Calculate weighted final score
-        final_score = user_score * 0.4 + context_score * 0.35 + effectiveness_score * 0.25
+        # Calculate weighted final score using configured weights
+        final_score = (user_score * weights["user_preference_weight"] + 
+                      context_score * weights["context_suitability_weight"] + 
+                      effectiveness_score * weights["historical_effectiveness_weight"])
 
         return ToolRanking(
             tool_id=tool_id,
             ranking_score=final_score,
             context=context_analysis,
             factors=factors,
-            confidence=min(final_score + 0.1, 1.0),
+            confidence=min(final_score + config["confidence_boost"], config["max_confidence"]),
         )
 
     def _calculate_context_suitability(self, tool_id: str, context_analysis: Dict[str, Any]) -> float:
         """Calculate how suitable a tool is for the given context."""
+        defaults = CONFIG["default_values"]
+        suitability_rules = CONFIG["tool_suitability_rules"]
+        thresholds = CONFIG["complexity_thresholds"]
+        limits = CONFIG["score_limits"]
 
         # Simple rule-based context matching
         task_type = context_analysis.get("task_type", "").lower()
-        complexity = context_analysis.get("complexity_score", 0.5)
-
-        # Tool type matching rules
-        suitability_rules = {
-            "search": {"search_files": 0.9, "grep": 0.8, "find": 0.7, "analyze": 0.4},
-            "file": {"read": 0.9, "write": 0.9, "edit": 0.8, "search": 0.6},
-            "analysis": {"analyze": 0.9, "search": 0.7, "read": 0.6},
-        }
+        complexity = context_analysis.get("complexity_score", defaults["default_score"])
 
         # Default suitability
-        base_score = 0.5
+        base_score = defaults["default_score"]
 
         # Apply task-based rules
         for task_keyword, tool_scores in suitability_rules.items():
@@ -312,10 +337,10 @@ class AutomaticToolSelector:
                     if tool_keyword in tool_id.lower():
                         base_score = max(base_score, score)
 
-        # Adjust for complexity
-        if complexity > 0.7 and "advanced" in tool_id.lower():
-            base_score += 0.1
-        elif complexity < 0.3 and "simple" in tool_id.lower():
-            base_score += 0.1
+        # Adjust for complexity using configured thresholds
+        if complexity > thresholds["high_complexity_threshold"] and "advanced" in tool_id.lower():
+            base_score += thresholds["complexity_bonus"]
+        elif complexity < thresholds["low_complexity_threshold"] and "simple" in tool_id.lower():
+            base_score += thresholds["complexity_bonus"]
 
-        return min(1.0, base_score)
+        return min(limits["max_score"], base_score)

@@ -8,15 +8,14 @@ tool effectiveness, and context patterns to improve automatic suggestions over t
 """
 
 import json
-import math
-import statistics
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from logging_config import get_logger
 from usage_pattern_analyzer import UsagePatternAnalysis
+from storage_manager import get_storage_manager
 
 logger = get_logger(__name__)
 
@@ -38,7 +37,8 @@ class UserPreferenceModel:
 
     def __init__(self, storage_path: Optional[Path] = None):
         """Initialize preference model with optional storage path."""
-        self.storage_path = storage_path or Path(".turboprop/preferences.json")
+        self.storage_manager = get_storage_manager()
+        self.storage_path = storage_path or self.storage_manager.get_preferences_path()
         self.preferences_data = self._load_preferences()
         self.context_weights = self._initialize_context_weights()
 
@@ -46,33 +46,23 @@ class UserPreferenceModel:
 
     def _load_preferences(self) -> Dict[str, Any]:
         """Load preferences from storage."""
-        try:
-            if self.storage_path.exists():
-                with open(self.storage_path, "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.warning("Failed to load preferences: %s", e)
-
-        # Return default structure
-        return {
-            "tool_preferences": {},
-            "context_preferences": {},
-            "learning_metadata": {"total_samples": 0, "last_updated": time.time(), "model_version": "1.0"},
-        }
+        return self.storage_manager.load_json_data(
+            self.storage_path,
+            default={
+                "tool_preferences": {},
+                "context_preferences": {},
+                "learning_metadata": {"total_samples": 0, "last_updated": time.time(), "model_version": "1.0"},
+            }
+        )
 
     def _save_preferences(self):
         """Save preferences to storage."""
-        try:
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Update metadata
-            self.preferences_data["learning_metadata"]["last_updated"] = time.time()
-
-            with open(self.storage_path, "w") as f:
-                json.dump(self.preferences_data, f, indent=2)
-
-        except Exception as e:
-            logger.error("Failed to save preferences: %s", e)
+        # Update metadata
+        self.preferences_data["learning_metadata"]["last_updated"] = time.time()
+        
+        # Use storage manager for thread-safe, atomic saves
+        if not self.storage_manager.save_json_data(self.storage_path, self.preferences_data):
+            logger.error("Failed to save preferences to %s", self.storage_path)
 
     def _initialize_context_weights(self) -> Dict[str, float]:
         """Initialize weights for different context factors."""
@@ -241,39 +231,31 @@ class ToolEffectivenessModel:
 
     def __init__(self, storage_path: Optional[Path] = None):
         """Initialize effectiveness model with optional storage path."""
-        self.storage_path = storage_path or Path(".turboprop/effectiveness.json")
+        self.storage_manager = get_storage_manager()
+        self.storage_path = storage_path or self.storage_manager.get_effectiveness_data_path()
         self.effectiveness_data = self._load_effectiveness()
 
         logger.debug("Initialized Tool Effectiveness Model")
 
     def _load_effectiveness(self) -> Dict[str, Any]:
         """Load effectiveness data from storage."""
-        try:
-            if self.storage_path.exists():
-                with open(self.storage_path, "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.warning("Failed to load effectiveness data: %s", e)
-
-        return {
-            "tool_effectiveness": {},
-            "context_effectiveness": {},
-            "learning_metadata": {"total_updates": 0, "last_updated": time.time(), "model_version": "1.0"},
-        }
+        return self.storage_manager.load_json_data(
+            self.storage_path,
+            default={
+                "tool_effectiveness": {},
+                "context_effectiveness": {},
+                "learning_metadata": {"total_updates": 0, "last_updated": time.time(), "model_version": "1.0"},
+            }
+        )
 
     def _save_effectiveness(self):
         """Save effectiveness data to storage."""
-        try:
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Update metadata
-            self.effectiveness_data["learning_metadata"]["last_updated"] = time.time()
-
-            with open(self.storage_path, "w") as f:
-                json.dump(self.effectiveness_data, f, indent=2)
-
-        except Exception as e:
-            logger.error("Failed to save effectiveness data: %s", e)
+        # Update metadata
+        self.effectiveness_data["learning_metadata"]["last_updated"] = time.time()
+        
+        # Use storage manager for thread-safe, atomic saves
+        if not self.storage_manager.save_json_data(self.storage_path, self.effectiveness_data):
+            logger.error("Failed to save effectiveness data to %s", self.storage_path)
 
     def update_effectiveness(self, tool_id: str, context: Dict[str, Any], success: bool, metrics: Dict[str, float]):
         """Update tool effectiveness based on outcome."""
@@ -420,25 +402,22 @@ class ContextPatternModel:
 
     def __init__(self, storage_path: Optional[Path] = None):
         """Initialize context pattern model."""
-        self.storage_path = storage_path or Path(".turboprop/context_patterns.json")
+        self.storage_manager = get_storage_manager()
+        self.storage_path = storage_path or self.storage_manager.get_custom_file_path("context_patterns.json")
         self.pattern_data = self._load_patterns()
 
         logger.debug("Initialized Context Pattern Model")
 
     def _load_patterns(self) -> Dict[str, Any]:
         """Load pattern data from storage."""
-        try:
-            if self.storage_path.exists():
-                with open(self.storage_path, "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.warning("Failed to load pattern data: %s", e)
-
-        return {
-            "context_patterns": {},
-            "pattern_outcomes": {},
-            "learning_metadata": {"total_patterns": 0, "last_updated": time.time()},
-        }
+        return self.storage_manager.load_json_data(
+            self.storage_path,
+            default={
+                "context_patterns": {},
+                "pattern_outcomes": {},
+                "learning_metadata": {"total_patterns": 0, "last_updated": time.time()},
+            }
+        )
 
     def update_context_patterns(self, context: Dict[str, Any], tool: str, outcome: bool):
         """Update context patterns with outcome data."""

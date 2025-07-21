@@ -10,13 +10,15 @@ improvement. It maintains selection history and calculates effectiveness scores.
 import json
 import statistics
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional
 
 from logging_config import get_logger
 from proactive_suggestion_engine import ProactiveSuggestion
+from automatic_selection_config import CONFIG
+from storage_manager import get_storage_manager
 
 logger = get_logger(__name__)
 
@@ -248,7 +250,8 @@ class SelectionEffectivenessTracker:
 
     def __init__(self, storage_path: Optional[Path] = None):
         """Initialize effectiveness tracker with optional storage path."""
-        self.storage_path = storage_path or Path(".turboprop/selection_effectiveness.json")
+        self.storage_manager = get_storage_manager()
+        self.storage_path = storage_path or self.storage_manager.get_effectiveness_data_path()
         self.selection_history: List[SelectionEvent] = []
         self.effectiveness_metrics: Dict[str, ToolMetrics] = {}
         self.performance_analyzer = PerformanceAnalyzer()
@@ -256,12 +259,15 @@ class SelectionEffectivenessTracker:
         # Load existing data
         self._load_tracking_data()
 
-        # Configuration
-        self.max_history_size = 1000
+        # Configuration from centralized config
+        memory_config = CONFIG["memory_config"]
+        self.max_history_size = memory_config["max_history_size"]
+        self.cleanup_threshold = memory_config["history_cleanup_threshold"] 
+        self.batch_size = memory_config["batch_size"]
         self.save_frequency = 25  # Save every N events
         self.event_counter = 0
 
-        logger.info("Initialized Selection Effectiveness Tracker")
+        logger.info("Initialized Selection Effectiveness Tracker with max_history_size=%d", self.max_history_size)
 
     def track_selection_event(
         self,
@@ -291,9 +297,8 @@ class SelectionEffectivenessTracker:
             # Update tool metrics
             self._update_tool_metrics_from_suggestions(suggestions)
 
-            # Maintain history size
-            if len(self.selection_history) > self.max_history_size:
-                self.selection_history = self.selection_history[-self.max_history_size :]
+            # Maintain history size with configurable cleanup
+            self._cleanup_history_if_needed()
 
             # Periodic save
             self.event_counter += 1
@@ -601,38 +606,87 @@ class SelectionEffectivenessTracker:
         except Exception as e:
             logger.warning("Failed to load tracking data: %s", e)
 
+    def _cleanup_history_if_needed(self):
+        """Clean up history when size limits are exceeded."""
+        current_size = len(self.selection_history)
+        
+        if current_size <= self.max_history_size:
+            return  # No cleanup needed
+        
+        # Aggressive cleanup when threshold is exceeded
+        if current_size >= self.cleanup_threshold:
+            # Keep only the most recent events up to max_history_size
+            events_to_keep = self.max_history_size
+            events_to_remove = current_size - events_to_keep
+            
+            logger.info(
+                "Cleaning up history: removing %d old events, keeping %d recent events",
+                events_to_remove,
+                events_to_keep
+            )
+            
+            self.selection_history = self.selection_history[-events_to_keep:]
+            
+        else:
+            # Gentle cleanup - remove a batch of old events
+            events_to_remove = min(self.batch_size, current_size - self.max_history_size)
+            
+            logger.debug(
+                "Gentle cleanup: removing %d old events from history of %d",
+                events_to_remove,
+                current_size
+            )
+            
+            self.selection_history = self.selection_history[events_to_remove:]
+
+    def get_memory_usage_stats(self) -> Dict[str, Any]:
+        """Get current memory usage statistics."""
+        current_size = len(self.selection_history)
+        metrics_count = len(self.effectiveness_metrics)
+        
+        # Calculate approximate memory usage
+        estimated_bytes = current_size * 500  # Rough estimate per event
+        estimated_mb = estimated_bytes / (1024 * 1024)
+        
+        return {
+            "current_history_size": current_size,
+            "max_history_size": self.max_history_size,
+            "cleanup_threshold": self.cleanup_threshold,
+            "total_metrics": metrics_count,
+            "memory_utilization_percent": round((current_size / self.max_history_size) * 100, 1),
+            "estimated_memory_mb": round(estimated_mb, 2),
+            "cleanup_needed": current_size > self.max_history_size,
+            "aggressive_cleanup_needed": current_size >= self.cleanup_threshold,
+        }
+
     def _save_tracking_data(self):
         """Save tracking data to storage."""
-        try:
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        # Prepare data for JSON serialization
+        data = {
+            "selection_history": [],
+            "effectiveness_metrics": {},
+            "metadata": {"last_saved": time.time(), "version": "1.0", "total_events": len(self.selection_history)},
+        }
 
-            # Prepare data for JSON serialization
-            data = {
-                "selection_history": [],
-                "effectiveness_metrics": {},
-                "metadata": {"last_saved": time.time(), "version": "1.0", "total_events": len(self.selection_history)},
-            }
+        # Convert selection history - limit to prevent huge files
+        events_to_save = min(500, len(self.selection_history))  # Save last 500 events
+        for event in self.selection_history[-events_to_save:]:
+            event_dict = asdict(event)
+            # Convert suggestions to dicts
+            event_dict["suggestions"] = [asdict(s) for s in event.suggestions]
+            data["selection_history"].append(event_dict)
 
-            # Convert selection history
-            for event in self.selection_history[-500:]:  # Save last 500 events
-                event_dict = asdict(event)
-                # Convert suggestions to dicts
-                event_dict["suggestions"] = [asdict(s) for s in event.suggestions]
-                data["selection_history"].append(event_dict)
+        # Convert effectiveness metrics
+        for tool_id, metrics in self.effectiveness_metrics.items():
+            metrics_dict = asdict(metrics)
+            # Convert deques to lists for JSON
+            for field_name, field_value in metrics_dict.items():
+                if isinstance(field_value, deque):
+                    metrics_dict[field_name] = list(field_value)
+            data["effectiveness_metrics"][tool_id] = metrics_dict
 
-            # Convert effectiveness metrics
-            for tool_id, metrics in self.effectiveness_metrics.items():
-                metrics_dict = asdict(metrics)
-                # Convert deques to lists for JSON
-                for field_name, field_value in metrics_dict.items():
-                    if isinstance(field_value, deque):
-                        metrics_dict[field_name] = list(field_value)
-                data["effectiveness_metrics"][tool_id] = metrics_dict
-
-            with open(self.storage_path, "w") as f:
-                json.dump(data, f, indent=2)
-
+        # Use storage manager for thread-safe, atomic saves
+        if self.storage_manager.save_json_data(self.storage_path, data):
             logger.debug("Saved tracking data to %s", self.storage_path)
-
-        except Exception as e:
-            logger.error("Failed to save tracking data: %s", e)
+        else:
+            logger.error("Failed to save tracking data to %s", self.storage_path)

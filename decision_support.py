@@ -346,14 +346,21 @@ class DecisionSupport:
 
                 tool_scores[tool_id] = weighted_score
 
-        # Find best tool
-        if not tool_scores:
-            return (
-                comparison_result.compared_tools[0] if comparison_result.compared_tools else "unknown",
-                SCORE_LIMITS["default_score"],
-            )
+        # Filter tools that meet threshold requirement
+        qualifying_tools = {tool_id: score for tool_id, score in tool_scores.items() if score >= threshold}
 
-        recommended_tool = max(tool_scores.keys(), key=lambda t: tool_scores[t])
+        # Find best tool
+        if not qualifying_tools:
+            # No tools meet threshold, fall back to best available tool if any
+            if tool_scores:
+                recommended_tool = max(tool_scores.keys(), key=lambda t: tool_scores[t])
+            else:
+                return (
+                    comparison_result.compared_tools[0] if comparison_result.compared_tools else "unknown",
+                    SCORE_LIMITS["default_score"],
+                )
+        else:
+            recommended_tool = max(qualifying_tools.keys(), key=lambda t: qualifying_tools[t])
         confidence = min(
             tool_scores[recommended_tool] * CONFIDENCE_FACTORS["confidence_boost"],
             SCORE_LIMITS["max_score"],

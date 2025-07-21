@@ -7,10 +7,8 @@ context analysis, and learned preferences. It provides intelligent
 recommendations to improve tool selection efficiency.
 """
 
-import json
 import time
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
