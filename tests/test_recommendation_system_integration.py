@@ -108,7 +108,10 @@ class TestRecommendationSystemIntegration:
     def test_complete_recommendation_flow_complex(self, complete_system):
         """Test the complete recommendation flow with complex ML task."""
         request = RecommendationRequest(
-            task_description="Build a machine learning pipeline with data validation, model training, and performance monitoring",
+            task_description=(
+                "Build a machine learning pipeline with data validation, "
+                "model training, and performance monitoring"
+            ),
             max_recommendations=5,
             include_alternatives=True,
             include_explanations=True,
@@ -149,7 +152,7 @@ class TestRecommendationSystemIntegration:
         # Verify environmental constraints
         assert response.context.environmental_constraints.cpu_cores == 16
         assert response.context.environmental_constraints.memory_gb == 32
-        assert response.context.environmental_constraints.gpu_available == True
+        assert response.context.environmental_constraints.gpu_available is True
 
     def test_end_to_end_performance(self, complete_system):
         """Test end-to-end performance and caching."""

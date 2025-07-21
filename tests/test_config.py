@@ -459,7 +459,10 @@ class TestEnvironmentVariableHandling:
                     # (to avoid isinstance issues with reloaded modules)
                     assert (
                         type(e).__name__ == "ConfigValidationError"
-                    ), f"Expected ConfigValidationError, got {type(e).__name__} for {env_var}={invalid_value}"  # noqa: E501
+                    ), (
+                        f"Expected ConfigValidationError, got {type(e).__name__} "
+                        f"for {env_var}={invalid_value}"
+                    )
 
 
 class TestBoundaryConditions:

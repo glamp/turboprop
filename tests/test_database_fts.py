@@ -13,7 +13,7 @@ This module tests:
 
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import duckdb
 import pytest
@@ -298,6 +298,7 @@ class TestFTSSearch:
 
             # Create FTS index if possible
             fts_created = self.db_manager.create_fts_index("code_files")
+            assert isinstance(fts_created, bool)
 
             # Test FTS search
             results = self.db_manager.search_full_text("authenticate", limit=5)
@@ -435,7 +436,8 @@ class TestFTSMigration:
                     )
                 """
                 )
-            except:
+            except duckdb.Error:
+                # Table might already exist or creation might fail - this is expected
                 pass
 
             # Test migration
@@ -544,7 +546,6 @@ class TestFTSErrorHandling:
     def test_concurrent_fts_operations(self):
         """Test FTS operations under concurrent access."""
         import threading
-        import time
 
         with self.db_manager.get_connection() as conn:
             # Setup test data

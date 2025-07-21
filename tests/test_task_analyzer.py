@@ -46,7 +46,10 @@ class TestTaskAnalyzer:
 
     def test_analyze_complex_data_processing_task(self, task_analyzer):
         """Test analysis of a complex data processing task."""
-        task_description = "Analyze large dataset to identify anomalies using machine learning and generate detailed report with visualizations"
+        task_description = (
+            "Analyze large dataset to identify anomalies using machine learning "
+            "and generate detailed report with visualizations"
+        )
 
         result = task_analyzer.analyze_task(task_description)
 

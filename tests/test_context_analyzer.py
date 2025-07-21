@@ -125,7 +125,7 @@ class TestContextAnalyzer:
         assert isinstance(env_constraints, EnvironmentalConstraints)
         assert env_constraints.cpu_cores == 8
         assert env_constraints.memory_gb == 16
-        assert env_constraints.gpu_available == False
+        assert env_constraints.gpu_available is False
         assert env_constraints.operating_system == "linux"
         assert len(env_constraints.security_requirements) > 0
         assert len(env_constraints.resource_limits) > 0
@@ -319,8 +319,8 @@ class TestEnvironmentAnalyzer:
         capacity = env_analyzer.assess_compute_capacity(system_info)
 
         assert capacity["level"] == "high"
-        assert capacity["supports_ml"] == True
-        assert capacity["parallel_processing"] == True
+        assert capacity["supports_ml"] is True
+        assert capacity["parallel_processing"] is True
 
     def test_assess_compute_capacity_limited(self, env_analyzer):
         """Test compute capacity assessment for limited systems."""
@@ -329,8 +329,8 @@ class TestEnvironmentAnalyzer:
         capacity = env_analyzer.assess_compute_capacity(system_info)
 
         assert capacity["level"] == "limited"
-        assert capacity["supports_ml"] == False
-        assert capacity["memory_constraints"] == True
+        assert capacity["supports_ml"] is False
+        assert capacity["memory_constraints"] is True
 
     def test_analyze_security_requirements_high_security(self, env_analyzer):
         """Test security requirement analysis for high-security environments."""
@@ -343,8 +343,8 @@ class TestEnvironmentAnalyzer:
         analysis = env_analyzer.analyze_security_requirements(security_info)
 
         assert analysis["security_level"] == "high"
-        assert analysis["encryption_required"] == True
-        assert analysis["audit_required"] == True
+        assert analysis["encryption_required"] is True
+        assert analysis["audit_required"] is True
         assert len(analysis["restricted_operations"]) > 0
 
     def test_analyze_security_requirements_standard(self, env_analyzer):
@@ -372,8 +372,8 @@ class TestEnvironmentAnalyzer:
         evaluation = env_analyzer.evaluate_resource_constraints(constraints)
 
         assert evaluation["constraint_level"] == "strict"
-        assert evaluation["memory_limited"] == True
-        assert evaluation["cpu_limited"] == True
+        assert evaluation["memory_limited"] is True
+        assert evaluation["cpu_limited"] is True
 
 
 class TestContextDataTypes:

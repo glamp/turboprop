@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from search_operations import format_hybrid_search_results
 from search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
 
 # Test constants
@@ -26,11 +27,6 @@ class TestSearchResultFormattingWithDecimalScores:
 
     def test_search_result_formatting_with_decimal_scores(self):
         """Test that search result formatting works with Decimal scores."""
-        from decimal import Decimal
-
-        from search_operations import format_hybrid_search_results
-        from search_result_types import CodeSearchResult, CodeSnippet
-
         # Create test results with Decimal scores
         snippet = CodeSnippet(text="test code", start_line=5, end_line=8)
         results = [
@@ -46,11 +42,6 @@ class TestSearchResultFormattingWithDecimalScores:
 
     def test_format_hybrid_search_results_mixed_types(self):
         """Test formatting with mixed Decimal and float similarity scores."""
-        from decimal import Decimal
-
-        from search_operations import format_hybrid_search_results
-        from search_result_types import CodeSearchResult, CodeSnippet
-
         snippet1 = CodeSnippet(text="def function1():", start_line=1, end_line=2)
         snippet2 = CodeSnippet(text="def function2():", start_line=5, end_line=6)
         snippet3 = CodeSnippet(text="class MyClass:", start_line=10, end_line=12)
@@ -75,10 +66,6 @@ class TestSearchResultFormattingWithDecimalScores:
 
     def test_format_hybrid_search_results_edge_case_scores(self):
         """Test formatting with edge case similarity scores."""
-        from decimal import Decimal
-
-        from search_operations import format_hybrid_search_results
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
 
@@ -101,9 +88,6 @@ class TestDatabaseResultTypes:
 
     def test_code_search_result_from_simulated_duckdb_decimal(self):
         """Test creating CodeSearchResult from simulated DuckDB Decimal results."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         # Simulate what DuckDB might return (Decimal for calculated similarity)
         duckdb_similarity = Decimal("0.8547362")  # High precision from database calculation
@@ -129,9 +113,6 @@ class TestDatabaseResultTypes:
 
     def test_batch_results_with_mixed_database_types(self):
         """Test processing batch results with mixed database types."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         # Simulate a batch of results from database with different types
         batch_data = [
@@ -160,9 +141,6 @@ class TestHybridSearchIntegration:
 
     def test_hybrid_search_result_ranking_with_decimals(self):
         """Test that ranking works correctly with Decimal similarity scores."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         # Create results with Decimal scores that need ranking
         results = [
@@ -196,9 +174,6 @@ class TestHybridSearchIntegration:
 
     def test_confidence_level_assignment_with_decimal_scores(self):
         """Test that confidence level assignment works with Decimal scores."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
 
@@ -222,9 +197,6 @@ class TestErrorHandlingAndEdgeCases:
     def test_serialization_with_converted_scores(self):
         """Test that serialization works correctly after type conversion."""
         import json
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test serialization", start_line=10, end_line=12)
         result = CodeSearchResult(
@@ -248,9 +220,6 @@ class TestErrorHandlingAndEdgeCases:
 
     def test_legacy_tuple_conversion_with_decimal_input(self):
         """Test legacy tuple conversion handles Decimal similarity scores."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="legacy test", start_line=5, end_line=7)
         result = CodeSearchResult(file_path="legacy.py", snippet=snippet, similarity_score=Decimal("0.83"))
@@ -266,9 +235,6 @@ class TestErrorHandlingAndEdgeCases:
 
     def test_round_trip_legacy_conversion_with_decimals(self):
         """Test round-trip conversion through legacy format preserves data."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         # Start with Decimal similarity score
         original_snippet = CodeSnippet(text="round trip test", start_line=1, end_line=3)
@@ -291,10 +257,6 @@ class TestConcurrencyAndBatchProcessing:
 
     def test_batch_processing_performance(self):
         """Test performance of type conversion with large batches."""
-        import time
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         # Create large batch of results with Decimal scores
         batch_size = 500
@@ -322,8 +284,6 @@ class TestConcurrencyAndBatchProcessing:
     def test_memory_usage_with_large_decimal_conversions(self):
         """Test that type conversion doesn't cause memory leaks with many conversions."""
         import gc
-        from decimal import Decimal
-
         from search_result_types import _ensure_float
 
         # Test many conversions in sequence
@@ -348,7 +308,6 @@ class TestRegressionSafety:
 
     def test_existing_float_workflows_unchanged(self):
         """Test that existing workflows with float scores continue to work."""
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         # Test traditional float-based workflow
         snippet = CodeSnippet(text="traditional workflow", start_line=1, end_line=1)
@@ -367,9 +326,6 @@ class TestRegressionSafety:
 
     def test_metadata_and_context_preservation(self):
         """Test that metadata and context are preserved during type conversion."""
-        from decimal import Decimal
-
-        from search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(
             text="preserved context test",

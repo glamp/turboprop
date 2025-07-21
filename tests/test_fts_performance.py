@@ -20,8 +20,7 @@ from unittest.mock import Mock
 import pytest
 
 from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from hybrid_search import HybridSearchEngine, SearchMode
+from hybrid_search import HybridSearchEngine
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -61,11 +60,26 @@ class TestFTSIndexingPerformance:
             # Generate realistic code content
             dataset_size = 50  # Smaller dataset for unit test (was 500)
             content_templates = [
-                "def function_{i}():\n    '''Function {i} documentation.'''\n    data = load_data_{i}()\n    return process_{i}(data)",
-                "class Class_{i}:\n    def __init__(self):\n        self.value = {i}\n    def method_{i}(self):\n        return self.value * {i}",
-                "# Configuration file {i}\nconfig = {{\n    'setting_{i}': '{i}',\n    'enabled': True,\n    'value': {i}\n}}",
-                "import sys\nimport os\n\n# Module {i}\ndef main_{i}():\n    print(f'Running module {i}')\n    return {i}",
-                "/* CSS Style {i} */\n.class_{i} {{\n    color: #{i:06d};\n    font-size: {i}px;\n    margin: {i}px;\n}}",
+                (
+                    "def function_{i}():\n    '''Function {i} documentation.'''\n    "
+                    "data = load_data_{i}()\n    return process_{i}(data)"
+                ),
+                (
+                    "class Class_{i}:\n    def __init__(self):\n        self.value = {i}\n    "
+                    "def method_{i}(self):\n        return self.value * {i}"
+                ),
+                (
+                    "# Configuration file {i}\nconfig = {{\n    'setting_{i}': '{i}',\n    "
+                    "'enabled': True,\n    'value': {i}\n}}"
+                ),
+                (
+                    "import sys\nimport os\n\n# Module {i}\ndef main_{i}():\n    "
+                    "print(f'Running module {i}')\n    return {i}"
+                ),
+                (
+                    "/* CSS Style {i} */\n.class_{i} {{\n    color: #{i:06d};\n    "
+                    "font-size: {i}px;\n    margin: {i}px;\n}}"
+                ),
             ]
 
             # Insert data in batches for better performance
@@ -134,26 +148,26 @@ class TestFTSIndexingPerformance:
                     elif i % 4 == 1:
                         content = (
                             f"class LargeClass_{i}:\n"
-                            + f"    def __init__(self):\n"
-                            + f"        self.items = []\n"
+                            + "    def __init__(self):\n"
+                            + "        self.items = []\n"
                             + f"    def add_item_{i}(self, item):\n"
-                            + f"        self.items.append(item)\n"
+                            + "        self.items.append(item)\n"
                             + f"    def get_count_{i}(self):\n"
-                            + f"        return len(self.items)"
+                            + "        return len(self.items)"
                         )
                     elif i % 4 == 2:
                         content = (
                             f"# Configuration module {i}\n"
-                            + f"settings = {{\n"
+                            + "settings = {\n"
                             + f"    'database_url': 'postgres://localhost/{i}',\n"
-                            + f"    'debug': True,\n"
+                            + "    'debug': True,\n"
                             + f"    'max_connections': {i},\n"
                             + f"    'timeout': {i * 10}\n"
-                            + f"}}"
+                            + "}"
                         )
                     else:
                         content = (
-                            f"import os\nimport sys\nimport json\n\n"
+                            "import os\nimport sys\nimport json\n\n"
                             + f"def utility_function_{i}(data):\n"
                             + f"    processed = preprocess_{i}(data)\n"
                             + f"    result = calculate_{i}(processed)\n"
@@ -364,7 +378,7 @@ class {term.title()}Handler_{i}:
                 avg_fts_time = sum(fts_times) / len(fts_times)
                 avg_like_time = sum(like_times) / len(like_times)
 
-                print(f"\n✓ Average search performance:")
+                print("\n✓ Average search performance:")
                 print(f"  FTS: {avg_fts_time:.4f}s")
                 print(f"  LIKE: {avg_like_time:.4f}s")
 
@@ -434,7 +448,10 @@ class {term.title()}Handler_{i}:
                     # Time increase should be less than proportional to limit increase
                     assert (
                         time_increase_ratio < limit_increase_ratio * 2
-                    ), f"Search time scaling poor: {time_increase_ratio:.2f}x time for {limit_increase_ratio:.2f}x limit"
+                    ), (
+                        f"Search time scaling poor: {time_increase_ratio:.2f}x time "
+                        f"for {limit_increase_ratio:.2f}x limit"
+                    )
 
                 print("✓ FTS search scalability test passed")
 
@@ -473,7 +490,7 @@ class {term.title()}Handler_{i}:
                     try:
                         # Each thread gets its own database manager to avoid connection conflicts
                         thread_db_manager = DatabaseManager(self.db_path)
-                        
+
                         start_time = time.time()
                         results = thread_db_manager.search_full_text("concurrent", limit=10)
                         search_time = time.time() - start_time
@@ -513,14 +530,16 @@ class {term.title()}Handler_{i}:
                 print(f"Total time: {total_time:.3f}s")
                 print(f"Successful searches: {len(search_results)}")
                 print(f"Search errors: {len(search_errors)}")
-                
+
                 # Log any errors for debugging
                 for worker_id, error in search_errors:
                     print(f"  Worker {worker_id} error: {error}")
 
                 # Performance assertions - be more tolerant of concurrency issues
                 # Allow for some errors in concurrent searches due to database locking
-                assert len(search_errors) <= 2, f"Too many errors in concurrent searches: {len(search_errors)} errors out of {num_threads} threads"
+                assert (
+                    len(search_errors) <= 2
+                ), f"Too many errors in concurrent searches: {len(search_errors)} errors out of {num_threads} threads"
                 assert len(search_results) >= 1, "At least one search should succeed in concurrent test"
 
                 if search_results:
@@ -529,7 +548,9 @@ class {term.title()}Handler_{i}:
 
                     # Concurrent searches may have database lock contention, allow more time
                     # Note: Database locking can cause delays in concurrent access
-                    assert avg_search_time < 12.0, f"Concurrent search too slow: {avg_search_time:.4f}s (considering database lock timeouts)"
+                    assert (
+                        avg_search_time < 12.0
+                    ), f"Concurrent search too slow: {avg_search_time:.4f}s (considering database lock timeouts)"
 
                 print("✓ Concurrent FTS search performance test passed")
 
@@ -606,7 +627,7 @@ class TestFTSMemoryUsage:
             gc.collect()
             final_memory = process.memory_info().rss / 1024 / 1024
 
-            print(f"\nMemory usage analysis:")
+            print("\nMemory usage analysis:")
             print(f"Initial: {initial_memory:.1f}MB")
             print(f"After data: {pre_index_memory:.1f}MB (+{pre_index_memory - initial_memory:.1f}MB)")
             print(f"After index: {post_index_memory:.1f}MB (+{post_index_memory - pre_index_memory:.1f}MB)")
@@ -675,7 +696,7 @@ class TestFTSMemoryUsage:
         final_memory = process.memory_info().rss / 1024 / 1024
         memory_increase = final_memory - initial_memory
 
-        print(f"\nMemory cleanup test:")
+        print("\nMemory cleanup test:")
         print(f"Initial: {initial_memory:.1f}MB")
         print(f"Final: {final_memory:.1f}MB")
         print(f"Increase: {memory_increase:.1f}MB")
@@ -778,7 +799,11 @@ class TestFTSPerformanceRegression:
             (
                 "large_files",
                 20,
-                "Very long content with extensive documentation and detailed implementation that spans multiple lines and includes various programming constructs",
+                (
+                    "Very long content with extensive documentation and detailed "
+                    "implementation that spans multiple lines and includes various "
+                    "programming constructs"
+                ),
             ),
         ]
 
@@ -803,7 +828,10 @@ class TestFTSPerformanceRegression:
 
                     # Insert scenario-specific data
                     for i in range(file_count):
-                        content = f"def {scenario_name}_function_{i}():\n    # {content_template}\n    return process_{scenario_name}_{i}()"
+                        content = (
+                            f"def {scenario_name}_function_{i}():\n    # {content_template}\n    "
+                            f"return process_{scenario_name}_{i}()"
+                        )
                         conn.execute(
                             "INSERT INTO code_files VALUES (?, ?, ?)", (str(i), f"{scenario_name}_{i}.py", content)
                         )

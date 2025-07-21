@@ -441,7 +441,9 @@ Confidence: {self._colorize(confidence_text, 'info')}
         trade_off_name = trade_off.trade_off_name.replace("_", " ").title()
         header = f"""
 {self._format_subheader(f"Trade-off #{index}: {trade_off_name}")}
-Magnitude: {trade_off.magnitude:.1%} | Importance: {self._colorize(trade_off.decision_importance.title(), importance_color)}
+Magnitude: {trade_off.magnitude:.1%} | Importance: {self._colorize(
+    trade_off.decision_importance.title(), importance_color
+)}
 Tools Involved: {', '.join(trade_off.tools_involved)}
 """
         sections.append(header.strip())

@@ -376,8 +376,8 @@ class TestRecommendationRequestTypes:
         minimal_request = RecommendationRequest(task_description="Test task")
 
         assert minimal_request.max_recommendations == 5  # Should have reasonable default
-        assert minimal_request.include_alternatives == True  # Should default to True
-        assert minimal_request.include_explanations == False  # Should default to False
+        assert minimal_request.include_alternatives is True  # Should default to True
+        assert minimal_request.include_explanations is False  # Should default to False
 
     def test_tool_sequence_request_creation(self):
         """Test tool sequence request creation."""

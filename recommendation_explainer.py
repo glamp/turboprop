@@ -120,10 +120,16 @@ class ExplanationGenerator:
 
         if match_score >= self.capability_thresholds["excellent"]:
             common_caps = ", ".join(list(common)[:3])
-            return f"Excellent capability match - tool provides {len(common)}/{len(required_set)} required capabilities including {common_caps}."
+            return (
+                f"Excellent capability match - tool provides {len(common)}/{len(required_set)} "
+                f"required capabilities including {common_caps}."
+            )
         elif match_score >= self.capability_thresholds["good"]:
             match_ratio = f"{len(common)}/{len(required_set)}"
-            return f"Good capability match - tool covers most required functionality with {match_ratio} matching capabilities."
+            return (
+                f"Good capability match - tool covers most required functionality "
+                f"with {match_ratio} matching capabilities."
+            )
         elif match_score >= self.capability_thresholds["adequate"]:
             missing_str = f", missing {', '.join(list(missing)[:2])}" if missing else ""
             match_ratio = f"{len(common)}/{len(required_set)}"
@@ -131,7 +137,10 @@ class ExplanationGenerator:
         else:
             match_ratio = f"{len(common)}/{len(required_set)}"
             missing_features = ", ".join(list(missing)[:3])
-            return f"Limited capability match - tool provides only {match_ratio} required capabilities. Missing key features: {missing_features}."
+            return (
+                f"Limited capability match - tool provides only {match_ratio} required "
+                f"capabilities. Missing key features: {missing_features}."
+            )
 
     def generate_complexity_explanation(
         self, task_complexity: str, tool_complexity: str, alignment_score: float
@@ -169,11 +178,20 @@ class ExplanationGenerator:
         required_params = sum(1 for p in tool_parameters.values() if p.get("required", False))
 
         if required_params == 0:
-            return f"Excellent parameter compatibility - tool has {param_count} optional parameters with sensible defaults."
+            return (
+                f"Excellent parameter compatibility - tool has {param_count} optional "
+                f"parameters with sensible defaults."
+            )
         elif required_params <= 2:
-            return f"Good parameter compatibility - tool requires only {required_params} parameters with {param_count - required_params} optional configurations."
+            return (
+                f"Good parameter compatibility - tool requires only {required_params} "
+                f"parameters with {param_count - required_params} optional configurations."
+            )
         else:
-            return f"Moderate parameter complexity - tool requires {required_params} parameters and offers {param_count - required_params} optional settings."
+            return (
+                f"Moderate parameter complexity - tool requires {required_params} "
+                f"parameters and offers {param_count - required_params} optional settings."
+            )
 
     def generate_confidence_explanation(
         self, recommendation_score: float, task_confidence: float, alignment_factors: Dict[str, float]
@@ -603,7 +621,10 @@ class RecommendationExplainer:
         self, primary: "ToolRecommendation", alternatives: List["ToolRecommendation"]
     ) -> str:
         """Generate summary for alternative comparison."""
-        return f"{primary.tool.name} recommended as primary choice, with {len(alternatives)} viable alternatives for different scenarios."
+        return (
+            f"{primary.tool.name} recommended as primary choice, with {len(alternatives)} "
+            f"viable alternatives for different scenarios."
+        )
 
     def _generate_configuration_suggestions(self, tool_metadata: Dict, user_skill: str) -> List[str]:
         """Generate configuration suggestions."""

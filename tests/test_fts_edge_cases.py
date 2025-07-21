@@ -22,7 +22,6 @@ import duckdb
 import pytest
 
 from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
 from hybrid_search import HybridSearchEngine, SearchMode
 
 
@@ -388,6 +387,7 @@ class TestFTSSpecialCharacters:
 
             # Create FTS index
             result = self.db_manager.create_fts_index("code_files")
+            assert isinstance(result, bool)
 
             # Test searches for various special character patterns
             search_tests = [
@@ -519,7 +519,7 @@ class TestFTSMigrationCompatibility:
             try:
                 conn.execute("CREATE TABLE code_files_fts_old (id VARCHAR, content_tsvector TEXT)")
                 conn.execute("CREATE TABLE fts_metadata_old (table_name VARCHAR, created_at TIMESTAMP)")
-            except:
+            except duckdb.Error:
                 pass  # Tables might not be creatable in current setup
 
             # Test migration
@@ -728,7 +728,8 @@ class TestFTSConcurrencyAndThreadSafety:
             finally:
                 try:
                     db_manager.cleanup()
-                except:
+                except Exception:
+                    # Ignore cleanup errors to prevent masking the original exception
                     pass
 
         # Start concurrent operations
