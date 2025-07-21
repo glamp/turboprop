@@ -7,13 +7,10 @@ across multiple dimensions including functionality, usability, reliability,
 performance, compatibility, and documentation quality.
 """
 
-import math
 import re
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from comparison_constants import (
-    CATEGORY_BONUSES,
-    CONFIDENCE_FACTORS,
     DOCUMENTATION_SCORING,
     FUNCTIONALITY_CONFIG,
     METRIC_WEIGHTS,

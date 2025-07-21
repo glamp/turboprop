@@ -11,6 +11,7 @@ import json
 import textwrap
 from typing import Any, Dict, List, Optional
 
+from comparison_types import ToolComparisonResult
 from decision_support import SelectionGuidance, TradeOffAnalysis
 from logging_config import get_logger
 
@@ -56,7 +57,7 @@ class ComparisonFormatter:
         self.config = FORMATTING_CONFIG.copy()
         logger.info(f"Comparison formatter initialized (colors: {use_colors})")
 
-    def format_comparison_table(self, comparison_result: "ToolComparisonResult", format_type: str = "detailed") -> str:
+    def format_comparison_table(self, comparison_result: ToolComparisonResult, format_type: str = "detailed") -> str:
         """
         Format comparison results as a readable table.
 
@@ -237,7 +238,7 @@ Confidence: {self._colorize(confidence_text, 'info')}
             logger.error(f"Error formatting alternative analysis: {e}")
             return f"Error formatting alternative analysis: {str(e)}"
 
-    def format_json_output(self, comparison_result: "ToolComparisonResult") -> str:
+    def format_json_output(self, comparison_result: ToolComparisonResult) -> str:
         """
         Format comparison results as structured JSON.
 
@@ -265,7 +266,7 @@ Confidence: {self._colorize(confidence_text, 'info')}
     def _build_formatted_sections(
         self,
         title: str,
-        comparison_result: "ToolComparisonResult",
+        comparison_result: ToolComparisonResult,
         include_tools: bool = True,
         include_full_matrix: bool = True,
         include_ranking: bool = True,
@@ -336,11 +337,11 @@ Confidence: {self._colorize(confidence_text, 'info')}
 
         return "\n\n".join(sections)
 
-    def _format_detailed_comparison_table(self, comparison_result: "ToolComparisonResult") -> str:
+    def _format_detailed_comparison_table(self, comparison_result: ToolComparisonResult) -> str:
         """Format detailed comparison table with all metrics."""
         return self._build_formatted_sections("DETAILED TOOL COMPARISON", comparison_result)
 
-    def _format_summary_comparison_table(self, comparison_result: "ToolComparisonResult") -> str:
+    def _format_summary_comparison_table(self, comparison_result: ToolComparisonResult) -> str:
         """Format summary comparison table with key metrics only."""
         key_metrics = ["functionality", "usability", "reliability"]
         return self._build_formatted_sections(
@@ -351,7 +352,7 @@ Confidence: {self._colorize(confidence_text, 'info')}
             key_metrics_only=key_metrics,
         )
 
-    def _format_compact_comparison_table(self, comparison_result: "ToolComparisonResult") -> str:
+    def _format_compact_comparison_table(self, comparison_result: ToolComparisonResult) -> str:
         """Format compact comparison table for quick reference."""
         if not comparison_result.overall_ranking:
             return "No comparison data available"
@@ -493,10 +494,14 @@ Complexity: {alternative.complexity_comparison} | Learning Curve: {alternative.l
 {self._colorize("Capability Analysis:", 'info')}
 """
             if alternative.shared_capabilities:
-                capabilities_section += f"Shared: {', '.join(alternative.shared_capabilities[:3])}{'...' if len(alternative.shared_capabilities) > 3 else ''}\n"
+                shared_list = ", ".join(alternative.shared_capabilities[:3])
+                ellipsis = "..." if len(alternative.shared_capabilities) > 3 else ""
+                capabilities_section += f"Shared: {shared_list}{ellipsis}\n"
 
             if alternative.unique_capabilities:
-                capabilities_section += f"Unique: {', '.join(alternative.unique_capabilities[:3])}{'...' if len(alternative.unique_capabilities) > 3 else ''}\n"
+                unique_list = ", ".join(alternative.unique_capabilities[:3])
+                ellipsis = "..." if len(alternative.unique_capabilities) > 3 else ""
+                capabilities_section += f"Unique: {unique_list}{ellipsis}\n"
 
             sections.append(capabilities_section.strip())
 

@@ -8,18 +8,18 @@ awareness, and recommendation algorithms to help users select optimal tools.
 
 Core MCP Tools:
 - recommend_tools_for_task: Main recommendation function with explanations
-- analyze_task_requirements: Deep task analysis and requirement extraction  
+- analyze_task_requirements: Deep task analysis and requirement extraction
 - suggest_tool_alternatives: Alternative tool suggestions with comparisons
 - recommend_tool_sequence: Multi-tool workflow recommendations
 """
 
 import json
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from context_analyzer import EnvironmentalConstraints, TaskContext, UserContext
 from logging_config import get_logger
-from mcp_error_handling import create_validation_error, handle_tool_exception, mcp_tool_exception_handler
+from mcp_error_handling import create_validation_error, handle_tool_exception
 from recommendation_explainer_mcp import (
     AlternativeComparisonFormatter,
     MCPExplanationFormatter,

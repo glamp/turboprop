@@ -7,7 +7,7 @@ relevance scores, and generating explanations for matches.
 """
 
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from logging_config import get_logger
 from mcp_metadata_types import MCPToolMetadata

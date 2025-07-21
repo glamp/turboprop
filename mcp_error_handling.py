@@ -12,7 +12,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import response_config
 
@@ -53,7 +53,7 @@ class MCPError:
     # Additional debugging information
     stack_trace: Optional[str] = None
     request_data: Optional[Dict[str, Any]] = None
-    suggestions: list[str] = None
+    suggestions: List[str] = None
 
     def __post_init__(self):
         if not self.timestamp:
@@ -92,7 +92,7 @@ class MCPErrorHandler:
         self.logger = logging.getLogger(__name__)
 
     def create_validation_error(
-        self, tool_name: str, message: str, context: str = "", suggestions: Optional[list[str]] = None
+        self, tool_name: str, message: str, context: str = "", suggestions: Optional[List[str]] = None
     ) -> MCPError:
         """Create a parameter validation error."""
         return MCPError(
@@ -137,7 +137,7 @@ class MCPErrorHandler:
         return error
 
     def create_business_logic_error(
-        self, tool_name: str, message: str, context: str = "", suggestions: Optional[list[str]] = None
+        self, tool_name: str, message: str, context: str = "", suggestions: Optional[List[str]] = None
     ) -> MCPError:
         """Create a business logic error."""
         return MCPError(
@@ -183,7 +183,7 @@ class MCPErrorHandler:
 
         return error
 
-    def _categorize_exception(self, exception: Exception) -> tuple[ErrorCategory, ErrorSeverity]:
+    def _categorize_exception(self, exception: Exception) -> Tuple[ErrorCategory, ErrorSeverity]:
         """Categorize exception type into category and severity."""
         if isinstance(exception, (ValueError, TypeError)):
             return ErrorCategory.VALIDATION, ErrorSeverity.MEDIUM
@@ -196,7 +196,7 @@ class MCPErrorHandler:
         else:
             return ErrorCategory.SYSTEM, ErrorSeverity.HIGH
 
-    def _get_exception_suggestions(self, exception: Exception) -> list[str]:
+    def _get_exception_suggestions(self, exception: Exception) -> List[str]:
         """Get helpful suggestions based on exception type."""
         suggestions = []
 
@@ -222,7 +222,7 @@ error_handler = MCPErrorHandler()
 
 # Convenience functions for common error patterns
 def create_validation_error(
-    tool_name: str, message: str, context: str = "", suggestions: Optional[list[str]] = None
+    tool_name: str, message: str, context: str = "", suggestions: Optional[List[str]] = None
 ) -> str:
     """Create and return JSON validation error response."""
     error = error_handler.create_validation_error(tool_name, message, context, suggestions)

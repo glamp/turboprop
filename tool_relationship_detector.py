@@ -8,8 +8,8 @@ usage patterns to identify how tools relate to each other.
 """
 
 import re
-from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Set, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Set
 
 from logging_config import get_logger
 from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolId
