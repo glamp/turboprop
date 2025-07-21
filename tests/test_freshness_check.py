@@ -139,8 +139,7 @@ class TestFreshnessCheck:
         files = [self.repo_path / "main.py", self.repo_path / "utils.py"]
         embed_and_store(self.db_manager, self.mock_embedder, files)
 
-        # Wait a bit and then modify a file
-        time.sleep(0.1)
+        # Modify a file (no sleep needed for test)
         (self.repo_path / "main.py").write_text("print('modified')")
 
         has_changed, reason, count = has_repository_changed(self.repo_path, 1024 * 1024, self.db_manager)

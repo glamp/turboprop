@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import duckdb
 
-from .config import EmbeddingConfig
+from .config import config
 from .database_manager import DatabaseManager
 from .exceptions import DatabaseError, DatabaseMigrationError
 from .logging_config import get_logger
@@ -39,7 +39,7 @@ class MCPToolSchema:
             provider VARCHAR,                -- Tool provider/source
             version VARCHAR,                 -- Tool version if available
             category VARCHAR,                -- 'file_ops', 'web', 'analysis', etc.
-            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],           -- Semantic embedding of description
+            embedding DOUBLE[{config.embedding.DIMENSIONS}],           -- Semantic embedding of description
             metadata_json TEXT,              -- Additional metadata as JSON
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,7 +60,7 @@ class MCPToolSchema:
             description TEXT,
             default_value TEXT,
             schema_json TEXT,                -- Full JSON schema
-            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],           -- Embedding of parameter description
+            embedding DOUBLE[{config.embedding.DIMENSIONS}],           -- Embedding of parameter description
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -76,7 +76,7 @@ class MCPToolSchema:
             example_call TEXT,               -- Example tool invocation
             expected_output TEXT,            -- Expected response/output
             context TEXT,                    -- When to use this pattern
-            embedding DOUBLE[{EmbeddingConfig.DIMENSIONS}],           -- Embedding of use case + context
+            embedding DOUBLE[{config.embedding.DIMENSIONS}],           -- Embedding of use case + context
             effectiveness_score FLOAT DEFAULT 0.0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -417,9 +417,9 @@ def validate_tool_metadata(tool_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
     if "embedding" in tool_data and tool_data["embedding"]:
         if not isinstance(tool_data["embedding"], list):
             errors.append("Embedding must be a list of numbers")
-        elif len(tool_data["embedding"]) != EmbeddingConfig.DIMENSIONS:
+        elif len(tool_data["embedding"]) != config.embedding.DIMENSIONS:
             embedding_len = len(tool_data["embedding"])
-            errors.append(f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {embedding_len}")
+            errors.append(f"Embedding must have exactly {config.embedding.DIMENSIONS} dimensions, got {embedding_len}")
 
     # Validate JSON fields
     if "metadata_json" in tool_data and tool_data["metadata_json"]:
@@ -468,8 +468,8 @@ def validate_parameter_metadata(param_data: Dict[str, Any]) -> Tuple[bool, List[
     if "embedding" in param_data and param_data["embedding"]:
         if not isinstance(param_data["embedding"], list):
             errors.append("Embedding must be a list of numbers")
-        elif len(param_data["embedding"]) != EmbeddingConfig.DIMENSIONS:
+        elif len(param_data["embedding"]) != config.embedding.DIMENSIONS:
             embedding_len = len(param_data["embedding"])
-            errors.append(f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {embedding_len}")
+            errors.append(f"Embedding must have exactly {config.embedding.DIMENSIONS} dimensions, got {embedding_len}")
 
     return len(errors) == 0, errors

@@ -1446,7 +1446,7 @@ class DatabaseManager:
         """
         logger.info("Creating MCP tool tables")
 
-        from mcp_tool_schema import MCPToolSchema
+        from .mcp_tool_schema import MCPToolSchema
 
         try:
             with self.get_connection() as conn:

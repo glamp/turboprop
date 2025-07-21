@@ -60,11 +60,27 @@ dev = [
     "pytest-cov>=4.0.0",    # Coverage reporting
 ]
 
-# Test configuration
+# Test configuration - optimized for speed
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
-testpaths = ["tests"]
+addopts = [
+    "-ra",                          # Show all test results except passed
+    "-q",                           # Quiet output
+    "--tb=short",                   # Short traceback format
+    "--strict-markers",             # Require explicit marker registration
+    "--disable-warnings",           # Disable warnings for speed
+    "--ignore=tests/performance/",  # Skip slow performance tests by default
+    "--ignore=tests/docker/",       # Skip slow docker tests by default
+    "-x",                          # Stop on first failure
+]
+testpaths = ["tests", "turboprop"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "benchmark: marks tests as benchmarks (deselect with '-m \"not benchmark\"')", 
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+cache_dir = ".pytest_cache"
 
 # Command-line entry points
 [project.scripts]

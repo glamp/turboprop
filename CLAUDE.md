@@ -174,3 +174,7 @@ turboprop/
 - `uvicorn`: ASGI server for running FastAPI
 
 This system is designed for semantic code discovery - finding code by meaning rather than exact text matches, making it ideal for AI-assisted development workflows. The use of DuckDB for vector operations eliminates the need for separate indexing libraries and provides excellent performance for most use cases.
+
+## Testing Strategies
+
+- Use the tests/docker/run_tests.sh to test packaging and distribution

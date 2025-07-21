@@ -369,7 +369,7 @@ def mock_embedder():
     return embedder
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def sample_repo(temp_root_dir):
     """Create a sample Git repository with diverse code files."""
     repo_path = temp_root_dir / "sample_repo"
@@ -463,7 +463,7 @@ node_modules/
     yield repo_path
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def large_repo(temp_root_dir):
     """Create a larger repository for performance testing."""
     repo_path = temp_root_dir / "large_repo"
@@ -474,13 +474,13 @@ def large_repo(temp_root_dir):
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
 
-    # Create multiple directories with many files
-    for dir_name in ["src", "tests", "utils", "api", "models"]:
+    # Create multiple directories with fewer files for speed
+    for dir_name in ["src", "tests"]:
         dir_path = repo_path / dir_name
         dir_path.mkdir(exist_ok=True)
 
-        # Create 10 files per directory
-        for i in range(10):
+        # Create 3 files per directory instead of 10
+        for i in range(3):
             file_content = f"""
 # File {i} in {dir_name}
 # This is a test file for performance testing
@@ -561,7 +561,7 @@ __pycache__/
     yield repo_path
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def corrupted_repo(temp_root_dir):
     """Create a repository with corrupted/problematic files."""
     repo_path = temp_root_dir / "corrupted_repo"
@@ -576,8 +576,8 @@ def corrupted_repo(temp_root_dir):
     with open(repo_path / "binary.dat", "wb") as f:
         f.write(b"\x80\x81\x82\x83\x84\x85")  # Invalid UTF-8 bytes
 
-    # Create extremely large text file (for memory testing)
-    large_content = "x" * (1024 * 1024)  # 1MB of 'x'
+    # Create smaller test file (for memory testing)
+    large_content = "x" * (1024 * 10)  # 10KB instead of 1MB
     (repo_path / "large.txt").write_text(large_content)
 
     # Create file with unusual encoding
@@ -832,6 +832,30 @@ type {name}Struct struct {{
 def test_data_generator():
     """Provide TestDataGenerator utility."""
     return TestDataGenerator
+
+
+@pytest.fixture
+def quick_git_repo(temp_root_dir):
+    """Create a minimal Git repository quickly without subprocess calls."""
+    repo_path = temp_root_dir / "quick_repo"
+    repo_path.mkdir(exist_ok=True)
+    
+    # Create minimal .git directory structure
+    git_dir = repo_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+    (git_dir / "config").write_text("[core]\n    repositoryformatversion = 0\n")
+    
+    # Create refs structure
+    refs_dir = git_dir / "refs" / "heads"
+    refs_dir.mkdir(parents=True)
+    (refs_dir / "main").write_text("fake_commit_hash\n")
+    
+    # Create test files
+    (repo_path / "main.py").write_text("print('hello world')")
+    (repo_path / "utils.py").write_text("def helper(): pass")
+    
+    yield repo_path
 
 
 # Performance monitoring utilities

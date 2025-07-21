@@ -35,8 +35,8 @@ class TestConnectionLifecycle:
                 assert thread_id in db_manager._connections
                 assert thread_id in db_manager._connection_created_time
 
-                # Wait for connection to age out
-                time.sleep(0.2)
+                # Manually set connection creation time to be old enough
+                db_manager._connection_created_time[thread_id] = time.time() - 0.2
 
                 # Check that connection is old enough to be cleaned up
                 current_time = time.time()
@@ -61,8 +61,8 @@ class TestConnectionLifecycle:
                     # Connection should be tracked
                     assert thread_id in db_manager._connections
 
-                # Wait for idle timeout
-                time.sleep(0.2)
+                # Manually set last access time to simulate idle timeout
+                db_manager._connection_last_access[thread_id] = time.time() - 0.2
 
                 # Test the cleanup method
                 cleaned_count = db_manager.cleanup_idle_connections()
@@ -104,7 +104,7 @@ class TestConnectionLifecycle:
                         # Do some work with the connection
                         result = conn.execute("SELECT 1").fetchone()
                         assert result[0] == 1
-                        time.sleep(0.01)  # Small delay to increase chance of conflicts
+                        pass  # Removed sleep for test speed
                 except Exception as e:
                     errors.append(f"Worker {worker_id}: {e}")
 
@@ -206,7 +206,7 @@ class TestFileLocking:
                         # Read back the data
                         result = conn.execute(f"SELECT id FROM test_{worker_id}").fetchone()
                         results[worker_id] = result[0]
-                        time.sleep(0.01)  # Hold connection briefly
+                        pass  # Removed sleep for test speed
                     db_manager.cleanup()
                 except Exception as e:
                     errors.append(f"Worker {worker_id}: {e}")

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  uvx-mcp-test:
+    build:
+      context: ../../
+      dockerfile: tests/docker/Dockerfile
+    container_name: turboprop-uvx-test
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    volumes:
+      # Mount the test results directory for output
+      - ./test-results:/app/test-results
+    working_dir: /test-repo
+    # Override default command for interactive testing if needed
+    command: ["python", "/app/test_uvx_mcp.py"]
+    
+  # Service for running validation tests
+  validate-mcp:
+    build:
+      context: ../../
+      dockerfile: tests/docker/Dockerfile
+    container_name: turboprop-mcp-validator
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    volumes:
+      - ./test-results:/app/test-results
+    working_dir: /test-repo
+    command: ["python", "/app/validate_mcp.py"]
+    depends_on:
+      - uvx-mcp-test
