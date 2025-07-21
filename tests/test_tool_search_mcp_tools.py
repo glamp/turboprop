@@ -374,7 +374,7 @@ class TestMCPToolSearchFunctions:
             ToolCategory(name="web", description="Web operations", tool_count=5),
         ]
         mock_load_categories.return_value = mock_categories
-        
+
         # Setup mock representative tools
         mock_get_representative_tools.return_value = ["sample_tool1", "sample_tool2", "sample_tool3"]
 

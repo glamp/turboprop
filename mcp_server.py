@@ -26,7 +26,12 @@ from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-# Import our existing code indexing functionality
+# Core dependencies - imported first to avoid circular dependencies
+from config import config
+from database_manager import DatabaseManager
+from embedding_helper import EmbeddingGenerator
+
+# Code indexing functionality  
 from code_index import (
     DIMENSIONS,
     EMBED_MODEL,
@@ -40,43 +45,98 @@ from code_index import (
     search_index,
     watch_mode,
 )
-from config import config
-from construct_search import ConstructSearchOperations, format_construct_search_results
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
+
+# Response types
 from mcp_response_types import IndexResponse, SearchResponse, StatusResponse
 
-# Import enhanced search functionality
-from search_operations import search_hybrid  # Legacy construct hybrid search
-from search_operations import search_with_hybrid_fusion  # New semantic+text hybrid search
+# Search functionality
+from construct_search import ConstructSearchOperations, format_construct_search_results
 from search_operations import (
     format_hybrid_search_results,
+    search_hybrid,  # Legacy construct hybrid search  
     search_with_comprehensive_response,
+    search_with_hybrid_fusion,  # New semantic+text hybrid search
     search_with_intelligent_routing,
 )
 
-# Import MCP tool search functionality
-from tool_search_mcp_tools import get_tool_details as _get_tool_details
-from tool_search_mcp_tools import initialize_search_engines
-from tool_search_mcp_tools import list_tool_categories as _list_tool_categories
-from tool_search_mcp_tools import search_mcp_tools as _search_mcp_tools
-from tool_search_mcp_tools import search_tools_by_capability as _search_tools_by_capability
+# MCP tool dependencies - imported last and with lazy loading where possible
 
-# Import tool recommendation functionality
-from tool_recommendation_mcp_tools import (
-    recommend_tools_for_task as _recommend_tools_for_task,
-    analyze_task_requirements as _analyze_task_requirements,
-    suggest_tool_alternatives as _suggest_tool_alternatives,
-    recommend_tool_sequence as _recommend_tool_sequence,
-    initialize_recommendation_tools,
-    get_tool_availability_status
-)
-from tool_recommendation_engine import ToolRecommendationEngine
-from context_analyzer import ContextAnalyzer
-from parameter_search_engine import ParameterSearchEngine
 
-# Removed unused imports: CodeSearchResult, convert_results_to_legacy_format, convert_legacy_to_enhanced_format
+class MCPToolRegistry:
+    """
+    Registry for MCP tool functions with lazy loading to prevent circular imports.
+    
+    This class acts as a dependency injection container for MCP tool functions,
+    loading them only when needed to break potential circular import chains.
+    """
+    
+    def __init__(self):
+        self._tool_recommendation_functions = {}
+        self._tool_search_functions = {}
+        self._components = {}
 
+    def get_recommendation_function(self, function_name: str):
+        """Get a tool recommendation function with lazy loading."""
+        if function_name not in self._tool_recommendation_functions:
+            from tool_recommendation_mcp_tools import (
+                analyze_task_requirements,
+                get_tool_availability_status,
+                initialize_recommendation_tools,
+                recommend_tool_sequence,
+                recommend_tools_for_task,
+                suggest_tool_alternatives,
+            )
+            
+            self._tool_recommendation_functions.update({
+                'analyze_task_requirements': analyze_task_requirements,
+                'get_tool_availability_status': get_tool_availability_status,
+                'initialize_recommendation_tools': initialize_recommendation_tools,
+                'recommend_tool_sequence': recommend_tool_sequence,
+                'recommend_tools_for_task': recommend_tools_for_task,
+                'suggest_tool_alternatives': suggest_tool_alternatives,
+            })
+            
+        return self._tool_recommendation_functions.get(function_name)
+
+    def get_search_function(self, function_name: str):
+        """Get a tool search function with lazy loading."""
+        if function_name not in self._tool_search_functions:
+            from tool_search_mcp_tools import (
+                get_tool_details,
+                initialize_search_engines,
+                list_tool_categories,
+                search_mcp_tools,
+                search_tools_by_capability,
+            )
+            
+            self._tool_search_functions.update({
+                'get_tool_details': get_tool_details,
+                'initialize_search_engines': initialize_search_engines,
+                'list_tool_categories': list_tool_categories,
+                'search_mcp_tools': search_mcp_tools,
+                'search_tools_by_capability': search_tools_by_capability,
+            })
+            
+        return self._tool_search_functions.get(function_name)
+
+    def get_component(self, component_name: str):
+        """Get a component with lazy loading."""
+        if component_name not in self._components:
+            if component_name == 'ContextAnalyzer':
+                from context_analyzer import ContextAnalyzer
+                self._components['ContextAnalyzer'] = ContextAnalyzer
+            elif component_name == 'ParameterSearchEngine':
+                from parameter_search_engine import ParameterSearchEngine
+                self._components['ParameterSearchEngine'] = ParameterSearchEngine
+            elif component_name == 'ToolRecommendationEngine':
+                from tool_recommendation_engine import ToolRecommendationEngine
+                self._components['ToolRecommendationEngine'] = ToolRecommendationEngine
+                
+        return self._components.get(component_name)
+
+
+# Create global tool registry instance
+_tool_registry = MCPToolRegistry()
 
 # Global lock for database connection management
 _db_connection_lock: threading.Lock = threading.Lock()
@@ -111,6 +171,208 @@ _recommendation_engine: Optional[ToolRecommendationEngine] = None
 _context_analyzer: Optional[ContextAnalyzer] = None
 _parameter_search_engine: Optional[ParameterSearchEngine] = None
 _recommendation_tools_initialized: bool = False
+
+
+class MCPServerInitializer:
+    """Handles complex MCP server initialization with proper error handling."""
+
+    def __init__(self):
+        self.config = _config.copy()
+        self.initialization_errors = []
+
+    def initialize_database_and_embedder(self) -> tuple[bool, Optional[str]]:
+        """Initialize database and embedder components."""
+        try:
+            db_connection = get_db_connection()
+            embedder = get_embedder()
+            return True, None
+        except Exception as e:
+            error_msg = f"Failed to initialize database/embedder: {e}"
+            self.initialization_errors.append(error_msg)
+            return False, error_msg
+
+    def run_smart_auto_index(self) -> bool:
+        """Run smart auto-indexing if configured."""
+        if not (self.config["repository_path"] and self.config["auto_index"]):
+            return True
+
+        try:
+            import time
+
+            print("🔍 Checking if repository needs indexing...", file=sys.stderr)
+
+            repo_path = Path(self.config["repository_path"])
+            max_bytes = int(self.config["max_file_size_mb"] * 1024 * 1024)
+
+            # Check index freshness
+            con = get_db_connection()
+            freshness = check_index_freshness(repo_path, max_bytes, con)
+
+            print(f"📊 Index status: {freshness['reason']}", file=sys.stderr)
+            print(f"📊 Total files: {freshness['total_files']}", file=sys.stderr)
+
+            if self.config["force_reindex"]:
+                print("🔄 Force reindexing requested, rebuilding entire index...", file=sys.stderr)
+            elif freshness["is_fresh"]:
+                print("✨ Index is up-to-date, skipping reindexing", file=sys.stderr)
+                print(f"📅 Last indexed: {freshness['last_index_time']}", file=sys.stderr)
+                return True
+
+            # Index needs updating
+            if freshness["changed_files"] > 0:
+                print(f"🔄 Found {freshness['changed_files']} changed files, updating index...", file=sys.stderr)
+            else:
+                print(f"🔍 {freshness['reason']}, building index...", file=sys.stderr)
+
+            start_time = time.time()
+            result = index_repository(force_all=self.config["force_reindex"])
+            end_time = time.time()
+
+            total_time = end_time - start_time
+
+            # Extract file count from result message
+            import re
+
+            file_count_match = re.search(r"Successfully indexed (\d+) files", result)
+            if file_count_match:
+                file_count = int(file_count_match.group(1))
+                if freshness["changed_files"] < file_count:
+                    print(
+                        f"⚡ Smart indexing: processed {freshness['changed_files']} "
+                        f"changed files out of {file_count} total",
+                        file=sys.stderr,
+                    )
+                time_per_file = total_time / max(1, freshness["changed_files"])
+                print(f"🚀 Indexing completed in {total_time:.2f}s at {time_per_file:.3f}s per file", file=sys.stderr)
+            else:
+                print(f"🚀 Indexing completed in {total_time:.2f}s", file=sys.stderr)
+
+            print(f"✅ {result}", file=sys.stderr)
+            return True
+
+        except Exception as e:
+            print(f"❌ Error during smart indexing: {e}", file=sys.stderr)
+            print("🔄 Falling back to standard indexing...", file=sys.stderr)
+            try:
+                result = index_repository()
+                print(f"✅ {result}", file=sys.stderr)
+                return True
+            except Exception as fallback_e:
+                error_msg = f"Auto-indexing failed: {fallback_e}"
+                self.initialization_errors.append(error_msg)
+                return False
+
+    def initialize_mcp_tool_search(self) -> bool:
+        """Initialize MCP tool search engines."""
+        try:
+            db_connection = get_db_connection()
+            embedder = get_embedder()
+            initialize_search_engines = _tool_registry.get_search_function('initialize_search_engines')
+            initialize_search_engines(db_connection, embedder)
+            print("🔧 MCP tool search engines initialized", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"⚠️  Warning: MCP tool search engines not initialized: {e}", file=sys.stderr)
+            self.initialization_errors.append(f"MCP tool search initialization failed: {e}")
+            return False
+
+    def initialize_recommendation_engines(self) -> bool:
+        """Initialize tool recommendation engines with proper global variable management."""
+        try:
+            global _recommendation_engine, _context_analyzer, _parameter_search_engine, _recommendation_tools_initialized
+
+            # Get component classes from registry
+            ContextAnalyzer = _tool_registry.get_component('ContextAnalyzer')
+            ParameterSearchEngine = _tool_registry.get_component('ParameterSearchEngine')
+            ToolRecommendationEngine = _tool_registry.get_component('ToolRecommendationEngine')
+
+            # Create recommendation engine components  
+            from mcp_tool_search_engine import MCPToolSearchEngine
+
+            db_connection = get_db_connection()
+            embedder = get_embedder()
+
+            # Initialize core components
+            mcp_tool_search = MCPToolSearchEngine(db_connection, embedder)
+            _parameter_search_engine = ParameterSearchEngine(db_connection, embedder)
+
+            from task_analyzer import TaskAnalyzer
+
+            task_analyzer = TaskAnalyzer()
+            _context_analyzer = ContextAnalyzer()
+
+            # Create recommendation engine
+            _recommendation_engine = ToolRecommendationEngine(
+                tool_search_engine=mcp_tool_search,
+                parameter_search_engine=_parameter_search_engine,
+                task_analyzer=task_analyzer,
+                context_analyzer=_context_analyzer,
+            )
+
+            # Initialize recommendation tools
+            initialize_recommendation_tools = _tool_registry.get_recommendation_function('initialize_recommendation_tools')
+            initialize_recommendation_tools(_recommendation_engine, task_analyzer)
+            _recommendation_tools_initialized = True
+
+            print("🧠 Tool recommendation engines initialized", file=sys.stderr)
+            return True
+
+        except Exception as e:
+            print(f"⚠️  Warning: Tool recommendation engines not initialized: {e}", file=sys.stderr)
+            _recommendation_tools_initialized = False
+            self.initialization_errors.append(f"Recommendation engines initialization failed: {e}")
+            return False
+
+    def start_file_watcher(self) -> bool:
+        """Start file watcher if configured."""
+        if not (self.config["repository_path"] and self.config["auto_watch"]):
+            return True
+
+        try:
+            start_file_watcher()
+            return True
+        except Exception as e:
+            error_msg = f"File watcher startup failed: {e}"
+            self.initialization_errors.append(error_msg)
+            return False
+
+    def run_initialization(self) -> bool:
+        """Run complete initialization sequence."""
+        success = True
+
+        # Initialize core components
+        db_success, db_error = self.initialize_database_and_embedder()
+        if not db_success:
+            print(f"❌ Core initialization failed: {db_error}", file=sys.stderr)
+            return False
+
+        # Run auto-indexing in background
+        if self.config["repository_path"] and self.config["auto_index"]:
+            auto_index_thread = threading.Thread(target=self.run_smart_auto_index, daemon=True)
+            auto_index_thread.start()
+            print("🧠 Smart auto-indexing started in background...", file=sys.stderr)
+
+        # Start file watcher
+        if not self.start_file_watcher():
+            success = False
+
+        # Initialize MCP tool search
+        if not self.initialize_mcp_tool_search():
+            success = False
+
+        # Initialize recommendation engines
+        if not self.initialize_recommendation_engines():
+            success = False
+
+        return success
+
+    def get_initialization_summary(self) -> str:
+        """Get a summary of initialization results."""
+        if not self.initialization_errors:
+            return "✅ All components initialized successfully"
+
+        error_summary = "\n".join([f"  • {error}" for error in self.initialization_errors])
+        return f"⚠️  Initialization completed with warnings:\n{error_summary}"
 
 
 def get_db_connection():
@@ -1505,7 +1767,8 @@ def search_mcp_tools(
         JSON with tool search results, metadata, and suggestions
     """
     try:
-        result = _search_mcp_tools(query, category, tool_type, max_results, include_examples, search_mode)
+        search_mcp_tools = _tool_registry.get_search_function('search_mcp_tools')
+        result = search_mcp_tools(query, category, tool_type, max_results, include_examples, search_mode)
         return json.dumps(result, indent=2)
     except Exception as e:
         return f"Error searching MCP tools: {str(e)}"
@@ -1549,7 +1812,8 @@ def get_tool_details(
         JSON with comprehensive tool documentation and metadata
     """
     try:
-        result = _get_tool_details(
+        get_tool_details = _tool_registry.get_search_function('get_tool_details')
+        result = get_tool_details(
             tool_id, include_schema, include_examples, include_relationships, include_usage_guidance
         )
         return json.dumps(result, indent=2)
@@ -1581,7 +1845,8 @@ def list_tool_categories() -> str:
         JSON with categories, tool counts, descriptions, and representative tools
     """
     try:
-        result = _list_tool_categories()
+        list_tool_categories = _tool_registry.get_search_function('list_tool_categories')
+        result = list_tool_categories()
         return json.dumps(result, indent=2)
     except Exception as e:
         return f"Error listing tool categories: {str(e)}"
@@ -1628,7 +1893,8 @@ def search_tools_by_capability(
         JSON with tools matching capability requirements and match explanations
     """
     try:
-        result = _search_tools_by_capability(
+        search_tools_by_capability = _tool_registry.get_search_function('search_tools_by_capability')
+        result = search_tools_by_capability(
             capability_description, required_parameters, preferred_complexity, max_results
         )
         return json.dumps(result, indent=2)
@@ -1638,49 +1904,55 @@ def search_tools_by_capability(
 
 # Tool Recommendation MCP Tools
 
+
 @mcp.tool()
 def recommend_tools_for_task(
     task_description: str,
     context: str = None,
     max_recommendations: int = 5,
     include_alternatives: bool = True,
-    complexity_preference: str = 'balanced',
-    explain_reasoning: bool = True
+    complexity_preference: str = "balanced",
+    explain_reasoning: bool = True,
 ) -> str:
     """
     🧠 TURBOPROP: Get intelligent tool recommendations for development tasks
-    
-    SMART TOOL SELECTION! This analyzes your task description and recommends the most 
-    appropriate MCP tools based on functionality, complexity, and context. Get detailed 
+
+    SMART TOOL SELECTION! This analyzes your task description and recommends the most
+    appropriate MCP tools based on functionality, complexity, and context. Get detailed
     explanations and alternatives to choose the optimal approach.
-    
+
     🎯 PERFECT FOR:
     • Understanding what tools to use for a specific task
     • Getting explanations for why tools are recommended
     • Exploring alternative approaches and tools
     • Learning about tool capabilities and usage patterns
-    
+
     💡 EXAMPLES:
     • "read configuration file and parse JSON data"
-    • "search codebase for specific function implementations"  
+    • "search codebase for specific function implementations"
     • "execute shell commands with timeout handling"
     • "process CSV files and generate reports"
-    
+
     Args:
         task_description: Natural language description of what you want to accomplish
         context: Additional context about environment, constraints, or preferences
         max_recommendations: Maximum number of tool recommendations (1-10)
         include_alternatives: Whether to include alternative tool options
-        complexity_preference: Tool complexity preference ('simple', 'balanced', 'powerful')  
+        complexity_preference: Tool complexity preference ('simple', 'balanced', 'powerful')
         explain_reasoning: Whether to include detailed explanations
-        
+
     Returns:
         JSON with ranked tool recommendations, explanations, and alternatives
     """
     try:
-        result = _recommend_tools_for_task(
-            task_description, context, max_recommendations, 
-            include_alternatives, complexity_preference, explain_reasoning
+        recommend_tools_for_task = _tool_registry.get_recommendation_function('recommend_tools_for_task')
+        result = recommend_tools_for_task(
+            task_description,
+            context,
+            max_recommendations,
+            include_alternatives,
+            complexity_preference,
+            explain_reasoning,
         )
         return json.dumps(result, indent=2) if isinstance(result, dict) else result
     except Exception as e:
@@ -1689,40 +1961,39 @@ def recommend_tools_for_task(
 
 @mcp.tool()
 def analyze_task_requirements(
-    task_description: str,
-    detail_level: str = 'standard',
-    include_suggestions: bool = True
+    task_description: str, detail_level: str = "standard", include_suggestions: bool = True
 ) -> str:
     """
     🔬 TURBOPROP: Analyze task requirements and complexity
-    
+
     DEEP TASK ANALYSIS! This provides detailed analysis of what your task requires,
     helping you understand complexity, required capabilities, and potential approaches
     before selecting tools.
-    
+
     🎯 ANALYSIS INCLUDES:
     • Task complexity assessment (simple, moderate, complex)
     • Required capabilities and functional requirements
     • Input/output specifications and data flow
     • Potential challenges and implementation considerations
     • Skill level requirements and learning resources
-    
+
     💡 PERFECT FOR:
     • Understanding task complexity before starting
     • Identifying requirements you might have missed
     • Getting suggestions to improve your task description
     • Planning multi-step workflows and processes
-    
+
     Args:
         task_description: Description of the task to analyze
         detail_level: Level of analysis ('basic', 'standard', 'comprehensive')
         include_suggestions: Whether to include task improvement suggestions
-        
+
     Returns:
         JSON with comprehensive task analysis and insights
     """
     try:
-        result = _analyze_task_requirements(task_description, detail_level, include_suggestions)
+        analyze_task_requirements = _tool_registry.get_recommendation_function('analyze_task_requirements')
+        result = analyze_task_requirements(task_description, detail_level, include_suggestions)
         return json.dumps(result, indent=2) if isinstance(result, dict) else result
     except Exception as e:
         return f"Error analyzing task requirements: {str(e)}"
@@ -1730,42 +2001,40 @@ def analyze_task_requirements(
 
 @mcp.tool()
 def suggest_tool_alternatives(
-    primary_tool: str,
-    task_context: str = None,
-    max_alternatives: int = 5,
-    include_comparisons: bool = True
+    primary_tool: str, task_context: str = None, max_alternatives: int = 5, include_comparisons: bool = True
 ) -> str:
     """
     🔄 TURBOPROP: Find alternative tools for your primary choice
-    
-    EXPLORE YOUR OPTIONS! This finds alternative tools that could accomplish similar 
-    tasks, providing detailed comparisons and guidance on when each alternative 
+
+    EXPLORE YOUR OPTIONS! This finds alternative tools that could accomplish similar
+    tasks, providing detailed comparisons and guidance on when each alternative
     might be preferred over your primary choice.
-    
+
     🎯 COMPARISON FEATURES:
     • Similarity analysis and functional overlap
-    • Complexity and learning curve comparisons  
+    • Complexity and learning curve comparisons
     • Performance and reliability trade-offs
     • Use case recommendations and preferences
     • Migration effort and implementation guidance
-    
+
     💡 PERFECT FOR:
     • Exploring different approaches to the same problem
     • Finding simpler or more powerful alternatives
     • Understanding tool trade-offs and limitations
     • Making informed decisions between similar tools
-    
+
     Args:
         primary_tool: The primary tool you're considering (e.g., "bash", "read")
         task_context: Context about your specific task or use case
         max_alternatives: Maximum number of alternatives to suggest
         include_comparisons: Whether to include detailed comparisons
-        
+
     Returns:
         JSON with alternative suggestions, comparisons, and usage guidance
     """
     try:
-        result = _suggest_tool_alternatives(primary_tool, task_context, max_alternatives, include_comparisons)
+        suggest_tool_alternatives = _tool_registry.get_recommendation_function('suggest_tool_alternatives')
+        result = suggest_tool_alternatives(primary_tool, task_context, max_alternatives, include_comparisons)
         return json.dumps(result, indent=2) if isinstance(result, dict) else result
     except Exception as e:
         return f"Error suggesting tool alternatives: {str(e)}"
@@ -1774,47 +2043,48 @@ def suggest_tool_alternatives(
 @mcp.tool()
 def recommend_tool_sequence(
     workflow_description: str,
-    optimization_goal: str = 'balanced',
+    optimization_goal: str = "balanced",
     max_sequence_length: int = 10,
-    allow_parallel_tools: bool = False
+    allow_parallel_tools: bool = False,
 ) -> str:
     """
     ⚡ TURBOPROP: Recommend tool sequences for complex workflows
-    
-    WORKFLOW OPTIMIZATION! This analyzes complex multi-step workflows and recommends 
+
+    WORKFLOW OPTIMIZATION! This analyzes complex multi-step workflows and recommends
     optimal sequences of tools to accomplish your tasks efficiently and reliably.
     Perfect for complex processes that require multiple tools working together.
-    
+
     🎯 SEQUENCE FEATURES:
     • Step-by-step tool recommendations with parameters
     • Data flow analysis between tools
     • Parallel execution opportunities identification
     • Error handling and reliability considerations
     • Performance optimization and bottleneck analysis
-    
+
     💡 OPTIMIZATION GOALS:
     • "speed" - Optimize for fast execution and minimal delays
     • "reliability" - Prioritize error handling and robust execution
     • "simplicity" - Prefer simple tools and straightforward approaches
     • "balanced" - Balance all factors for general-purpose workflows
-    
+
     🔧 PERFECT FOR:
     • Multi-step data processing workflows
     • Complex deployment and build processes
     • Automated testing and validation sequences
     • Data transformation and analysis pipelines
-    
+
     Args:
         workflow_description: Description of the complete workflow or process
         optimization_goal: What to optimize for ('speed', 'reliability', 'simplicity', 'balanced')
         max_sequence_length: Maximum number of tools in sequence (2-20)
         allow_parallel_tools: Whether to suggest parallel tool execution
-        
+
     Returns:
         JSON with recommended tool sequences, optimization analysis, and guidance
     """
     try:
-        result = _recommend_tool_sequence(
+        recommend_tool_sequence = _tool_registry.get_recommendation_function('recommend_tool_sequence')
+        result = recommend_tool_sequence(
             workflow_description, optimization_goal, max_sequence_length, allow_parallel_tools
         )
         return json.dumps(result, indent=2) if isinstance(result, dict) else result
@@ -2100,137 +2370,14 @@ def main():
         print("📁 No repository configured - use tools to specify paths", file=sys.stderr)
         print(file=sys.stderr)
 
-    # Smart auto-indexing with freshness checks
-    if _config["repository_path"] and _config["auto_index"]:
+    # Initialize all server components using the new initializer class
+    initializer = MCPServerInitializer()
+    initialization_success = initializer.run_initialization()
 
-        def start_smart_auto_index():
-            import time
-
-            print("🔍 Checking if repository needs indexing...", file=sys.stderr)
-
-            repo_path = Path(_config["repository_path"])
-            max_bytes = int(_config["max_file_size_mb"] * 1024 * 1024)
-
-            # Check index freshness (unless force reindex is requested)
-            try:
-                con = get_db_connection()
-                freshness = check_index_freshness(repo_path, max_bytes, con)
-
-                print(f"📊 Index status: {freshness['reason']}", file=sys.stderr)
-                print(f"📊 Total files: {freshness['total_files']}", file=sys.stderr)
-
-                if _config["force_reindex"]:
-                    print(
-                        "🔄 Force reindexing requested, rebuilding entire index...",
-                        file=sys.stderr,
-                    )
-                elif freshness["is_fresh"]:
-                    print("✨ Index is up-to-date, skipping reindexing", file=sys.stderr)
-                    print(
-                        f"📅 Last indexed: {freshness['last_index_time']}",
-                        file=sys.stderr,
-                    )
-                    return
-
-                # Index needs updating
-                if freshness["changed_files"] > 0:
-                    print(
-                        f"🔄 Found {freshness['changed_files']} changed files, " f"updating index...",
-                        file=sys.stderr,
-                    )
-                else:
-                    print(f"🔍 {freshness['reason']}, building index...", file=sys.stderr)
-
-                start_time = time.time()
-                result = index_repository(force_all=_config["force_reindex"])
-                end_time = time.time()
-
-                total_time = end_time - start_time
-
-                # Extract file count from result message
-                import re
-
-                file_count_match = re.search(r"Successfully indexed (\d+) files", result)
-                if file_count_match:
-                    file_count = int(file_count_match.group(1))
-                    if freshness["changed_files"] < file_count:
-                        print(
-                            f"⚡ Smart indexing: processed {freshness['changed_files']} "
-                            f"changed files out of {file_count} total",
-                            file=sys.stderr,
-                        )
-                    time_per_file = total_time / max(1, freshness["changed_files"])
-                    print(
-                        f"🚀 Indexing completed in {total_time:.2f}s at " f"{time_per_file:.3f}s per file",
-                        file=sys.stderr,
-                    )
-                else:
-                    print(f"🚀 Indexing completed in {total_time:.2f}s", file=sys.stderr)
-
-                print(f"✅ {result}", file=sys.stderr)
-
-            except Exception as e:
-                print(f"❌ Error during smart indexing: {e}", file=sys.stderr)
-                print("🔄 Falling back to standard indexing...", file=sys.stderr)
-                result = index_repository()
-                print(f"✅ {result}", file=sys.stderr)
-
-            print(file=sys.stderr)
-
-        auto_index_thread = threading.Thread(target=start_smart_auto_index, daemon=True)
-        auto_index_thread.start()
-        print("🧠 Smart auto-indexing started in background...", file=sys.stderr)
-        print(file=sys.stderr)
-
-    # Start file watcher if configured
-    if _config["repository_path"] and _config["auto_watch"]:
-        start_file_watcher()
-        print(file=sys.stderr)
-
-    # Initialize MCP tool search engines
-    try:
-        db_connection = get_db_connection()
-        embedder = get_embedder()
-        initialize_search_engines(db_connection, embedder)
-        print("🔧 MCP tool search engines initialized", file=sys.stderr)
-    except Exception as e:
-        print(f"⚠️  Warning: MCP tool search engines not initialized: {e}", file=sys.stderr)
-
-    # Initialize tool recommendation engines
-    try:
-        global _recommendation_engine, _context_analyzer, _parameter_search_engine, _recommendation_tools_initialized
-        
-        # Create recommendation engine components
-        from mcp_tool_search_engine import MCPToolSearchEngine
-        
-        db_connection = get_db_connection()
-        embedder = get_embedder()
-        
-        # Initialize core components
-        mcp_tool_search = MCPToolSearchEngine(db_connection, embedder)
-        _parameter_search_engine = ParameterSearchEngine(db_connection, embedder)
-        
-        from task_analyzer import TaskAnalyzer
-        task_analyzer = TaskAnalyzer()
-        
-        _context_analyzer = ContextAnalyzer()
-        
-        # Create recommendation engine
-        _recommendation_engine = ToolRecommendationEngine(
-            tool_search_engine=mcp_tool_search,
-            parameter_search_engine=_parameter_search_engine,
-            task_analyzer=task_analyzer,
-            context_analyzer=_context_analyzer
-        )
-        
-        # Initialize recommendation tools
-        initialize_recommendation_tools(_recommendation_engine, task_analyzer)
-        _recommendation_tools_initialized = True
-        
-        print("🧠 Tool recommendation engines initialized", file=sys.stderr)
-    except Exception as e:
-        print(f"⚠️  Warning: Tool recommendation engines not initialized: {e}", file=sys.stderr)
-        _recommendation_tools_initialized = False
+    # Print initialization summary
+    print(file=sys.stderr)
+    print(initializer.get_initialization_summary(), file=sys.stderr)
+    print(file=sys.stderr)
 
     print("🎯 MCP Server ready - listening for tool calls...", file=sys.stderr)
     print("=" * 40, file=sys.stderr)

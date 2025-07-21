@@ -44,6 +44,7 @@ logger = get_logger(__name__)
 @dataclass
 class OperationContext:
     """Context information for structured logging and operation tracking."""
+
     operation_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     operation_name: str = ""
     user_id: Optional[str] = None
@@ -51,25 +52,25 @@ class OperationContext:
     tool_id: Optional[str] = None
     start_time: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def start(self) -> None:
         """Mark the start of the operation."""
         self.start_time = time.time()
-    
+
     def elapsed(self) -> float:
         """Get elapsed time since operation start."""
         if self.start_time is None:
             return 0.0
         return time.time() - self.start_time
-    
+
     def to_log_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for structured logging."""
         log_data = {
             "operation_id": self.operation_id,
             "operation_name": self.operation_name,
-            "elapsed_seconds": self.elapsed()
+            "elapsed_seconds": self.elapsed(),
         }
-        
+
         if self.user_id:
             log_data["user_id"] = self.user_id
         if self.query:
@@ -78,18 +79,19 @@ class OperationContext:
             log_data["tool_id"] = self.tool_id
         if self.metadata:
             log_data.update(self.metadata)
-            
+
         return log_data
 
 
 def log_operation(operation_name: str, context: OperationContext = None):
     """
     Decorator for adding structured logging to operations.
-    
+
     Args:
         operation_name: Name of the operation being logged
         context: Optional operation context for additional data
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -97,57 +99,53 @@ def log_operation(operation_name: str, context: OperationContext = None):
             op_context = context or OperationContext(operation_name=operation_name)
             if not op_context.operation_name:
                 op_context.operation_name = operation_name
-            
+
             # Extract context from common parameters
             if args:
-                if hasattr(args[0], '__name__') or isinstance(args[0], str):
-                    if 'query' in str(args[0]) or 'search' in operation_name.lower():
+                if hasattr(args[0], "__name__") or isinstance(args[0], str):
+                    if "query" in str(args[0]) or "search" in operation_name.lower():
                         op_context.query = str(args[0])
-                    elif 'tool' in operation_name.lower():
+                    elif "tool" in operation_name.lower():
                         op_context.tool_id = str(args[0])
-            
+
             op_context.start()
-            
+
             # Log operation start
-            logger.info(
-                "Starting %s",
-                operation_name,
-                extra={"structured_data": op_context.to_log_dict()}
-            )
-            
+            logger.info("Starting %s", operation_name, extra={"structured_data": op_context.to_log_dict()})
+
             try:
                 result = func(*args, **kwargs)
-                
+
                 # Log successful completion
                 completion_data = op_context.to_log_dict()
-                if hasattr(result, '__len__') and not isinstance(result, str):
+                if hasattr(result, "__len__") and not isinstance(result, str):
                     completion_data["result_count"] = len(result)
-                
+
                 logger.info(
                     "Completed %s successfully in %.3fs",
-                    operation_name, op_context.elapsed(),
-                    extra={"structured_data": completion_data}
+                    operation_name,
+                    op_context.elapsed(),
+                    extra={"structured_data": completion_data},
                 )
-                
+
                 return result
-                
+
             except Exception as e:
                 # Log operation failure
                 error_data = op_context.to_log_dict()
-                error_data.update({
-                    "error_type": type(e).__name__,
-                    "error_message": str(e),
-                    "success": False
-                })
-                
+                error_data.update({"error_type": type(e).__name__, "error_message": str(e), "success": False})
+
                 logger.error(
                     "Failed %s after %.3fs: %s",
-                    operation_name, op_context.elapsed(), str(e),
-                    extra={"structured_data": error_data}
+                    operation_name,
+                    op_context.elapsed(),
+                    str(e),
+                    extra={"structured_data": error_data},
                 )
                 raise
-                
+
         return wrapper
+
     return decorator
 
 
@@ -178,7 +176,7 @@ DB_CONFIG = {
     "connection_timeout": 30.0,
 }
 
-# Cache configuration constants  
+# Cache configuration constants
 CACHE_CONFIG = {
     "category_cache_ttl": 300,  # 5 minutes
     "representative_tools_cache_ttl": 600,  # 10 minutes
@@ -189,14 +187,15 @@ CACHE_CONFIG = {
 @dataclass
 class CacheEntry:
     """Simple cache entry with TTL support."""
+
     value: Any
     timestamp: float
     ttl: float
-    
+
     def is_expired(self) -> bool:
         """Check if the cache entry has expired."""
         return time.time() - self.timestamp > self.ttl
-    
+
     def is_valid(self) -> bool:
         """Check if the cache entry is still valid."""
         return not self.is_expired()
@@ -205,22 +204,22 @@ class CacheEntry:
 class SimpleCache:
     """
     Simple in-memory cache with TTL support for performance optimization.
-    
+
     This cache is designed for caching expensive operations like database
     queries for category information that don't change frequently.
     """
-    
+
     def __init__(self, max_size: int = None):
         self.max_size = max_size or CACHE_CONFIG["max_cache_size"]
         self._cache: Dict[str, CacheEntry] = {}
-    
+
     def get(self, key: str) -> Optional[Any]:
         """
         Get a value from cache if it exists and is not expired.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             Cached value if valid, None otherwise
         """
@@ -232,11 +231,11 @@ class SimpleCache:
                 # Remove expired entry
                 del self._cache[key]
         return None
-    
+
     def set(self, key: str, value: Any, ttl: float) -> None:
         """
         Set a value in cache with specified TTL.
-        
+
         Args:
             key: Cache key
             value: Value to cache
@@ -247,17 +246,13 @@ class SimpleCache:
             # Remove oldest entry
             oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k].timestamp)
             del self._cache[oldest_key]
-        
-        self._cache[key] = CacheEntry(
-            value=value,
-            timestamp=time.time(),
-            ttl=ttl
-        )
-    
+
+        self._cache[key] = CacheEntry(value=value, timestamp=time.time(), ttl=ttl)
+
     def clear(self) -> None:
         """Clear all cache entries."""
         self._cache.clear()
-    
+
     def cleanup_expired(self) -> int:
         """Remove expired entries and return count of removed entries."""
         expired_keys = [k for k, v in self._cache.items() if v.is_expired()]
@@ -273,7 +268,7 @@ _cache = SimpleCache()
 def _with_db_retry(max_attempts: int = None, delay: float = None):
     """
     Decorator that adds retry logic for database operations.
-    
+
     Args:
         max_attempts: Maximum number of retry attempts
         delay: Delay between retries in seconds
@@ -282,53 +277,64 @@ def _with_db_retry(max_attempts: int = None, delay: float = None):
         max_attempts = DB_CONFIG["retry_attempts"]
     if delay is None:
         delay = DB_CONFIG["retry_delay"]
-    
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
             last_exception = None
-            
+
             for attempt in range(max_attempts):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
                     last_exception = e
-                    
+
                     # Check if this is a database connection error that should be retried
                     if _is_retryable_db_error(e):
                         if attempt < max_attempts - 1:  # Don't sleep on final attempt
                             logger.warning(
-                                "Database operation failed (attempt %d/%d): %s. Retrying in %.1fs...", 
-                                attempt + 1, max_attempts, str(e), delay
+                                "Database operation failed (attempt %d/%d): %s. Retrying in %.1fs...",
+                                attempt + 1,
+                                max_attempts,
+                                str(e),
+                                delay,
                             )
                             time.sleep(delay)
                             continue
-                    
+
                     # Non-retryable error or final attempt
                     break
-            
+
             # All attempts failed
             logger.error("Database operation failed after %d attempts: %s", max_attempts, str(last_exception))
             raise last_exception
-            
+
         return wrapper
+
     return decorator
 
 
 def _is_retryable_db_error(error: Exception) -> bool:
     """
     Check if a database error should be retried.
-    
+
     Args:
         error: Exception that occurred during database operation
-        
+
     Returns:
         True if the error is retryable (connection issues, timeouts, etc.)
     """
     error_str = str(error).lower()
     retryable_patterns = [
-        "connection", "timeout", "busy", "locked", "network", 
-        "unavailable", "refused", "broken pipe", "reset"
+        "connection",
+        "timeout",
+        "busy",
+        "locked",
+        "network",
+        "unavailable",
+        "refused",
+        "broken pipe",
+        "reset",
     ]
     return any(pattern in error_str for pattern in retryable_patterns)
 
@@ -336,12 +342,12 @@ def _is_retryable_db_error(error: Exception) -> bool:
 def _handle_mcp_error(function_name: str, error: Exception, context: Optional[str] = None) -> str:
     """
     Standardized error handling for MCP tool functions.
-    
+
     Args:
         function_name: Name of the function that encountered the error
-        error: The exception that occurred  
+        error: The exception that occurred
         context: Optional context information (query, tool_id, etc.)
-        
+
     Returns:
         JSON string containing standardized error response
     """
@@ -354,46 +360,47 @@ def _handle_mcp_error(function_name: str, error: Exception, context: Optional[st
 class MCPToolSearchContext:
     """
     Dependency injection container for MCP tool search operations.
-    
+
     This class manages all dependencies required for MCP tool search functionality,
     providing a cleaner alternative to global state management. It supports
     dependency injection for better testability and maintainability.
     """
+
     db_manager: DatabaseManager
     embedding_generator: EmbeddingGenerator
     tool_search_engine: Optional[MCPToolSearchEngine] = None
     parameter_search_engine: Optional[ParameterSearchEngine] = None
     validator: Optional[MCPToolValidator] = None
-    
+
     def __post_init__(self):
         """Initialize dependent components after construction."""
         if self.validator is None:
             self.validator = MCPToolValidator()
-            
+
         if self.tool_search_engine is None:
             self.tool_search_engine = MCPToolSearchEngine(self.db_manager, self.embedding_generator)
-            
+
         if self.parameter_search_engine is None:
             self.parameter_search_engine = ParameterSearchEngine(self.db_manager)
-    
+
     def get_search_engine(self) -> MCPToolSearchEngine:
         """Get the tool search engine instance."""
         if self.tool_search_engine is None:
             raise RuntimeError("Tool search engine not initialized")
         return self.tool_search_engine
-    
+
     def get_parameter_search_engine(self) -> ParameterSearchEngine:
         """Get the parameter search engine instance."""
         if self.parameter_search_engine is None:
             raise RuntimeError("Parameter search engine not initialized")
         return self.parameter_search_engine
-    
+
     def get_validator(self) -> MCPToolValidator:
         """Get the validator instance."""
         if self.validator is None:
             raise RuntimeError("Validator not initialized")
         return self.validator
-    
+
     def get_db_manager(self) -> DatabaseManager:
         """Get the database manager instance."""
         return self.db_manager
@@ -423,7 +430,9 @@ def _execute_mcp_search(validated_params: ValidatedSearchParams, search_mode: st
         )
 
 
-def _create_search_response(query: str, search_results, search_mode: str, execution_time: float) -> ToolSearchMCPResponse:
+def _create_search_response(
+    query: str, search_results, search_mode: str, execution_time: float
+) -> ToolSearchMCPResponse:
     """Create structured response from search results."""
     response = ToolSearchMCPResponse(
         query=query,
@@ -444,10 +453,10 @@ def _enhance_search_response(response: ToolSearchMCPResponse, query: str) -> Non
 def _validate_capability_business_logic(validated_params) -> None:
     """
     Perform additional business logic validation for capability search parameters.
-    
+
     Args:
         validated_params: Already validated parameters from MCPToolValidator
-        
+
     Raises:
         ValueError: If business logic constraints are violated
     """
@@ -462,32 +471,33 @@ def _validate_capability_business_logic(validated_params) -> None:
         # Check for overly specific requirements (too many required parameters)
         if len(validated_params.required_parameters) > 10:
             errors.append(
-                "Too many required parameters (max 10). "
-                "Consider using multiple searches with fewer constraints"
+                "Too many required parameters (max 10). " "Consider using multiple searches with fewer constraints"
             )
 
         # Check for suspicious parameter patterns
         suspicious_params = ["password", "secret", "key", "token", "auth"]
-        found_suspicious = [p for p in validated_params.required_parameters 
-                          if any(s in p.lower() for s in suspicious_params)]
+        found_suspicious = [
+            p for p in validated_params.required_parameters if any(s in p.lower() for s in suspicious_params)
+        ]
         if found_suspicious:
             logger.warning("Search includes security-sensitive parameters: %s", found_suspicious)
 
     # Validate capability description content
     capability_lower = validated_params.capability_description.lower()
-    
+
     # Check for overly broad descriptions that might return too many results
     broad_terms = ["tool", "function", "command", "any", "all", "everything"]
     if any(term in capability_lower for term in broad_terms) and len(capability_lower.split()) <= 2:
         errors.append(
-            "Capability description is too broad. "
-            "Please be more specific about the functionality you need"
+            "Capability description is too broad. " "Please be more specific about the functionality you need"
         )
 
     # Check for conflicting complexity and parameter requirements
-    if (validated_params.preferred_complexity == "simple" and 
-        validated_params.required_parameters and 
-        len(validated_params.required_parameters) > 5):
+    if (
+        validated_params.preferred_complexity == "simple"
+        and validated_params.required_parameters
+        and len(validated_params.required_parameters) > 5
+    ):
         errors.append(
             "Requesting 'simple' complexity with many required parameters is contradictory. "
             "Consider reducing parameters or changing complexity preference"
@@ -500,7 +510,7 @@ def _validate_capability_business_logic(validated_params) -> None:
 def initialize_search_engines(db_manager: DatabaseManager, embedding_generator: EmbeddingGenerator) -> None:
     """
     Initialize the search engines with database and embedding components.
-    
+
     This function should be called once during server startup to initialize
     the dependency injection context with the provided components.
 
@@ -513,11 +523,8 @@ def initialize_search_engines(db_manager: DatabaseManager, embedding_generator: 
     logger.info("Initializing MCP tool search context...")
 
     # Create dependency injection context
-    _search_context = MCPToolSearchContext(
-        db_manager=db_manager,
-        embedding_generator=embedding_generator
-    )
-    
+    _search_context = MCPToolSearchContext(db_manager=db_manager, embedding_generator=embedding_generator)
+
     logger.info("✅ MCPToolValidator initialized")
     logger.info("✅ MCPToolSearchEngine initialized")
     logger.info("✅ ParameterSearchEngine initialized")
@@ -527,18 +534,15 @@ def initialize_search_engines(db_manager: DatabaseManager, embedding_generator: 
 def get_search_context() -> MCPToolSearchContext:
     """
     Get the current search context.
-    
+
     Returns:
         The initialized MCPToolSearchContext instance
-        
+
     Raises:
         RuntimeError: If the context has not been initialized
     """
     if _search_context is None:
-        raise RuntimeError(
-            "MCP tool search context not initialized. "
-            "Call initialize_search_engines() first."
-        )
+        raise RuntimeError("MCP tool search context not initialized. " "Call initialize_search_engines() first.")
     return _search_context
 
 
@@ -744,7 +748,7 @@ def list_tool_categories() -> dict:
         return _handle_mcp_error("list_tool_categories", e)
 
 
-@log_operation("capability_search")  
+@log_operation("capability_search")
 def search_tools_by_capability(
     capability_description: str,
     required_parameters: Optional[List[str]] = None,
@@ -929,7 +933,7 @@ def load_tool_categories() -> List[ToolCategory]:
     if cached_result is not None:
         logger.debug("Returning cached tool categories (%d categories)", len(cached_result))
         return cached_result
-    
+
     try:
         db_manager = _get_db_manager()
 
@@ -955,9 +959,12 @@ def load_tool_categories() -> List[ToolCategory]:
 
             # Cache the result before returning
             _cache.set(cache_key, categories, CACHE_CONFIG["category_cache_ttl"])
-            logger.debug("Cached tool categories (%d categories) for %.1f seconds", 
-                        len(categories), CACHE_CONFIG["category_cache_ttl"])
-            
+            logger.debug(
+                "Cached tool categories (%d categories) for %.1f seconds",
+                len(categories),
+                CACHE_CONFIG["category_cache_ttl"],
+            )
+
             return categories
 
     except Exception as e:
@@ -988,14 +995,14 @@ def get_representative_tools(category_name: str, limit: int = None) -> List[str]
     """Get representative tools for a category with caching."""
     if limit is None:
         limit = SEARCH_CONFIG["representative_tools_limit"]
-    
+
     # Try to get from cache first
     cache_key = f"representative_tools_{category_name}_{limit}"
     cached_result = _cache.get(cache_key)
     if cached_result is not None:
         logger.debug("Returning cached representative tools for %s (%d tools)", category_name, len(cached_result))
         return cached_result
-        
+
     try:
         db_manager = _get_db_manager()
 
@@ -1013,12 +1020,16 @@ def get_representative_tools(category_name: str, limit: int = None) -> List[str]
             ).fetchall()
 
             tools_list = [tool[0] for tool in tools]
-            
+
             # Cache the result before returning
             _cache.set(cache_key, tools_list, CACHE_CONFIG["representative_tools_cache_ttl"])
-            logger.debug("Cached representative tools for %s (%d tools) for %.1f seconds", 
-                        category_name, len(tools_list), CACHE_CONFIG["representative_tools_cache_ttl"])
-            
+            logger.debug(
+                "Cached representative tools for %s (%d tools) for %.1f seconds",
+                category_name,
+                len(tools_list),
+                CACHE_CONFIG["representative_tools_cache_ttl"],
+            )
+
             return tools_list
 
     except Exception as e:
@@ -1029,32 +1040,32 @@ def get_representative_tools(category_name: str, limit: int = None) -> List[str]
 def generate_query_suggestions(query: str, results: List[ToolSearchResult]) -> List[str]:
     """
     Generate intelligent query refinement suggestions based on search results.
-    
+
     This function analyzes the number and quality of search results to provide
     contextual suggestions for improving the search query. The suggestions are
     tailored to help users refine their queries for better tool discovery.
-    
+
     Algorithm:
     - For empty results: Suggests broadening the search scope
     - For too few results: Suggests adding more specific context
     - For too many results: Suggests narrowing the search scope
     - For normal results: Provides advanced refinement tips
-    
+
     Args:
         query: The original search query string that was executed
         results: List of ToolSearchResult objects returned from the search
                 Empty list indicates no tools matched the query
-    
+
     Returns:
         List of human-readable suggestion strings that help users refine their
         search queries. Suggestions are ordered by usefulness, with the most
         actionable suggestions first.
-        
+
     Examples:
         >>> suggestions = generate_query_suggestions("file", [])
         >>> print(suggestions[0])
         "Try broader terms related to 'file'"
-        
+
         >>> suggestions = generate_query_suggestions("very specific query", many_results)
         >>> print(suggestions[0])
         "Add more specific context to 'very specific query' to narrow results"
@@ -1092,36 +1103,36 @@ def generate_query_suggestions(query: str, results: List[ToolSearchResult]) -> L
 def generate_navigation_hints(results: List[ToolSearchResult]) -> List[str]:
     """
     Generate contextual navigation hints to help users understand search results.
-    
+
     This function analyzes the characteristics of search results to provide
     actionable insights about the tools that were found. It helps users understand
     the complexity distribution, availability of examples, and other metadata
     that can guide their tool selection decisions.
-    
+
     Algorithm:
     - Counts total results and provides overview
     - Analyzes tool complexity distribution (simple vs complex tools)
     - Identifies tools with comprehensive usage examples
     - Provides guidance on parameter requirements and usage patterns
-    
+
     Args:
         results: List of ToolSearchResult objects to analyze for hints
                 Can be empty list if no results were found
-    
+
     Returns:
         List of human-readable hint strings that help users navigate and
         understand the search results. Hints are ordered by importance,
         with overview information first followed by specific characteristics.
-        
+
     Examples:
         >>> hints = generate_navigation_hints([simple_tool, complex_tool])
         >>> print(hints[0])
         "Found 2 matching tools"
-        
+
         >>> hints = generate_navigation_hints([tool_with_examples])
         >>> print(hints[-1])
         "1 tools have detailed usage examples"
-        
+
     Note:
         This function assumes that ToolSearchResult objects implement
         the methods is_simple_tool(), is_complex_tool(), and has_good_examples().
@@ -1229,28 +1240,28 @@ def _generate_usage_guidance(tool_details: ToolSearchResult) -> Dict[str, List[s
 def _calculate_parameter_match_score(tool_result: ToolSearchResult, required_params: List[str]) -> float:
     """
     Calculate parameter match score for capability-based tool search.
-    
+
     This function computes a normalized score (0.0 to 1.0) indicating how well
-    a tool's available parameters match the user's required parameters. The 
+    a tool's available parameters match the user's required parameters. The
     algorithm performs case-insensitive matching and returns a perfect score
     if no specific parameters are required.
-    
+
     Args:
         tool_result: ToolSearchResult containing the tool's parameter information
         required_params: List of parameter names that the user requires
                         Empty list means no specific parameters required
-    
+
     Returns:
         Float between 0.0 and 1.0 where:
         - 1.0: Perfect match (all required parameters available)
         - 0.5-0.9: Partial match (some required parameters available)
         - 0.0: No match (none of the required parameters available)
-        
+
     Algorithm:
         - If no parameters required, returns 1.0 (perfect match)
         - Performs case-insensitive matching of parameter names
         - Calculates ratio of matched parameters to total required parameters
-        
+
     Examples:
         >>> score = _calculate_parameter_match_score(tool, ["file_path", "timeout"])
         >>> # If tool has both parameters: score = 1.0

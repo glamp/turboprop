@@ -16,12 +16,8 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Configuration constants with environment variable overrides
-MAX_TASK_DESCRIPTION_LENGTH = int(os.getenv("TURBOPROP_MAX_TASK_LENGTH", 2000))
-COMPLEX_TASK_PATTERN_THRESHOLD = int(os.getenv("TURBOPROP_COMPLEX_PATTERN_THRESHOLD", 3))
-COMPLEX_TASK_STEPS_THRESHOLD = int(os.getenv("TURBOPROP_COMPLEX_STEPS_THRESHOLD", 8))
-DEFAULT_SIMPLE_STEPS = int(os.getenv("TURBOPROP_DEFAULT_SIMPLE_STEPS", 6))
-BASE_CONFIDENCE_SCORE = float(os.getenv("TURBOPROP_BASE_CONFIDENCE", 0.7))
+# Import configuration
+from config import config
 
 
 class TaskComplexity(Enum):
@@ -62,6 +58,7 @@ class TaskAnalysis:
     def to_dict(self) -> Dict[str, Any]:
         """Convert TaskAnalysis to dictionary for JSON serialization."""
         from dataclasses import asdict
+
         return asdict(self)
 
 
@@ -269,7 +266,7 @@ class TaskAnalyzer:
             raise ValueError("Task description must be a non-empty string")
         if not task_description.strip():
             raise ValueError("Task description cannot be empty or only whitespace")
-        if len(task_description) > MAX_TASK_DESCRIPTION_LENGTH:
+        if len(task_description) > config.mcp.MAX_TASK_DESCRIPTION_LENGTH:
             raise ValueError("Task description too long (max 2000 characters)")
 
         logger.info(f"Analyzing task: {task_description}")
@@ -351,7 +348,7 @@ class TaskAnalyzer:
         # Check estimated steps
         if task_analysis.estimated_steps <= 2:
             return TaskComplexity.SIMPLE
-        elif task_analysis.estimated_steps >= COMPLEX_TASK_STEPS_THRESHOLD:
+        elif task_analysis.estimated_steps >= config.mcp.COMPLEX_TASK_STEPS_THRESHOLD:
             return TaskComplexity.COMPLEX
         else:
             return TaskComplexity.MODERATE
@@ -382,7 +379,7 @@ class TaskAnalyzer:
                 return "simple"
 
         # Check pattern complexity
-        if len(patterns) >= COMPLEX_TASK_PATTERN_THRESHOLD:
+        if len(patterns) >= config.mcp.COMPLEX_TASK_PATTERN_THRESHOLD:
             return "complex"
         elif len(patterns) <= 1:
             return "simple"
@@ -396,7 +393,7 @@ class TaskAnalyzer:
         elif complexity_level == "moderate":
             return 3 + len(re.findall(r"\band\b", task_description.lower()))
         else:  # complex
-            base_steps = DEFAULT_SIMPLE_STEPS
+            base_steps = config.mcp.DEFAULT_SIMPLE_STEPS
             # Add steps for each "and" conjunction
             additional_steps = len(re.findall(r"\band\b", task_description.lower()))
             return base_steps + additional_steps
@@ -412,7 +409,7 @@ class TaskAnalyzer:
 
     def _calculate_confidence(self, task_description: str, patterns: List[str], capabilities: List[str]) -> float:
         """Calculate confidence in the analysis."""
-        base_confidence = BASE_CONFIDENCE_SCORE
+        base_confidence = config.mcp.BASE_CONFIDENCE_SCORE
 
         # Boost confidence if we detected patterns
         if len(patterns) > 0:

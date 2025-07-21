@@ -19,6 +19,7 @@ from tool_search_results import ToolSearchResult
 # Specific type definitions for better type safety
 class SearchResultDict(TypedDict):
     """Type definition for search result dictionary."""
+
     tool_id: str
     name: str
     description: str
@@ -30,6 +31,7 @@ class SearchResultDict(TypedDict):
 
 class ParameterSchemaDict(TypedDict, total=False):
     """Type definition for parameter schema dictionary."""
+
     name: str
     type: str
     required: bool
@@ -39,6 +41,7 @@ class ParameterSchemaDict(TypedDict, total=False):
 
 class UsageExampleDict(TypedDict):
     """Type definition for usage example dictionary."""
+
     use_case: str
     example_call: str
     expected_output: str
@@ -48,6 +51,7 @@ class UsageExampleDict(TypedDict):
 
 class SearchCriteriaDict(TypedDict, total=False):
     """Type definition for search criteria dictionary."""
+
     capability_description: str
     required_parameters: Optional[List[str]]
     preferred_complexity: str
@@ -57,12 +61,14 @@ class SearchCriteriaDict(TypedDict, total=False):
 
 class ErrorResponseDict(TypedDict):
     """Type definition for error response dictionary."""
+
     success: bool
     error: Dict[str, Union[str, Optional[str], List[str]]]
 
 
 class ToolCategoryDict(TypedDict):
     """Type definition for tool category dictionary."""
+
     name: str
     description: str
     tool_count: int

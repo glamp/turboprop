@@ -456,6 +456,37 @@ class MCPConfig:
         os.getenv("TURBOPROP_MCP_MAX_SEARCH_RESULTS", "20"), "TURBOPROP_MCP_MAX_SEARCH_RESULTS", 20
     )
 
+    # Tool recommendation limits
+    DEFAULT_MAX_RECOMMENDATIONS: int = validate_positive_int(
+        os.getenv("TURBOPROP_MCP_MAX_RECOMMENDATIONS", "5"), "TURBOPROP_MCP_MAX_RECOMMENDATIONS", 5
+    )
+    DEFAULT_MAX_ALTERNATIVES: int = validate_positive_int(
+        os.getenv("TURBOPROP_MCP_MAX_ALTERNATIVES", "5"), "TURBOPROP_MCP_MAX_ALTERNATIVES", 5
+    )
+    DEFAULT_MAX_SEQUENCE_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_MCP_MAX_SEQUENCE_LENGTH", "10"), "TURBOPROP_MCP_MAX_SEQUENCE_LENGTH", 10
+    )
+    TASK_DESCRIPTION_MAX_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_MCP_TASK_DESCRIPTION_MAX_LENGTH", "1000"), "TURBOPROP_MCP_TASK_DESCRIPTION_MAX_LENGTH", 1000
+    )
+
+    # Task analysis configuration
+    MAX_TASK_DESCRIPTION_LENGTH: int = validate_positive_int(
+        os.getenv("TURBOPROP_MAX_TASK_LENGTH", "2000"), "TURBOPROP_MAX_TASK_LENGTH", 2000
+    )
+    COMPLEX_TASK_PATTERN_THRESHOLD: int = validate_positive_int(
+        os.getenv("TURBOPROP_COMPLEX_PATTERN_THRESHOLD", "3"), "TURBOPROP_COMPLEX_PATTERN_THRESHOLD", 3
+    )
+    COMPLEX_TASK_STEPS_THRESHOLD: int = validate_positive_int(
+        os.getenv("TURBOPROP_COMPLEX_STEPS_THRESHOLD", "8"), "TURBOPROP_COMPLEX_STEPS_THRESHOLD", 8
+    )
+    DEFAULT_SIMPLE_STEPS: int = validate_positive_int(
+        os.getenv("TURBOPROP_DEFAULT_SIMPLE_STEPS", "6"), "TURBOPROP_DEFAULT_SIMPLE_STEPS", 6
+    )
+    BASE_CONFIDENCE_SCORE: float = validate_range_float(
+        os.getenv("TURBOPROP_BASE_CONFIDENCE", "0.7"), "TURBOPROP_BASE_CONFIDENCE", 0.0, 1.0
+    )
+
 
 # Convenience class for accessing all configurations
 class Config:
