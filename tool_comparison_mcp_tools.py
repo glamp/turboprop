@@ -18,6 +18,7 @@ from comparison_response_types import (
 from context_analyzer import TaskContext
 from decision_support import DecisionSupport, SelectionGuidance
 from logging_config import get_logger
+from mcp_response_standardizer import standardize_mcp_tool_response
 from mcp_tool_validator import tool_exists
 from tool_comparison_engine import ToolComparisonEngine
 
@@ -62,6 +63,7 @@ def create_task_context(description: str) -> Optional[TaskContext]:
         return None
 
 
+@standardize_mcp_tool_response
 def compare_mcp_tools(
     tool_ids: List[str],
     comparison_criteria: Optional[List[str]] = None,
@@ -140,6 +142,7 @@ def compare_mcp_tools(
         return create_error_response("compare_mcp_tools", str(e), str(tool_ids))
 
 
+@standardize_mcp_tool_response
 def find_tool_alternatives(
     reference_tool: str,
     similarity_threshold: float = 0.7,
@@ -209,6 +212,7 @@ def find_tool_alternatives(
         return create_error_response("find_tool_alternatives", str(e), reference_tool)
 
 
+@standardize_mcp_tool_response
 def analyze_tool_relationships(
     tool_id: str,
     relationship_types: Optional[List[str]] = None,
@@ -267,6 +271,7 @@ def analyze_tool_relationships(
         return create_error_response("analyze_tool_relationships", str(e), tool_id)
 
 
+@standardize_mcp_tool_response
 def get_tool_recommendations_comparison(
     task_description: str,
     candidate_tools: Optional[List[str]] = None,

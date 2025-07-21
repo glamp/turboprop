@@ -18,6 +18,7 @@ from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from logging_config import get_logger
 from mcp_metadata_types import ParameterAnalysis, ToolExample, ToolId
+from mcp_response_standardizer import standardize_mcp_tool_response
 from mcp_tool_search_engine import MCPToolSearchEngine
 from mcp_tool_search_responses import (
     CapabilityMatch,
@@ -567,6 +568,7 @@ def _get_db_manager() -> DatabaseManager:
 
 
 @log_operation("mcp_tool_search")
+@standardize_mcp_tool_response
 def search_mcp_tools(
     query: str,
     category: Optional[str] = None,
@@ -618,13 +620,16 @@ def search_mcp_tools(
 
         logger.info("MCP tool search completed: %d results in %.3fs", len(response.results), response.execution_time)
 
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
-        return _handle_mcp_error("search_mcp_tools", e, query)
+        error_response = create_error_response("search_mcp_tools", str(e), query)
+        logger.error("Error in search_mcp_tools: %s (context: %s)", str(e), query or "none")
+        return error_response
 
 
 @log_operation("get_tool_details")
+@standardize_mcp_tool_response
 def get_tool_details(
     tool_id: str,
     include_schema: bool = True,
@@ -659,7 +664,8 @@ def get_tool_details(
 
         # Validate tool existence
         if not tool_exists(tool_id):
-            return json.dumps(create_error_response("get_tool_details", f"Tool '{tool_id}' not found", tool_id))
+            error_response = create_error_response("get_tool_details", f"Tool '{tool_id}' not found", tool_id)
+            return error_response
 
         # Validate parameters
         validator = _get_validator()
@@ -703,12 +709,15 @@ def get_tool_details(
 
         logger.info("Tool details retrieved for %s in %.3fs", tool_id, time.time() - start_time)
 
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
-        return _handle_mcp_error("get_tool_details", e, tool_id)
+        error_response = create_error_response("get_tool_details", str(e), tool_id)
+        logger.error("Error in get_tool_details: %s (context: %s)", str(e), tool_id or "none")
+        return error_response
 
 
+@standardize_mcp_tool_response
 def list_tool_categories() -> dict:
     """
     Get overview of available tool categories and their contents.
@@ -742,13 +751,16 @@ def list_tool_categories() -> dict:
 
         logger.info("Tool categories loaded: %d categories in %.3fs", len(categories), time.time() - start_time)
 
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
-        return _handle_mcp_error("list_tool_categories", e)
+        error_response = create_error_response("list_tool_categories", str(e), None)
+        logger.error("Error in list_tool_categories: %s", str(e))
+        return error_response
 
 
 @log_operation("capability_search")
+@standardize_mcp_tool_response
 def search_tools_by_capability(
     capability_description: str,
     required_parameters: Optional[List[str]] = None,
@@ -839,10 +851,12 @@ def search_tools_by_capability(
             "Capability search completed: %d results in %.3fs", len(capability_matches), response.execution_time
         )
 
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
-        return _handle_mcp_error("search_tools_by_capability", e, capability_description)
+        error_response = create_error_response("search_tools_by_capability", str(e), capability_description)
+        logger.error("Error in search_tools_by_capability: %s (context: %s)", str(e), capability_description or "none")
+        return error_response
 
 
 # Helper functions

@@ -72,6 +72,10 @@ class ToolSearchResult:
         # Convert ParameterAnalysis and ToolExample objects to dictionaries
         result["parameters"] = [p.to_dict() for p in self.parameters]
         result["examples"] = [ex.to_dict() for ex in self.examples]
+        # Rename tool_id to id for validator compatibility
+        if "tool_id" in result:
+            result["id"] = str(result["tool_id"])
+            del result["tool_id"]
         return result
 
     def get_confidence_score(self) -> float:

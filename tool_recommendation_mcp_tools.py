@@ -20,6 +20,7 @@ from typing import Any, Dict, Optional
 from context_analyzer import EnvironmentalConstraints, TaskContext, UserContext
 from logging_config import get_logger
 from mcp_error_handling import create_validation_error, handle_tool_exception
+from mcp_response_standardizer import standardize_mcp_tool_response
 from recommendation_explainer_mcp import (
     AlternativeComparisonFormatter,
     MCPExplanationFormatter,
@@ -93,6 +94,7 @@ def initialize_recommendation_tools(
     logger.info("Tool recommendation MCP tools initialized successfully")
 
 
+@standardize_mcp_tool_response
 def recommend_tools_for_task(
     task_description: str,
     context: Optional[str] = None,
@@ -169,9 +171,7 @@ def recommend_tools_for_task(
 
         # Check if recommendation engine is initialized
         if not _recommendation_engine or not _task_analyzer:
-            return json.dumps(
-                create_error_response("recommend_tools_for_task", "Recommendation engine not initialized")
-            )
+            return create_error_response("recommend_tools_for_task", "Recommendation engine not initialized")
 
         logger.info(f"Processing tool recommendation request: {task_description[:50]}...")
 
@@ -260,7 +260,7 @@ def recommend_tools_for_task(
                 response.add_refinement_suggestion(suggestion)
 
         logger.info(f"Tool recommendation completed in {time.time() - start_time:.2f}s")
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
         return handle_tool_exception(
@@ -271,6 +271,7 @@ def recommend_tools_for_task(
         )
 
 
+@standardize_mcp_tool_response
 def analyze_task_requirements(
     task_description: str, detail_level: str = "standard", include_suggestions: bool = True
 ) -> dict:
@@ -297,20 +298,16 @@ def analyze_task_requirements(
     try:
         # Validate inputs
         if not task_description or not isinstance(task_description, str):
-            return json.dumps(
-                create_error_response("analyze_task_requirements", "Task description must be a non-empty string")
-            )
+            return create_error_response("analyze_task_requirements", "Task description must be a non-empty string")
 
         task_description = task_description.strip()
         if not task_description:
-            return json.dumps(create_error_response("analyze_task_requirements", "Task description cannot be empty"))
+            return create_error_response("analyze_task_requirements", "Task description cannot be empty")
 
         if len(task_description) > config.mcp.TASK_DESCRIPTION_MAX_LENGTH:
-            return json.dumps(
-                create_error_response(
-                    "analyze_task_requirements",
-                    f"Task description too long (max {config.mcp.TASK_DESCRIPTION_MAX_LENGTH} characters)",
-                )
+            return create_error_response(
+                "analyze_task_requirements",
+                f"Task description too long (max {config.mcp.TASK_DESCRIPTION_MAX_LENGTH} characters)",
             )
 
         # Validate detail_level
@@ -319,7 +316,7 @@ def analyze_task_requirements(
 
         # Check if task analyzer is initialized
         if not _task_analyzer:
-            return json.dumps(create_error_response("analyze_task_requirements", "Task analyzer not initialized"))
+            return create_error_response("analyze_task_requirements", "Task analyzer not initialized")
 
         logger.info(f"Analyzing task requirements: {task_description[:50]}...")
 
@@ -396,13 +393,14 @@ def analyze_task_requirements(
                 response.alternative_approaches.append("Evaluate different data formats and serialization options")
 
         logger.info(f"Task analysis completed in {time.time() - start_time:.2f}s")
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
         logger.error(f"Error in analyze_task_requirements: {str(e)}", exc_info=True)
-        return json.dumps(create_error_response("analyze_task_requirements", str(e), task_description))
+        return create_error_response("analyze_task_requirements", str(e), task_description)
 
 
+@standardize_mcp_tool_response
 def suggest_tool_alternatives(
     primary_tool: str,
     task_context: Optional[str] = None,
@@ -433,22 +431,18 @@ def suggest_tool_alternatives(
     try:
         # Validate inputs
         if not primary_tool or not isinstance(primary_tool, str):
-            return json.dumps(
-                create_error_response("suggest_tool_alternatives", "Primary tool must be a non-empty string")
-            )
+            return create_error_response("suggest_tool_alternatives", "Primary tool must be a non-empty string")
 
         primary_tool = primary_tool.strip()
         if not primary_tool:
-            return json.dumps(create_error_response("suggest_tool_alternatives", "Primary tool name cannot be empty"))
+            return create_error_response("suggest_tool_alternatives", "Primary tool name cannot be empty")
 
         # Validate max_alternatives
         max_alternatives = max(1, min(max_alternatives, 10))
 
         # Check if recommendation engine is initialized
         if not _recommendation_engine:
-            return json.dumps(
-                create_error_response("suggest_tool_alternatives", "Recommendation engine not initialized")
-            )
+            return create_error_response("suggest_tool_alternatives", "Recommendation engine not initialized")
 
         logger.info(f"Finding alternatives for tool: {primary_tool}")
 
@@ -517,13 +511,14 @@ def suggest_tool_alternatives(
                 response.categorize_alternative("Feature-rich alternatives", alt.tool_id)
 
         logger.info(f"Alternative suggestions completed in {time.time() - start_time:.2f}s")
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
         logger.error(f"Error in suggest_tool_alternatives: {str(e)}", exc_info=True)
-        return json.dumps(create_error_response("suggest_tool_alternatives", str(e), primary_tool))
+        return create_error_response("suggest_tool_alternatives", str(e), primary_tool)
 
 
+@standardize_mcp_tool_response
 def recommend_tool_sequence(
     workflow_description: str,
     optimization_goal: str = "balanced",
@@ -554,20 +549,16 @@ def recommend_tool_sequence(
     try:
         # Validate inputs
         if not workflow_description or not isinstance(workflow_description, str):
-            return json.dumps(
-                create_error_response("recommend_tool_sequence", "Workflow description must be a non-empty string")
-            )
+            return create_error_response("recommend_tool_sequence", "Workflow description must be a non-empty string")
 
         workflow_description = workflow_description.strip()
         if not workflow_description:
-            return json.dumps(create_error_response("recommend_tool_sequence", "Workflow description cannot be empty"))
+            return create_error_response("recommend_tool_sequence", "Workflow description cannot be empty")
 
         if len(workflow_description) > config.mcp.TASK_DESCRIPTION_MAX_LENGTH * 2:
-            return json.dumps(
-                create_error_response(
-                    "recommend_tool_sequence",
-                    f"Workflow description too long (max {config.mcp.TASK_DESCRIPTION_MAX_LENGTH * 2} characters)",
-                )
+            return create_error_response(
+                "recommend_tool_sequence",
+                f"Workflow description too long (max {config.mcp.TASK_DESCRIPTION_MAX_LENGTH * 2} characters)",
             )
 
         # Validate optimization_goal
@@ -579,7 +570,7 @@ def recommend_tool_sequence(
 
         # Check if engines are initialized
         if not _recommendation_engine or not _workflow_formatter:
-            return json.dumps(create_error_response("recommend_tool_sequence", "Required engines not initialized"))
+            return create_error_response("recommend_tool_sequence", "Required engines not initialized")
 
         logger.info(f"Analyzing workflow: {workflow_description[:50]}...")
 
@@ -676,11 +667,11 @@ def recommend_tool_sequence(
         response.add_customization_suggestion("Consider adding intermediate validation steps for reliability")
 
         logger.info(f"Tool sequence recommendation completed in {time.time() - start_time:.2f}s")
-        return json.dumps(response.to_dict())
+        return response.to_dict()
 
     except Exception as e:
         logger.error(f"Error in recommend_tool_sequence: {str(e)}", exc_info=True)
-        return json.dumps(create_error_response("recommend_tool_sequence", str(e), workflow_description))
+        return create_error_response("recommend_tool_sequence", str(e), workflow_description)
 
 
 # Helper functions for context creation and management
