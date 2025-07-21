@@ -5,8 +5,6 @@ import time
 from typing import Any, Dict, List, Optional
 
 from mcp_response_config import (
-    CONTROL_CHARS_PATTERN,
-    DANGEROUS_HTML_TAGS,
     JAVASCRIPT_SAFE_INTEGER,
     MAX_DICT_SIZE,
     MAX_KEY_LENGTH,
@@ -15,7 +13,6 @@ from mcp_response_config import (
     MAX_TOOL_NAME_LENGTH,
     RESPONSE_FORMAT_VERSION,
     SAFE_KEY_PATTERN,
-    SAFE_TOOL_NAME_PATTERN,
 )
 
 logger = logging.getLogger(__name__)

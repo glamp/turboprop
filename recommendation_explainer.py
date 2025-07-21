@@ -6,8 +6,8 @@ This module generates clear explanations for tool recommendations, including
 comparisons between alternatives and detailed usage guidance.
 """
 
-from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from logging_config import get_logger
 from task_analyzer import TaskAnalysis
@@ -303,23 +303,23 @@ class GuidanceGenerator:
         if user_skill == "beginner":
             return [
                 f"1. Initialize {tool_name} with default settings",
-                f"2. Prepare your input data in the required format",
+                "2. Prepare your input data in the required format",
                 f"3. Run {tool_name} with minimal parameters first",
-                f"4. Verify the output meets your requirements",
-                f"5. Gradually add additional parameters as needed",
+                "4. Verify the output meets your requirements",
+                "5. Gradually add additional parameters as needed",
             ]
         elif user_skill == "intermediate":
             return [
                 f"1. Configure {tool_name} with task-specific parameters",
-                f"2. Set up error handling and validation",
-                f"3. Run tool and monitor performance",
-                f"4. Optimize parameters based on results",
+                "2. Set up error handling and validation",
+                "3. Run tool and monitor performance",
+                "4. Optimize parameters based on results",
             ]
         else:  # advanced
             return [
                 f"1. Configure {tool_name} for optimal performance",
-                f"2. Implement custom error handling and logging",
-                f"3. Integrate with existing workflow automation",
+                "2. Implement custom error handling and logging",
+                "3. Integrate with existing workflow automation",
             ]
 
     def generate_optimization_tips(self, tool_metadata: Dict[str, Any], user_skill: str) -> List[str]:

@@ -42,6 +42,7 @@ from watchdog.observers import Observer  # noqa: E402
 from database_manager import DatabaseManager  # noqa: E402
 from embedding_helper import EmbeddingGenerator  # noqa: E402
 from logging_config import get_logger  # noqa: E402
+from config import config  # noqa: E402
 
 # Global database manager instance
 _db_manager = None
@@ -60,9 +61,6 @@ def get_version():
     except ImportError:
         return "0.2.2"
 
-
-# Import configuration
-from config import config
 
 # Backward compatibility for tests
 DB_PATH = "code_index.duckdb"
@@ -1414,7 +1412,7 @@ def handle_search_command(args, embedder):
             fusion_weights = {
                 "semantic_weight": args.semantic_weight,
                 "text_weight": args.text_weight,
-                "rrf_k": 60,
+                "rrf_k": config.search.RRF_K,
                 "boost_exact_matches": True,
                 "exact_match_boost": 1.5,
             }

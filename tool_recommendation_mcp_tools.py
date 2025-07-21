@@ -13,10 +13,10 @@ Core MCP Tools:
 - recommend_tool_sequence: Multi-tool workflow recommendations
 """
 
-import json
 import time
 from typing import Any, Dict, Optional
 
+from config import config
 from context_analyzer import EnvironmentalConstraints, TaskContext, UserContext
 from logging_config import get_logger
 from mcp_error_handling import create_validation_error, handle_tool_exception
@@ -63,9 +63,6 @@ _explanation_formatter: Optional[MCPExplanationFormatter] = None
 _suggestion_generator: Optional[TaskDescriptionSuggestionGenerator] = None
 _comparison_formatter: Optional[AlternativeComparisonFormatter] = None
 _workflow_formatter: Optional[WorkflowAnalysisFormatter] = None
-
-# Import configuration
-from config import config
 
 
 def initialize_recommendation_tools(

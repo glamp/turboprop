@@ -16,7 +16,7 @@ from comparison_response_types import (
     create_error_response,
 )
 from context_analyzer import TaskContext
-from decision_support import DecisionSupport, SelectionGuidance
+from decision_support import DecisionSupport
 from logging_config import get_logger
 from mcp_response_standardizer import standardize_mcp_tool_response
 from mcp_tool_validator import tool_exists

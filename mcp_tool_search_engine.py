@@ -17,7 +17,7 @@ from parameter_utils import calculate_parameter_counts
 from search_result_formatter import SearchResultFormatter
 from tool_matching_algorithms import ToolMatchingAlgorithms
 from tool_query_processor import ToolQueryProcessor
-from tool_search_results import ProcessedQuery, ToolResultCluster, ToolSearchResponse, ToolSearchResult
+from tool_search_results import ProcessedQuery, ToolSearchResponse, ToolSearchResult
 
 logger = get_logger(__name__)
 
@@ -483,9 +483,9 @@ class MCPToolSearchEngine:
 
         for i, term in enumerate(terms):
             pattern = f"%{term}%"
-            search_conditions.append(f"(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)")
+            search_conditions.append("(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)")
             score_conditions.append(
-                f"""
+                """
                 CASE
                     WHEN LOWER(name) LIKE ? THEN 2.0
                     WHEN LOWER(description) LIKE ? THEN 1.0

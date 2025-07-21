@@ -11,13 +11,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from advanced_filters import AdvancedFilters, CompatibilityRequirements, ParameterFilterSet
+from advanced_filters import AdvancedFilters, ParameterFilterSet
 from logging_config import get_logger
 from mcp_metadata_types import ParameterAnalysis, ToolId
 from mcp_tool_search_engine import MCPToolSearchEngine
-from parameter_analyzer import ParameterAnalyzer, ParameterMatchResult, ParameterRequirements
+from parameter_analyzer import ParameterAnalyzer, ParameterRequirements
 from parameter_ranking import ComplexityPreference, ParameterRanking, RankingContext
-from tool_search_results import ToolSearchResponse, ToolSearchResult
+from tool_search_results import ToolSearchResult
 from type_compatibility_analyzer import ConversionChain, TypeCompatibilityAnalyzer
 
 logger = get_logger(__name__)

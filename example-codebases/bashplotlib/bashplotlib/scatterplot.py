@@ -7,7 +7,6 @@ Plotting terminal based scatterplots
 
 from __future__ import print_function
 
-import csv
 import optparse
 import sys
 

@@ -11,25 +11,20 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
 import numpy as np
-import pytest
 
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from mcp_metadata_extractor import MCPMetadataExtractor
 from mcp_metadata_types import (
     ComplexityAnalysis,
-    DocumentationAnalysis,
     MCPToolMetadata,
     ParameterAnalysis,
     ToolExample,
-    UsagePattern,
 )
-from mcp_tool_discovery import MCPTool, MCPToolDiscovery, ParameterInfo
-from mcp_tool_discovery import ToolExample as MCPToolExample
+from mcp_tool_discovery import MCPToolDiscovery
 
 
 class TestToolStorageOperations(unittest.TestCase):

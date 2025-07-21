@@ -11,16 +11,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from context_analyzer import ContextAnalyzer, EnvironmentalConstraints, TaskContext, UserContext
+from context_analyzer import ContextAnalyzer, EnvironmentalConstraints, TaskContext
 from parameter_search_engine import ParameterSearchEngine
 from task_analyzer import TaskAnalysis, TaskAnalyzer
 from tool_recommendation_engine import (
-    AlternativeRequest,
     AlternativeResponse,
-    RecommendationRequest,
     RecommendationResponse,
     ToolRecommendationEngine,
-    ToolSequenceRequest,
     ToolSequenceResponse,
 )
 from tool_recommendation_mcp_tools import (

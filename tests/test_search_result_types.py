@@ -6,9 +6,7 @@ This module tests the enhanced data structures that replace simple tuples
 in search results, providing structured data for AI reasoning.
 """
 
-from dataclasses import asdict
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 

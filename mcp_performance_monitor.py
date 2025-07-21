@@ -2,7 +2,7 @@ import logging
 import statistics
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 

@@ -22,8 +22,6 @@ from embedding_helper import EmbeddingGenerator
 from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample, ToolId
 from mcp_tool_search_engine import MCPToolSearchEngine
 from search_result_formatter import SearchResultFormatter
-from tool_matching_algorithms import ToolMatchingAlgorithms
-from tool_query_processor import ToolQueryProcessor
 from tool_search_results import ToolSearchResponse
 
 
@@ -345,7 +343,7 @@ class TestEndToEndEdgeCases:
                 operation()
             except ValueError:
                 pass  # Expected for some operations
-            except Exception as e:
+            except Exception:
                 # Unexpected error - but system should still be consistent
                 pass
 

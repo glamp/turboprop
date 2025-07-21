@@ -6,12 +6,11 @@ This module provides comprehensive parameter schema analysis and matching
 for parameter-aware tool search capabilities.
 """
 
-import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from logging_config import get_logger
-from mcp_metadata_types import ParameterAnalysis, ToolId
+from mcp_metadata_types import ParameterAnalysis
 
 logger = get_logger(__name__)
 

@@ -8,12 +8,15 @@ including trade-off analysis, selection guidance, and decision trees.
 
 import statistics
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from comparison_constants import CONFIDENCE_FACTORS, DECISION_THRESHOLDS, SCORE_LIMITS, TASK_SCORING_WEIGHTS
 from context_analyzer import TaskContext
 from logging_config import get_logger
 from tool_search_results import ToolSearchResult
+
+if TYPE_CHECKING:
+    from comparison_types import ToolComparisonResult
 
 logger = get_logger(__name__)
 

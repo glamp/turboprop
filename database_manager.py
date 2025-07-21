@@ -179,8 +179,8 @@ class ConnectionManager:
         for conn in self._connections.values():
             try:
                 conn.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Error closing connection during cleanup: %s", e)
 
         self._connections.clear()
         self._connection_created_time.clear()
@@ -217,9 +217,9 @@ class DatabaseManager:
         try:
             signal.signal(signal.SIGTERM, self._signal_handler)
             signal.signal(signal.SIGINT, self._signal_handler)
-        except ValueError:
+        except ValueError as e:
             # Signal handling only works in main thread, ignore in other threads
-            pass
+            logger.debug("Signal handler setup failed (not in main thread): %s", e)
 
     @property
     def _connections(self) -> Dict[int, Any]:
@@ -294,8 +294,8 @@ class DatabaseManager:
                 fcntl.flock(self._file_lock.fileno(), fcntl.LOCK_UN)
                 self._file_lock.close()
                 self._lock_file_path.unlink(missing_ok=True)
-            except (IOError, OSError):
-                pass
+            except (IOError, OSError) as e:
+                logger.debug("Error cleaning up lock file: %s", e)
             finally:
                 self._file_lock = None
 
@@ -386,7 +386,8 @@ class DatabaseManager:
 
                 conn.execute("COMMIT")
                 return results
-            except Exception:
+            except Exception as e:
+                logger.error("Transaction failed, rolling back: %s", e)
                 conn.execute("ROLLBACK")
                 raise
 
@@ -606,52 +607,68 @@ class DatabaseManager:
             DatabaseError: For other database-related errors
         """
         try:
-            # Create a separate FTS table manually
-            fts_create_alt = f"""
-            CREATE TABLE IF NOT EXISTS {fts_table_name} AS
-            SELECT id, path, content
-            FROM {table_name}
-            WHERE content IS NOT NULL
-            """
-            conn.execute(fts_create_alt)
+            # Create the FTS table
+            self._create_fts_table_structure(conn, fts_table_name, table_name)
             logger.info("Created alternative FTS table %s", fts_table_name)
 
-            # Create basic DuckDB-compatible index instead of PostgreSQL gin index
-            try:
-                index_sql = f"CREATE INDEX IF NOT EXISTS {INDEX_PREFIX}_{fts_table_name}_{FTS_CONTENT_INDEX_SUFFIX} ON {fts_table_name} (content)"
-                conn.execute(index_sql)
-                logger.info("Created basic content index on alternative FTS table %s", fts_table_name)
-            except duckdb.Error as e:
-                error_msg = str(e).lower()
-                if "permission" in error_msg or "denied" in error_msg:
-                    logger.warning("Permission denied when creating content index on fallback table: %s", e)
-                elif "space" in error_msg or "disk" in error_msg:
-                    logger.warning("Insufficient disk space when creating content index on fallback table: %s", e)
-                elif "lock" in error_msg:
-                    logger.warning("Database locked when creating content index on fallback table: %s", e)
-                else:
-                    logger.warning("Failed to create content index on fallback table: %s", e)
-                logger.info("Alternative FTS table %s created without index", fts_table_name)
+            # Try to create an index (non-critical if it fails)
+            self._create_fts_content_index(conn, fts_table_name)
 
         except duckdb.Error as e:
-            error_msg = str(e).lower()
-            if "permission" in error_msg or "denied" in error_msg:
-                logger.error("Permission denied when creating alternative FTS table: %s", e)
-                raise DatabasePermissionError(f"Permission denied when creating alternative FTS table: {e}") from e
-            elif "space" in error_msg or "disk" in error_msg:
-                logger.error("Insufficient disk space when creating alternative FTS table: %s", e)
-                raise DatabaseDiskSpaceError(f"Insufficient disk space when creating alternative FTS table: {e}") from e
-            elif "corrupt" in error_msg:
-                logger.error("Database corruption detected when creating alternative FTS table: %s", e)
-                raise DatabaseCorruptionError(
-                    f"Database corruption detected when creating alternative FTS table: {e}"
-                ) from e
-            elif "lock" in error_msg:
-                logger.error("Database locked when creating alternative FTS table: %s", e)
-                raise DatabaseLockError(f"Database locked when creating alternative FTS table: {e}") from e
-            else:
-                logger.error("Failed to create alternative FTS table: %s", e)
-                raise DatabaseError(f"Failed to create alternative FTS table: {e}") from e
+            self._handle_fts_table_creation_error(e, "alternative FTS table")
+
+    def _create_fts_table_structure(
+        self, conn: duckdb.DuckDBPyConnection, fts_table_name: str, table_name: str
+    ) -> None:
+        """Create the basic FTS table structure."""
+        fts_create_alt = f"""
+        CREATE TABLE IF NOT EXISTS {fts_table_name} AS
+        SELECT id, path, content
+        FROM {table_name}
+        WHERE content IS NOT NULL
+        """
+        conn.execute(fts_create_alt)
+
+    def _create_fts_content_index(self, conn: duckdb.DuckDBPyConnection, fts_table_name: str) -> None:
+        """Create content index on FTS table, with graceful fallback if it fails."""
+        try:
+            index_sql = f"CREATE INDEX IF NOT EXISTS {INDEX_PREFIX}_{fts_table_name}_{FTS_CONTENT_INDEX_SUFFIX} ON {fts_table_name} (content)"
+            conn.execute(index_sql)
+            logger.info("Created basic content index on alternative FTS table %s", fts_table_name)
+        except duckdb.Error as e:
+            self._handle_index_creation_error(e, fts_table_name)
+
+    def _handle_index_creation_error(self, error: duckdb.Error, fts_table_name: str) -> None:
+        """Handle errors during index creation with appropriate logging."""
+        error_msg = str(error).lower()
+        if "permission" in error_msg or "denied" in error_msg:
+            logger.warning("Permission denied when creating content index on fallback table: %s", error)
+        elif "space" in error_msg or "disk" in error_msg:
+            logger.warning("Insufficient disk space when creating content index on fallback table: %s", error)
+        elif "lock" in error_msg:
+            logger.warning("Database locked when creating content index on fallback table: %s", error)
+        else:
+            logger.warning("Failed to create content index on fallback table: %s", error)
+        logger.info("Alternative FTS table %s created without index", fts_table_name)
+
+    def _handle_fts_table_creation_error(self, error: duckdb.Error, operation: str) -> None:
+        """Handle database errors during FTS table creation and raise appropriate exceptions."""
+        error_msg = str(error).lower()
+        if "permission" in error_msg or "denied" in error_msg:
+            logger.error("Permission denied when creating %s: %s", operation, error)
+            raise DatabasePermissionError(f"Permission denied when creating {operation}: {error}") from error
+        elif "space" in error_msg or "disk" in error_msg:
+            logger.error("Insufficient disk space when creating %s: %s", operation, error)
+            raise DatabaseDiskSpaceError(f"Insufficient disk space when creating {operation}: {error}") from error
+        elif "corrupt" in error_msg:
+            logger.error("Database corruption detected when creating %s: %s", operation, error)
+            raise DatabaseCorruptionError(f"Database corruption detected when creating {operation}: {error}") from error
+        elif "lock" in error_msg:
+            logger.error("Database locked when creating %s: %s", operation, error)
+            raise DatabaseLockError(f"Database locked when creating {operation}: {error}") from error
+        else:
+            logger.error("Failed to create %s: %s", operation, error)
+            raise DatabaseError(f"Failed to create {operation}: {error}") from error
 
     def create_fts_index(self, table_name: str = "code_files") -> bool:
         """
@@ -734,7 +751,7 @@ class DatabaseManager:
                     logger.info(f"Successfully rebuilt DuckDB FTS index for {table_name}")
                 except Exception as create_e:
                     logger.warning(f"FTS index recreation failed: {create_e}, trying alternative approach")
-                    
+
                     # Fallback to alternative table approach
                     fts_table_name = f"{table_name}_fts"
                     try:
@@ -764,8 +781,10 @@ class DatabaseManager:
                 fts_schema = f"fts_main_{table_name}"
                 try:
                     # Check if FTS schema exists
-                    conn.execute(f"SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{fts_schema}'").fetchone()
-                    
+                    conn.execute(
+                        f"SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{fts_schema}'"
+                    ).fetchone()
+
                     # Test match_bm25 function with a simple query
                     conn.execute(f"SELECT {fts_schema}.match_bm25('{table_name}', 'test') LIMIT 1")
                     logger.debug(f"DuckDB FTS is available for table {table_name}")
@@ -796,60 +815,75 @@ class DatabaseManager:
             List of search results with FTS scores
         """
         try:
-            fts_table_name = f"{table_name}_fts"
-
-            # Try DuckDB FTS search using match_bm25 function
-            try:
-                fts_schema = f"fts_main_{table_name}"
-                
-                # Use DuckDB's match_bm25 function with correct syntax (id column value, not table name)
-                fts_query = f"""
-                SELECT cf.id, cf.path, cf.content, 
-                       {fts_schema}.match_bm25(cf.id, ?) as fts_score
-                FROM {table_name} cf
-                WHERE {fts_schema}.match_bm25(cf.id, ?) IS NOT NULL 
-                   AND {fts_schema}.match_bm25(cf.id, ?) > 0
-                ORDER BY fts_score DESC
-                LIMIT ?
-                """
-
-                results = conn.execute(fts_query, [query, query, query, limit]).fetchall()
-                logger.debug(f"DuckDB FTS search for '{query}' returned {len(results)} results")
+            # Try DuckDB native FTS first
+            results = self._try_native_fts_search(conn, query, limit, table_name)
+            if results:
                 return results
 
-            except Exception as fts_error:
-                logger.debug(f"DuckDB FTS search failed: {fts_error}. Trying alternative FTS table.")
-
-                # Alternative approach using the FTS table we created
-                alt_fts_query = f"""
-                SELECT id, path, content,
-                       CASE 
-                           WHEN content_lower LIKE ? THEN 1.0
-                           WHEN path_lower LIKE ? THEN 0.8
-                           WHEN content_lower LIKE ? THEN 0.6
-                           ELSE 0.4
-                       END as fts_score
-                FROM {fts_table_name}
-                WHERE content_lower LIKE ? OR path_lower LIKE ? OR content_lower LIKE ?
-                ORDER BY fts_score DESC
-                LIMIT ?
-                """
-
-                # Create search patterns
-                exact_pattern = f"%{query.lower()}%"
-                fuzzy_pattern = f"%{query.lower().replace(' ', '%')}%"
-
-                results = conn.execute(
-                    alt_fts_query,
-                    [exact_pattern, exact_pattern, fuzzy_pattern, exact_pattern, exact_pattern, fuzzy_pattern, limit],
-                ).fetchall()
-
-                logger.debug(f"Alternative FTS search for '{query}' returned {len(results)} results")
-                return results
+            # Fall back to alternative FTS table search
+            return self._try_alternative_fts_search(conn, query, limit, table_name)
 
         except Exception as e:
             logger.warning(f"DuckDB FTS search failed: {e}")
             return []
+
+    def _try_native_fts_search(
+        self, conn: duckdb.DuckDBPyConnection, query: str, limit: int, table_name: str
+    ) -> List[tuple]:
+        """Try native DuckDB FTS search using match_bm25 function."""
+        try:
+            fts_schema = f"fts_main_{table_name}"
+
+            # Use DuckDB's match_bm25 function with correct syntax
+            fts_query = f"""
+            SELECT cf.id, cf.path, cf.content, 
+                   {fts_schema}.match_bm25(cf.id, ?) as fts_score
+            FROM {table_name} cf
+            WHERE {fts_schema}.match_bm25(cf.id, ?) IS NOT NULL 
+               AND {fts_schema}.match_bm25(cf.id, ?) > 0
+            ORDER BY fts_score DESC
+            LIMIT ?
+            """
+
+            results = conn.execute(fts_query, [query, query, query, limit]).fetchall()
+            logger.debug(f"DuckDB FTS search for '{query}' returned {len(results)} results")
+            return results
+
+        except Exception as fts_error:
+            logger.debug(f"DuckDB FTS search failed: {fts_error}. Trying alternative FTS table.")
+            return []
+
+    def _try_alternative_fts_search(
+        self, conn: duckdb.DuckDBPyConnection, query: str, limit: int, table_name: str
+    ) -> List[tuple]:
+        """Try alternative FTS search using custom FTS table with LIKE queries."""
+        fts_table_name = f"{table_name}_fts"
+
+        alt_fts_query = f"""
+        SELECT id, path, content,
+               CASE 
+                   WHEN content_lower LIKE ? THEN 1.0
+                   WHEN path_lower LIKE ? THEN 0.8
+                   WHEN content_lower LIKE ? THEN 0.6
+                   ELSE 0.4
+               END as fts_score
+        FROM {fts_table_name}
+        WHERE content_lower LIKE ? OR path_lower LIKE ? OR content_lower LIKE ?
+        ORDER BY fts_score DESC
+        LIMIT ?
+        """
+
+        # Create search patterns
+        exact_pattern = f"%{query.lower()}%"
+        fuzzy_pattern = f"%{query.lower().replace(' ', '%')}%"
+
+        results = conn.execute(
+            alt_fts_query,
+            [exact_pattern, exact_pattern, fuzzy_pattern, exact_pattern, exact_pattern, fuzzy_pattern, limit],
+        ).fetchall()
+
+        logger.debug(f"Alternative FTS search for '{query}' returned {len(results)} results")
+        return results
 
     def _execute_like_search(
         self, conn: duckdb.DuckDBPyConnection, query: str, limit: int, table_name: str = "code_files"

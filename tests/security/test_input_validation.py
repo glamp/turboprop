@@ -379,8 +379,7 @@ class TestSecurityIntegration:
 
     def test_security_logging(self):
         """Test that security violations are properly logged."""
-        import logging
-        from unittest.mock import Mock, patch
+        from unittest.mock import patch
 
         # Mock logger to capture security warnings
         with patch("tool_query_processor.logger") as mock_logger:

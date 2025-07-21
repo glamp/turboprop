@@ -7,11 +7,11 @@ including comparison between alternatives and usage guidance.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import pytest
 
-from recommendation_algorithms import AlternativeRecommendation, ToolRecommendation
+from recommendation_algorithms import ToolRecommendation
 from recommendation_explainer import (
     AlternativeComparison,
     ComparisonAnalyzer,

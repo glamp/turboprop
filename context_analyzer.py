@@ -448,7 +448,6 @@ class ContextAnalyzer:
         logger.debug("Analyzing user context")
 
         usage_history = context_data.get("tool_usage_history", [])
-        task_history = context_data.get("task_completion_history", [])
         preferences = context_data.get("preferences", {})
 
         # Infer skill level from usage history

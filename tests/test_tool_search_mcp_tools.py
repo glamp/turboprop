@@ -7,11 +7,11 @@ response formatting, error handling, and integration with search engines.
 """
 
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_metadata_types import ParameterAnalysis, ToolExample, ToolId
+from mcp_metadata_types import ToolId
 from mcp_tool_search_responses import (
     CapabilityMatch,
     CapabilitySearchResponse,
@@ -27,7 +27,6 @@ from mcp_tool_validator import (
     ValidatedSearchParams,
     ValidatedToolDetailsParams,
     generate_error_suggestions,
-    tool_exists,
 )
 from tool_search_mcp_tools import (
     get_tool_details,

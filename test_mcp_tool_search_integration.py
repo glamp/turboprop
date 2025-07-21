@@ -11,11 +11,9 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
 
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from mcp_metadata_types import ToolId
 from tool_search_mcp_tools import (
     get_representative_tools,
     get_tool_details,

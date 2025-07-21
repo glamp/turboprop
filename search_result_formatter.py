@@ -7,10 +7,10 @@ in various user-friendly formats including console output, JSON, and structured 
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from logging_config import get_logger
-from tool_search_results import ToolResultCluster, ToolSearchResponse, ToolSearchResult
+from tool_search_results import ToolSearchResponse, ToolSearchResult
 
 logger = get_logger(__name__)
 

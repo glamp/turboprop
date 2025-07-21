@@ -6,11 +6,10 @@ This module analyzes natural language task descriptions and extracts requirement
 constraints, and metadata to enable intelligent tool recommendations.
 """
 
-import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from logging_config import get_logger
 

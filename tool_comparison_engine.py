@@ -16,7 +16,7 @@ from comparison_formatter import ComparisonFormatter
 from comparison_metrics import ComparisonMetrics
 from comparison_types import DetailedComparison, TaskComparisonResult, ToolComparisonResult
 from context_analyzer import TaskContext
-from decision_support import DecisionSupport, SelectionGuidance, TradeOffAnalysis
+from decision_support import DecisionSupport
 from logging_config import get_logger
 from tool_search_results import ToolSearchResult
 

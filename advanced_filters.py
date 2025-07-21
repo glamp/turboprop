@@ -10,10 +10,9 @@ complexity-based filtering.
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
-from mcp_metadata_types import ParameterAnalysis
 
 logger = get_logger(__name__)
 

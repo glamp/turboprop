@@ -13,12 +13,10 @@ from comparison_response_types import (
     CategoryOverviewResponse,
     SelectionContext,
     SelectionGuidanceResponse,
-    TaskAnalysis,
-    ToolSearchResult,
     create_error_response,
 )
 from context_analyzer import ContextAnalyzer
-from decision_support import DecisionSupport, SelectionGuidance
+from decision_support import DecisionSupport
 from logging_config import get_logger
 from task_analyzer import TaskAnalyzer
 

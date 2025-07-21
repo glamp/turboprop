@@ -11,7 +11,6 @@ import time
 from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
-from recommendation_explainer import RecommendationExplanation
 from task_analysis_response_types import ToolRecommendation
 from task_analyzer import TaskAnalysis
 

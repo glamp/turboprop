@@ -6,10 +6,9 @@ This module provides sophisticated ranking algorithms based on parameter analysi
 enabling improved tool search results through parameter match quality assessment.
 """
 
-import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
 from mcp_metadata_types import ParameterAnalysis

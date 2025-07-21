@@ -16,7 +16,6 @@ from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from logging_config import get_logger
 from mcp_metadata_extractor import MCPMetadataExtractor
-from mcp_metadata_types import MCPToolMetadata
 from mcp_tool_discovery import MCPToolDiscovery
 from tool_embedding_pipeline import ToolEmbeddingPipeline
 from tool_relationship_detector import ToolRelationshipDetector

@@ -6,7 +6,6 @@ This module contains the core data types shared between comparison components
 to avoid circular import dependencies.
 """
 
-import statistics
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 

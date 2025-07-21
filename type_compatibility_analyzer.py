@@ -6,10 +6,9 @@ This module provides sophisticated type compatibility analysis for parameter-awa
 tool search, including type hierarchies, conversion chains, and compatibility scoring.
 """
 
-import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from logging_config import get_logger
 

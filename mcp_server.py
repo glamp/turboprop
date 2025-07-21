@@ -934,7 +934,7 @@ def search_code_hybrid(
             fusion_weights = {
                 "semantic_weight": semantic_weight,
                 "text_weight": text_weight,
-                "rrf_k": 60,
+                "rrf_k": config.search.RRF_K,
                 "boost_exact_matches": True,
                 "exact_match_boost": 1.5,
             }

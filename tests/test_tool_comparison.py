@@ -6,10 +6,7 @@ This module tests the tool comparison and alternative detection capabilities,
 including multi-dimensional analysis, decision support, and result formatting.
 """
 
-import tempfile
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

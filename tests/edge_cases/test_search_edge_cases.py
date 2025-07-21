@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -23,12 +23,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from exceptions import DatabaseTimeoutError, EmbeddingError, SearchError
-from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample, ToolId
+from exceptions import DatabaseTimeoutError, EmbeddingError
 from mcp_tool_search_engine import MCPToolSearchEngine
-from tool_matching_algorithms import ToolMatchingAlgorithms
 from tool_query_processor import ToolQueryProcessor
-from tool_search_results import ProcessedQuery, SearchIntent, ToolSearchResponse, ToolSearchResult
+from tool_search_results import ProcessedQuery, ToolSearchResponse
 
 
 class TestLargeResultSets:

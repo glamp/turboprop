@@ -10,18 +10,15 @@ This module tests all components of the automatic tool selection system:
 - SelectionEffectivenessTracker: Performance monitoring
 """
 
-import json
 import time
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from automatic_tool_selector import AutomaticSelectionResult, AutomaticToolSelector, ToolRanking
 from proactive_suggestion_engine import ProactiveSuggestion, ProactiveSuggestionEngine
 from selection_effectiveness_tracker import SelectionEffectivenessTracker
 from tool_learning_system import ToolLearningSystem
-from usage_pattern_analyzer import DetectedPattern, InefficiencyPattern, UsagePatternAnalysis, UsagePatternAnalyzer
+from usage_pattern_analyzer import InefficiencyPattern, UsagePatternAnalysis, UsagePatternAnalyzer
 
 
 class TestAutomaticToolSelector:

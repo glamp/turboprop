@@ -368,6 +368,9 @@ class SearchConfig:
         os.getenv("TURBOPROP_TITLE_MATCH_SCORE", "0.7"), "TURBOPROP_TITLE_MATCH_SCORE", 0.0, 2.0
     )
 
+    # Hybrid search and RRF (Reciprocal Rank Fusion) parameters
+    RRF_K: int = validate_positive_int(os.getenv("TURBOPROP_RRF_K", "60"), "TURBOPROP_RRF_K", 60)
+
 
 class EmbeddingConfig:
     """Embedding model and processing configuration."""

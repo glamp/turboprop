@@ -10,7 +10,7 @@ Tests for the snippet_extractor module including:
 - Fallback extraction for unsupported languages
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 

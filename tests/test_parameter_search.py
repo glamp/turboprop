@@ -7,7 +7,7 @@ parameter analysis, type compatibility, advanced filtering, and ranking.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import List
 from unittest.mock import Mock
 
 import pytest
@@ -431,7 +431,6 @@ class TestParameterSearchExamples:
     def test_tools_with_file_path_and_timeout(self):
         """Test finding tools with file path and timeout parameters."""
         # This test verifies basic functionality without complex mocking
-        from unittest.mock import patch
 
         from parameter_search_engine import ParameterSearchEngine
 

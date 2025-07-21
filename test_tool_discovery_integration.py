@@ -49,7 +49,7 @@ def test_complete_discovery_workflow():
         for tool in system_tools:
             print(f"  • {tool.name} ({tool.category}) - {len(tool.parameters)} parameters")
 
-        print(f"\n💾 Cataloging tools to database...")
+        print("\n💾 Cataloging tools to database...")
         result = discovery.catalog_tools(system_tools)
 
         end_time = time.time()
@@ -61,12 +61,12 @@ def test_complete_discovery_workflow():
         print(f"   - Success: {result.success}")
 
         if result.errors:
-            print(f"❌ Errors encountered:")
+            print("❌ Errors encountered:")
             for error in result.errors:
                 print(f"   - {error}")
 
         # Verify database contents
-        print(f"\n🔍 Verifying database contents...")
+        print("\n🔍 Verifying database contents...")
 
         with db_manager.get_connection() as conn:
             # Check tools table
@@ -86,12 +86,12 @@ def test_complete_discovery_workflow():
             # Show a sample of stored tools
             sample_tools = conn.execute("SELECT name, category, tool_type FROM mcp_tools LIMIT 5").fetchall()
 
-            print(f"\n📋 Sample tools in database:")
+            print("\n📋 Sample tools in database:")
             for tool_name, category, tool_type in sample_tools:
                 print(f"   • {tool_name} ({tool_type}, {category})")
 
         # Test tool registry
-        print(f"\n📊 Tool registry statistics:")
+        print("\n📊 Tool registry statistics:")
         registry_stats = discovery.tool_registry.get_registry_statistics()
         print(f"   - Total tools: {registry_stats['total_tools']}")
         print(f"   - Tools by type: {registry_stats['tools_by_type']}")
@@ -106,13 +106,13 @@ def test_complete_discovery_workflow():
         # Success validation
         expected_tool_count = len(discovery.SYSTEM_TOOLS_CATALOG)
         if result.success and result.tools_stored == expected_tool_count:
-            print(f"✅ Integration test PASSED!")
+            print("✅ Integration test PASSED!")
             print(f"   - All {expected_tool_count} system tools discovered and cataloged")
-            print(f"   - All tools have embeddings")
-            print(f"   - Tool registry is healthy")
+            print("   - All tools have embeddings")
+            print("   - Tool registry is healthy")
             return True
         else:
-            print(f"❌ Integration test FAILED!")
+            print("❌ Integration test FAILED!")
             print(f"   - Expected {expected_tool_count} tools, stored {result.tools_stored}")
             return False
 

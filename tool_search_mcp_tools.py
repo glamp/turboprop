@@ -33,7 +33,6 @@ from mcp_tool_validator import (
     MCPToolValidator,
     ValidatedCapabilityParams,
     ValidatedSearchParams,
-    ValidatedToolDetailsParams,
     tool_exists,
 )
 from parameter_search_engine import ParameterSearchEngine

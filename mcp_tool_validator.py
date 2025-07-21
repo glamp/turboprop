@@ -7,7 +7,7 @@ for MCP tool operations, ensuring robust input validation and helpful error mess
 """
 
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from mcp_tool_search_responses import create_error_response
 

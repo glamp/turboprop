@@ -1027,7 +1027,7 @@ def search_with_hybrid_fusion(
             weights = FusionWeights(
                 semantic_weight=fusion_weights.get("semantic_weight", 0.6),
                 text_weight=fusion_weights.get("text_weight", 0.4),
-                rrf_k=fusion_weights.get("rrf_k", 60),
+                rrf_k=fusion_weights.get("rrf_k", config.search.RRF_K),
                 boost_exact_matches=fusion_weights.get("boost_exact_matches", True),
                 exact_match_boost=fusion_weights.get("exact_match_boost", 1.5),
             )

@@ -5,15 +5,12 @@ This shows how the new metadata extraction system works with the existing
 tool discovery framework.
 """
 
-import os
 import tempfile
 
 from database_manager import DatabaseManager
 from docstring_parser import DocstringParser
 from embedding_helper import EmbeddingGenerator
 from mcp_metadata_extractor import MCPMetadataExtractor
-from mcp_metadata_types import MCPToolMetadata
-from mcp_tool_discovery import MCPToolDiscovery
 from schema_analyzer import SchemaAnalyzer
 
 
@@ -128,7 +125,7 @@ def test_enhanced_tool_discovery():
 
             # Show documentation analysis
             if metadata.documentation_analysis:
-                print(f"\n📖 Documentation Analysis:")
+                print("\n📖 Documentation Analysis:")
                 print(f"  Parameters documented: {len(metadata.documentation_analysis.parameters)}")
                 print(f"  Notes: {len(metadata.documentation_analysis.notes)}")
                 print(f"  Warnings: {len(metadata.documentation_analysis.warnings)}")

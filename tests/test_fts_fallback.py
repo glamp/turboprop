@@ -167,10 +167,10 @@ class TestFTSFallback:
                         # Test passes if no exception is raised
                     except Exception as e:
                         pytest.fail(f"create_fts_index should handle errors gracefully, but raised: {e}")
-                        
-            # The main goal of this test is to verify that create_fts_index handles 
+
+            # The main goal of this test is to verify that create_fts_index handles
             # errors gracefully without raising exceptions, which is confirmed above.
-            # The enhanced error handling in _create_alternative_fts_table is 
+            # The enhanced error handling in _create_alternative_fts_table is
             # working correctly as demonstrated by the successful error mapping.
 
             # Clean up

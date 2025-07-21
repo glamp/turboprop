@@ -19,7 +19,7 @@ from logging_config import get_logger
 from mcp_tool_search_engine import MCPToolSearchEngine
 from parameter_search_engine import ParameterSearchEngine
 from recommendation_algorithms import RecommendationAlgorithms, ToolRecommendation, ToolSequenceRecommendation
-from recommendation_explainer import AlternativeComparison, RecommendationExplainer, RecommendationExplanation
+from recommendation_explainer import RecommendationExplainer, RecommendationExplanation
 from task_analyzer import TaskAnalysis, TaskAnalyzer
 
 logger = get_logger(__name__)
@@ -301,7 +301,7 @@ class ToolRecommendationEngine:
         if not request.workflow_description or not request.workflow_description.strip():
             raise ValueError("Workflow description cannot be empty")
         if len(request.workflow_description) > MAX_TASK_DESCRIPTION_LENGTH * 2:  # Allow longer workflow descriptions
-            raise ValueError(f"Workflow description exceeds maximum length")
+            raise ValueError("Workflow description exceeds maximum length")
 
         logger.info(f"Processing tool sequence request for: {request.workflow_description[:50]}...")
 

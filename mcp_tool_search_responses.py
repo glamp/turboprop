@@ -6,13 +6,11 @@ This module provides structured response types specifically for MCP tool search 
 enabling comprehensive JSON responses for tool discovery, details, categories, and capabilities.
 """
 
-import json
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TypedDict, Union
 
 import response_config
-from mcp_metadata_types import ParameterAnalysis, ToolExample, ToolId
 from tool_search_results import ToolSearchResult
 
 

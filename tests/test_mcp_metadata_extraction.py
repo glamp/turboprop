@@ -7,8 +7,6 @@ for MCP tools, including schema analysis, docstring parsing, usage pattern
 recognition, and example generation.
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -24,7 +22,6 @@ from mcp_metadata_types import (
     MCPToolMetadata,
     ParameterAnalysis,
     ToolExample,
-    UsagePattern,
 )
 from schema_analyzer import SchemaAnalyzer
 from usage_pattern_detector import UsagePatternDetector

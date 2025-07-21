@@ -7,7 +7,7 @@ expand terms with synonyms, and prepare queries for semantic search.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
 from tool_search_results import ProcessedQuery, SearchIntent

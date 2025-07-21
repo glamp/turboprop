@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Union
 
+from config import config
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from search_result_types import CodeSearchResult
@@ -39,7 +40,7 @@ class FusionWeights:
 
     semantic_weight: float = 0.6
     text_weight: float = 0.4
-    rrf_k: int = 60  # RRF parameter
+    rrf_k: int = config.search.RRF_K  # RRF parameter
     boost_exact_matches: bool = True
     exact_match_boost: float = 1.5
 

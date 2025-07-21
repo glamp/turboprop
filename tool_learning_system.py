@@ -7,7 +7,6 @@ using statistical models and JSON-based persistence. It learns from user prefere
 tool effectiveness, and context patterns to improve automatic suggestions over time.
 """
 
-import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path

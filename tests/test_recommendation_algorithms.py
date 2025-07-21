@@ -7,20 +7,17 @@ based on task requirements and context.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import pytest
 
-from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolId
 from recommendation_algorithms import (
-    AlternativeRecommendation,
     RecommendationAlgorithms,
     ToolRecommendation,
     ToolSequenceRecommendation,
     WorkflowRequirements,
 )
-from search_result_types import CodeSearchResult
-from task_analyzer import TaskAnalysis, TaskComplexity
+from task_analyzer import TaskAnalysis
 
 
 # Mock classes for testing

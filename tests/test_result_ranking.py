@@ -7,7 +7,6 @@ system including multi-factor ranking, match reason generation, deduplication,
 and confidence assessment.
 """
 
-import os
 import tempfile
 from typing import List
 from unittest.mock import Mock, patch

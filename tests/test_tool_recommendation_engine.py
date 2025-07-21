@@ -6,15 +6,13 @@ This module tests the main orchestrator that coordinates all components to provi
 comprehensive tool recommendations with explanations and context awareness.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock
+from dataclasses import dataclass
+from typing import Any, Dict, List
+from unittest.mock import Mock
 
 import pytest
 
 from context_analyzer import ContextAnalyzer, EnvironmentalConstraints, ProjectContext, TaskContext, UserContext
-from recommendation_algorithms import RecommendationAlgorithms, ToolRecommendation
-from recommendation_explainer import RecommendationExplainer, RecommendationExplanation
 from task_analyzer import TaskAnalysis, TaskAnalyzer
 from tool_recommendation_engine import (
     AlternativeRequest,

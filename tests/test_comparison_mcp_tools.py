@@ -7,23 +7,18 @@ and category browsing functionality.
 """
 
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from comparison_response_types import (
     AlternativeAnalysis,
     AlternativesFoundResponse,
-    CategoryBrowseResponse,
-    CategoryOverviewResponse,
-    SelectionGuidanceResponse,
     ToolComparisonMCPResponse,
-    ToolRelationshipsResponse,
     create_error_response,
 )
 from tool_category_mcp_tools import (
     browse_tools_by_category,
-    explore_tool_ecosystem,
     find_tools_by_complexity,
     get_category_overview,
     get_tool_selection_guidance,
@@ -33,7 +28,6 @@ from tool_comparison_mcp_tools import (
     analyze_tool_relationships,
     compare_mcp_tools,
     find_tool_alternatives,
-    get_tool_recommendations_comparison,
     initialize_comparison_tools,
 )
 
