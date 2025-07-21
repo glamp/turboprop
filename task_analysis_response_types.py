@@ -29,7 +29,7 @@ import response_config
 @dataclass
 class ResponseMetadata:
     """Common metadata for all MCP tool responses."""
-    
+
     timestamp: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()))
     version: str = response_config.RESPONSE_VERSION
     processing_time: Optional[float] = None
@@ -42,7 +42,7 @@ class ResponseMetadata:
 @dataclass
 class AnalysisMetrics:
     """Analysis scores and complexity assessments."""
-    
+
     complexity_assessment: str = "moderate"
     confidence_score: float = 0.7
     estimated_steps: int = 3
@@ -55,7 +55,7 @@ class AnalysisMetrics:
 @dataclass
 class RecommendationCore:
     """Core data for a single tool recommendation."""
-    
+
     tool_id: str
     tool_name: str
     confidence_score: float
@@ -71,7 +71,7 @@ class RecommendationCore:
 @dataclass
 class RecommendationEnhancements:
     """Enhancement data for tool recommendations."""
-    
+
     recommendation_reasons: List[str] = field(default_factory=list)
     usage_guidance: List[str] = field(default_factory=list)
     parameter_suggestions: Dict[str, Any] = field(default_factory=dict)
@@ -85,7 +85,7 @@ class RecommendationEnhancements:
 @dataclass
 class TaskAnalysisCore:
     """Core data for task analysis."""
-    
+
     task_description: str
     detail_level: str = "standard"
     required_capabilities: List[str] = field(default_factory=list)
@@ -98,7 +98,7 @@ class TaskAnalysisCore:
 @dataclass
 class RequirementsBreakdown:
     """Detailed requirements breakdown."""
-    
+
     functional_requirements: List[str] = field(default_factory=list)
     non_functional_requirements: List[str] = field(default_factory=list)
     input_specifications: List[str] = field(default_factory=list)
@@ -111,7 +111,7 @@ class RequirementsBreakdown:
 @dataclass
 class EnhancementSuggestions:
     """Enhancement and improvement suggestions."""
-    
+
     suggestions: List[str] = field(default_factory=list)
     task_improvement_suggestions: List[str] = field(default_factory=list)
     alternative_approaches: List[str] = field(default_factory=list)
@@ -134,7 +134,7 @@ class EnhancementSuggestions:
 @dataclass
 class AlternativeToolCore:
     """Core data for an alternative tool recommendation."""
-    
+
     tool_id: str
     tool_name: str
     similarity_score: float
@@ -150,7 +150,7 @@ class AlternativeToolCore:
 @dataclass
 class AlternativeToolDetails:
     """Detailed information for alternative tools."""
-    
+
     advantages: List[str] = field(default_factory=list)
     disadvantages: List[str] = field(default_factory=list)
     use_cases: List[str] = field(default_factory=list)
@@ -163,7 +163,7 @@ class AlternativeToolDetails:
 @dataclass
 class ToolSequenceStep:
     """A single step in a tool sequence."""
-    
+
     step_number: int
     tool_id: str
     tool_name: str
@@ -171,7 +171,7 @@ class ToolSequenceStep:
     complexity: str = "moderate"
     optional: bool = False
     estimated_time: Optional[str] = None
-    
+
     # Data flow information
     suggested_parameters: Dict[str, Any] = field(default_factory=dict)
     input_from_previous: List[str] = field(default_factory=list)
@@ -184,7 +184,7 @@ class ToolSequenceStep:
 @dataclass
 class SequenceMetrics:
     """Quality metrics for tool sequences."""
-    
+
     reliability_score: float = 0.8
     efficiency_score: float = 0.8
     maintainability_score: float = 0.8
@@ -197,7 +197,7 @@ class SequenceMetrics:
 @dataclass
 class SequenceGuidance:
     """Usage guidance for tool sequences."""
-    
+
     prerequisites: List[str] = field(default_factory=list)
     common_pitfalls: List[str] = field(default_factory=list)
     optimization_tips: List[str] = field(default_factory=list)
@@ -208,10 +208,11 @@ class SequenceGuidance:
 
 # Composed Response Classes
 
+
 @dataclass
 class ToolRecommendation:
     """Complete tool recommendation combining core data and enhancements."""
-    
+
     core: RecommendationCore
     enhancements: RecommendationEnhancements = field(default_factory=RecommendationEnhancements)
 
@@ -224,7 +225,7 @@ class ToolRecommendation:
 @dataclass
 class AlternativeTool:
     """Complete alternative tool recommendation."""
-    
+
     core: AlternativeToolCore
     details: AlternativeToolDetails = field(default_factory=AlternativeToolDetails)
 
@@ -237,14 +238,14 @@ class AlternativeTool:
 @dataclass
 class ToolSequence:
     """Complete tool sequence with steps, metrics and guidance."""
-    
+
     sequence_id: str
     sequence_name: str
     steps: List[ToolSequenceStep] = field(default_factory=list)
     complexity_level: str = "moderate"
     parallel_execution_possible: bool = False
     total_steps: int = 0
-    
+
     metrics: SequenceMetrics = field(default_factory=SequenceMetrics)
     guidance: SequenceGuidance = field(default_factory=SequenceGuidance)
 
@@ -261,24 +262,25 @@ class ToolSequence:
             "complexity_level": self.complexity_level,
             "parallel_execution_possible": self.parallel_execution_possible,
             **self.metrics.to_dict(),
-            **self.guidance.to_dict()
+            **self.guidance.to_dict(),
         }
 
 
 # Main Response Classes
 
+
 @dataclass
 class TaskRecommendationResponse:
     """Composed response for recommend_tools_for_task MCP tool."""
-    
+
     task_description: str
     recommendations: List[ToolRecommendation] = field(default_factory=list)
-    
+
     # Composed components
     metadata: ResponseMetadata = field(default_factory=ResponseMetadata)
     analysis_metrics: Optional[AnalysisMetrics] = None
     enhancements: EnhancementSuggestions = field(default_factory=EnhancementSuggestions)
-    
+
     # Core response data
     context_factors: Optional[Dict[str, Any]] = None
     recommendation_strategy: str = "intelligent"
@@ -308,7 +310,7 @@ class TaskRecommendationResponse:
             "explanations": self.explanations,
             **self.metadata.to_dict(),
             **(self.analysis_metrics.to_dict() if self.analysis_metrics else {}),
-            **self.enhancements.to_dict()
+            **self.enhancements.to_dict(),
         }
 
     def to_json(self) -> str:
@@ -318,15 +320,15 @@ class TaskRecommendationResponse:
 @dataclass
 class TaskAnalysisResponse:
     """Composed response for analyze_task_requirements MCP tool."""
-    
+
     core: TaskAnalysisCore
-    
-    # Composed components  
+
+    # Composed components
     metadata: ResponseMetadata = field(default_factory=ResponseMetadata)
     metrics: AnalysisMetrics = field(default_factory=AnalysisMetrics)
     requirements: RequirementsBreakdown = field(default_factory=RequirementsBreakdown)
     enhancements: EnhancementSuggestions = field(default_factory=EnhancementSuggestions)
-    
+
     # Additional analysis data
     analysis: Optional[Dict[str, Any]] = None
 
@@ -334,12 +336,12 @@ class TaskAnalysisResponse:
         """Add a potential challenge to the core analysis."""
         if challenge not in self.core.potential_challenges:
             self.core.potential_challenges.append(challenge)
-    
+
     def add_capability(self, capability: str) -> None:
         """Add a required capability to the core analysis."""
         if capability not in self.core.required_capabilities:
             self.core.required_capabilities.append(capability)
-            
+
     def add_suggestions(self, suggestions: List[str]) -> None:
         """Add suggestions to the enhancements."""
         for suggestion in suggestions:
@@ -352,7 +354,7 @@ class TaskAnalysisResponse:
             **self.metadata.to_dict(),
             **self.metrics.to_dict(),
             **self.requirements.to_dict(),
-            **self.enhancements.to_dict()
+            **self.enhancements.to_dict(),
         }
 
     def to_json(self) -> str:
@@ -362,15 +364,15 @@ class TaskAnalysisResponse:
 @dataclass
 class AlternativesResponse:
     """Composed response for suggest_tool_alternatives MCP tool."""
-    
+
     primary_tool: str
     alternatives: List[AlternativeTool] = field(default_factory=list)
     task_context: Optional[str] = None
-    
+
     # Composed components
     metadata: ResponseMetadata = field(default_factory=ResponseMetadata)
     enhancements: EnhancementSuggestions = field(default_factory=EnhancementSuggestions)
-    
+
     # Analysis data
     primary_tool_advantages: List[str] = field(default_factory=list)
     alternative_categories: Dict[str, List[str]] = field(default_factory=dict)
@@ -380,7 +382,7 @@ class AlternativesResponse:
     def __post_init__(self):
         if self.total_alternatives == 0:
             self.total_alternatives = len(self.alternatives)
-            
+
     def add_selection_criterion(self, criterion: str) -> None:
         """Add a selection criterion for choosing alternatives."""
         if criterion not in self.selection_criteria:
@@ -396,7 +398,7 @@ class AlternativesResponse:
             "selection_criteria": self.selection_criteria,
             "total_alternatives": self.total_alternatives,
             **self.metadata.to_dict(),
-            **self.enhancements.to_dict()
+            **self.enhancements.to_dict(),
         }
 
     def to_json(self) -> str:
@@ -406,16 +408,16 @@ class AlternativesResponse:
 @dataclass
 class ToolSequenceResponse:
     """Composed response for recommend_tool_sequence MCP tool."""
-    
+
     workflow_description: str
     sequences: List[ToolSequence] = field(default_factory=list)
     optimization_goal: str = "balanced"
-    
+
     # Composed components
     metadata: ResponseMetadata = field(default_factory=ResponseMetadata)
     metrics: AnalysisMetrics = field(default_factory=AnalysisMetrics)
     enhancements: EnhancementSuggestions = field(default_factory=EnhancementSuggestions)
-    
+
     # Workflow analysis
     workflow_analysis: Optional[Dict[str, Any]] = None
     parallel_opportunities: List[str] = field(default_factory=list)
@@ -428,17 +430,17 @@ class ToolSequenceResponse:
             self.total_sequences = len(self.sequences)
         if self.recommended_sequence_id is None and self.sequences:
             self.recommended_sequence_id = self.sequences[0].sequence_id
-            
+
     def add_parallel_opportunity(self, opportunity: str) -> None:
         """Add a parallel execution opportunity."""
         if opportunity not in self.parallel_opportunities:
             self.parallel_opportunities.append(opportunity)
-            
+
     def add_bottleneck(self, bottleneck: str) -> None:
         """Add a bottleneck analysis point."""
         if bottleneck not in self.bottleneck_analysis:
             self.bottleneck_analysis.append(bottleneck)
-            
+
     def add_customization_suggestion(self, suggestion: str) -> None:
         """Add a customization suggestion."""
         self.enhancements.add_suggestion(suggestion)
@@ -455,7 +457,7 @@ class ToolSequenceResponse:
             "total_sequences": self.total_sequences,
             **self.metadata.to_dict(),
             **self.metrics.to_dict(),
-            **self.enhancements.to_dict()
+            **self.enhancements.to_dict(),
         }
 
     def to_json(self) -> str:
@@ -463,6 +465,7 @@ class ToolSequenceResponse:
 
 
 # Utility functions
+
 
 def create_error_response(tool_name: str, error_message: str, context: str = "") -> Dict[str, Any]:
     """Create a standardized error response for MCP tools."""

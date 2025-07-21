@@ -467,7 +467,9 @@ class MCPConfig:
         os.getenv("TURBOPROP_MCP_MAX_SEQUENCE_LENGTH", "10"), "TURBOPROP_MCP_MAX_SEQUENCE_LENGTH", 10
     )
     TASK_DESCRIPTION_MAX_LENGTH: int = validate_positive_int(
-        os.getenv("TURBOPROP_MCP_TASK_DESCRIPTION_MAX_LENGTH", "1000"), "TURBOPROP_MCP_TASK_DESCRIPTION_MAX_LENGTH", 1000
+        os.getenv("TURBOPROP_MCP_TASK_DESCRIPTION_MAX_LENGTH", "1000"),
+        "TURBOPROP_MCP_TASK_DESCRIPTION_MAX_LENGTH",
+        1000,
     )
 
     # Task analysis configuration

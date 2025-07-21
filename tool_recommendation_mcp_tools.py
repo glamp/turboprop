@@ -19,35 +19,31 @@ from typing import Any, Dict, List, Optional
 
 from context_analyzer import EnvironmentalConstraints, TaskContext, UserContext
 from logging_config import get_logger
+from mcp_error_handling import create_validation_error, handle_tool_exception, mcp_tool_exception_handler
 from recommendation_explainer_mcp import (
     AlternativeComparisonFormatter,
     MCPExplanationFormatter,
     TaskDescriptionSuggestionGenerator,
     WorkflowAnalysisFormatter,
 )
+from task_analysis_response_types import create_error_response  # Keep for backward compatibility
 from task_analysis_response_types import (
     AlternativesResponse,
     AlternativeTool,
     AlternativeToolCore,
     AlternativeToolDetails,
     AnalysisMetrics,
+    RecommendationCore,
+    RecommendationEnhancements,
     RequirementsBreakdown,
     ResponseMetadata,
     TaskAnalysisCore,
     TaskAnalysisResponse,
     TaskRecommendationResponse,
     ToolRecommendation,
-    RecommendationCore,
-    RecommendationEnhancements,
     ToolSequence,
     ToolSequenceResponse,
     ToolSequenceStep,
-    create_error_response,  # Keep for backward compatibility
-)
-from mcp_error_handling import (
-    create_validation_error,
-    handle_tool_exception,
-    mcp_tool_exception_handler,
 )
 from task_analyzer import TaskAnalyzer
 from tool_recommendation_engine import (
@@ -137,10 +133,10 @@ def recommend_tools_for_task(
         # Validate inputs
         if not task_description or not isinstance(task_description, str):
             return create_validation_error(
-                "recommend_tools_for_task", 
+                "recommend_tools_for_task",
                 "Task description must be a non-empty string",
                 "Parameter validation failed",
-                ["Provide a string value for task_description parameter"]
+                ["Provide a string value for task_description parameter"],
             )
 
         task_description = task_description.strip()
@@ -149,7 +145,7 @@ def recommend_tools_for_task(
                 "recommend_tools_for_task",
                 "Task description cannot be empty",
                 "Empty or whitespace-only input provided",
-                ["Provide a meaningful task description", "Include specific details about what you want to accomplish"]
+                ["Provide a meaningful task description", "Include specific details about what you want to accomplish"],
             )
 
         if len(task_description) > config.mcp.TASK_DESCRIPTION_MAX_LENGTH:
@@ -157,7 +153,11 @@ def recommend_tools_for_task(
                 "recommend_tools_for_task",
                 f"Task description too long (max {config.mcp.TASK_DESCRIPTION_MAX_LENGTH} characters)",
                 f"Input length: {len(task_description)} characters",
-                ["Shorten your task description", "Focus on the essential requirements", "Break complex tasks into smaller parts"]
+                [
+                    "Shorten your task description",
+                    "Focus on the essential requirements",
+                    "Break complex tasks into smaller parts",
+                ],
             )
 
         # Validate max_recommendations
@@ -210,7 +210,7 @@ def recommend_tools_for_task(
                 complexity_fit=rec.complexity_assessment or "moderate",
                 skill_level_match=getattr(rec, "skill_level_match", "intermediate"),
             )
-            
+
             # Create enhancement data
             enhancements = RecommendationEnhancements(
                 recommendation_reasons=rec.recommendation_reasons,
@@ -219,7 +219,7 @@ def recommend_tools_for_task(
                 alternatives_available=include_alternatives and len(engine_response.recommendations) > 1,
                 alternative_count=len(engine_response.recommendations) - 1 if include_alternatives else 0,
             )
-            
+
             # Create composed recommendation
             mcp_rec = ToolRecommendation(core=core, enhancements=enhancements)
             mcp_recommendations.append(mcp_rec)
@@ -232,13 +232,11 @@ def recommend_tools_for_task(
                 complexity_assessment=task_analysis.complexity_level,
                 confidence_score=task_analysis.confidence,
                 estimated_steps=task_analysis.estimated_steps,
-                skill_level_required=task_analysis.skill_level_required
+                skill_level_required=task_analysis.skill_level_required,
             )
 
         # Create metadata with processing time
-        metadata = ResponseMetadata(
-            processing_time=time.time() - start_time
-        )
+        metadata = ResponseMetadata(processing_time=time.time() - start_time)
 
         response = TaskRecommendationResponse(
             task_description=task_description,
@@ -266,10 +264,10 @@ def recommend_tools_for_task(
 
     except Exception as e:
         return handle_tool_exception(
-            "recommend_tools_for_task", 
-            e, 
+            "recommend_tools_for_task",
+            e,
             f"Task: {task_description[:100]}...",
-            {"task_description": task_description, "max_recommendations": max_recommendations}
+            {"task_description": task_description, "max_recommendations": max_recommendations},
         )
 
 
@@ -337,34 +335,34 @@ def analyze_task_requirements(
             task_description=task_description,
             detail_level=detail_level,
             required_capabilities=analysis.required_capabilities if analysis else [],
-            potential_challenges=[]  # Will be populated below
+            potential_challenges=[],  # Will be populated below
         )
-        
+
         # Create response metadata with processing time
         metadata = ResponseMetadata(processing_time=time.time() - start_time)
-        
+
         # Create analysis metrics
         metrics = AnalysisMetrics(
             complexity_assessment=analysis.complexity_level if analysis else "moderate",
             confidence_score=analysis.confidence if analysis else 0.7,
             estimated_steps=analysis.estimated_steps if analysis else 3,
-            skill_level_required=analysis.skill_level_required if analysis else "intermediate"
+            skill_level_required=analysis.skill_level_required if analysis else "intermediate",
         )
-        
+
         # Create requirements breakdown
         requirements_breakdown = RequirementsBreakdown(
             functional_requirements=requirements.functional_requirements,
             non_functional_requirements=requirements.non_functional_requirements,
             input_specifications=requirements.input_types,
-            output_specifications=requirements.output_types
+            output_specifications=requirements.output_types,
         )
-        
+
         response = TaskAnalysisResponse(
             core=core,
             metadata=metadata,
             metrics=metrics,
             requirements=requirements_breakdown,
-            analysis=analysis.to_dict() if analysis else None
+            analysis=analysis.to_dict() if analysis else None,
         )
 
         # Add potential challenges based on analysis
@@ -475,14 +473,14 @@ def suggest_tool_alternatives(
                 similarity_score=alt.relevance_score,
                 complexity_comparison=_compare_complexity(primary_tool, alt),
             )
-            
+
             # Create detailed alternative data
             details = AlternativeToolDetails(
                 advantages=alt.recommendation_reasons[:3],  # Limit to top 3 advantages
                 use_cases=alt.usage_guidance[:3] if alt.usage_guidance else [],
                 when_to_prefer=alt.usage_guidance[:2] if alt.usage_guidance else [],
             )
-            
+
             # Create composed alternative
             alt_meta = AlternativeTool(core=core, details=details)
             mcp_alternatives.append(alt_meta)
@@ -490,7 +488,7 @@ def suggest_tool_alternatives(
         # Create alternatives response
         # Create metadata with processing time
         metadata = ResponseMetadata(processing_time=time.time() - start_time)
-        
+
         response = AlternativesResponse(
             primary_tool=primary_tool,
             alternatives=mcp_alternatives,
@@ -653,12 +651,10 @@ def recommend_tool_sequence(
         # Create sequence response
         # Create metadata with processing time
         metadata = ResponseMetadata(processing_time=time.time() - start_time)
-        
+
         # Create analysis metrics with complexity assessment
-        metrics = AnalysisMetrics(
-            complexity_assessment=workflow_analysis.get("complexity", "moderate")
-        )
-        
+        metrics = AnalysisMetrics(complexity_assessment=workflow_analysis.get("complexity", "moderate"))
+
         response = ToolSequenceResponse(
             workflow_description=workflow_description,
             sequences=mcp_sequences,

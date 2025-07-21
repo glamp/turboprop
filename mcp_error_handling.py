@@ -19,26 +19,28 @@ import response_config
 
 class ErrorSeverity(Enum):
     """Error severity levels for categorization."""
+
     CRITICAL = "critical"  # Service unavailable, data corruption
-    HIGH = "high"         # Tool unavailable, invalid configuration  
-    MEDIUM = "medium"     # Invalid parameters, missing data
-    LOW = "low"          # Warnings, optional features unavailable
+    HIGH = "high"  # Tool unavailable, invalid configuration
+    MEDIUM = "medium"  # Invalid parameters, missing data
+    LOW = "low"  # Warnings, optional features unavailable
 
 
 class ErrorCategory(Enum):
     """Error categories for better organization."""
-    VALIDATION = "validation"       # Input parameter validation
+
+    VALIDATION = "validation"  # Input parameter validation
     AUTHENTICATION = "authentication"  # Authentication/authorization
-    RESOURCE = "resource"          # Database, file system, network
+    RESOURCE = "resource"  # Database, file system, network
     BUSINESS_LOGIC = "business_logic"  # Domain-specific logic errors
-    SYSTEM = "system"             # Infrastructure, configuration
-    EXTERNAL = "external"         # Third-party service failures
+    SYSTEM = "system"  # Infrastructure, configuration
+    EXTERNAL = "external"  # Third-party service failures
 
 
 @dataclass
 class MCPError:
     """Standardized MCP error structure."""
-    
+
     tool_name: str
     message: str
     category: ErrorCategory
@@ -47,7 +49,7 @@ class MCPError:
     error_code: str = ""
     timestamp: str = ""
     version: str = response_config.RESPONSE_VERSION
-    
+
     # Additional debugging information
     stack_trace: Optional[str] = None
     request_data: Optional[Dict[str, Any]] = None
@@ -75,7 +77,7 @@ class MCPError:
                 "stack_trace": self.stack_trace,
                 "request_data": self.request_data,
                 "suggestions": self.suggestions,
-            }
+            },
         }
 
     def to_json(self) -> str:
@@ -85,16 +87,12 @@ class MCPError:
 
 class MCPErrorHandler:
     """Centralized error handling for MCP tools."""
-    
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
     def create_validation_error(
-        self,
-        tool_name: str,
-        message: str,
-        context: str = "",
-        suggestions: Optional[list[str]] = None
+        self, tool_name: str, message: str, context: str = "", suggestions: Optional[list[str]] = None
     ) -> MCPError:
         """Create a parameter validation error."""
         return MCPError(
@@ -104,15 +102,11 @@ class MCPErrorHandler:
             severity=ErrorSeverity.MEDIUM,
             context=context,
             error_code="VALIDATION_FAILED",
-            suggestions=suggestions or []
+            suggestions=suggestions or [],
         )
 
     def create_resource_error(
-        self,
-        tool_name: str,
-        message: str,
-        context: str = "",
-        severity: ErrorSeverity = ErrorSeverity.HIGH
+        self, tool_name: str, message: str, context: str = "", severity: ErrorSeverity = ErrorSeverity.HIGH
     ) -> MCPError:
         """Create a resource access error."""
         return MCPError(
@@ -121,15 +115,11 @@ class MCPErrorHandler:
             category=ErrorCategory.RESOURCE,
             severity=severity,
             context=context,
-            error_code="RESOURCE_ERROR"
+            error_code="RESOURCE_ERROR",
         )
 
     def create_system_error(
-        self,
-        tool_name: str,
-        message: str,
-        context: str = "",
-        include_trace: bool = False
+        self, tool_name: str, message: str, context: str = "", include_trace: bool = False
     ) -> MCPError:
         """Create a system error with optional stack trace."""
         error = MCPError(
@@ -138,20 +128,16 @@ class MCPErrorHandler:
             category=ErrorCategory.SYSTEM,
             severity=ErrorSeverity.CRITICAL,
             context=context,
-            error_code="SYSTEM_ERROR"
+            error_code="SYSTEM_ERROR",
         )
-        
+
         if include_trace:
             error.stack_trace = traceback.format_exc()
-            
+
         return error
 
     def create_business_logic_error(
-        self,
-        tool_name: str,
-        message: str,
-        context: str = "",
-        suggestions: Optional[list[str]] = None
+        self, tool_name: str, message: str, context: str = "", suggestions: Optional[list[str]] = None
     ) -> MCPError:
         """Create a business logic error."""
         return MCPError(
@@ -161,30 +147,26 @@ class MCPErrorHandler:
             severity=ErrorSeverity.MEDIUM,
             context=context,
             error_code="BUSINESS_LOGIC_ERROR",
-            suggestions=suggestions or []
+            suggestions=suggestions or [],
         )
 
     def handle_exception(
-        self,
-        tool_name: str,
-        exception: Exception,
-        context: str = "",
-        request_data: Optional[Dict[str, Any]] = None
+        self, tool_name: str, exception: Exception, context: str = "", request_data: Optional[Dict[str, Any]] = None
     ) -> MCPError:
         """Handle an exception and convert it to standardized MCP error."""
         error_message = str(exception)
         error_type = type(exception).__name__
-        
+
         # Log the exception
         self.logger.error(
             f"Tool '{tool_name}' encountered {error_type}: {error_message}",
             extra={"context": context, "tool": tool_name},
-            exc_info=True
+            exc_info=True,
         )
 
         # Categorize exception type
         category, severity = self._categorize_exception(exception)
-        
+
         error = MCPError(
             tool_name=tool_name,
             message=f"{error_type}: {error_message}",
@@ -193,12 +175,12 @@ class MCPErrorHandler:
             context=context,
             error_code=f"{category.value.upper()}_{error_type.upper()}",
             stack_trace=traceback.format_exc(),
-            request_data=request_data
+            request_data=request_data,
         )
-        
+
         # Add suggestions based on exception type
         error.suggestions = self._get_exception_suggestions(exception)
-        
+
         return error
 
     def _categorize_exception(self, exception: Exception) -> tuple[ErrorCategory, ErrorSeverity]:
@@ -217,7 +199,7 @@ class MCPErrorHandler:
     def _get_exception_suggestions(self, exception: Exception) -> list[str]:
         """Get helpful suggestions based on exception type."""
         suggestions = []
-        
+
         if isinstance(exception, ValueError):
             suggestions.append("Check that all required parameters are provided with valid values")
             suggestions.append("Verify parameter formats match expected patterns")
@@ -230,7 +212,7 @@ class MCPErrorHandler:
         elif isinstance(exception, TimeoutError):
             suggestions.append("Try reducing the request size or complexity")
             suggestions.append("Check system load and available resources")
-        
+
         return suggestions
 
 
@@ -240,10 +222,7 @@ error_handler = MCPErrorHandler()
 
 # Convenience functions for common error patterns
 def create_validation_error(
-    tool_name: str, 
-    message: str, 
-    context: str = "",
-    suggestions: Optional[list[str]] = None
+    tool_name: str, message: str, context: str = "", suggestions: Optional[list[str]] = None
 ) -> str:
     """Create and return JSON validation error response."""
     error = error_handler.create_validation_error(tool_name, message, context, suggestions)
@@ -251,10 +230,7 @@ def create_validation_error(
 
 
 def create_resource_error(
-    tool_name: str,
-    message: str,
-    context: str = "",
-    severity: ErrorSeverity = ErrorSeverity.HIGH
+    tool_name: str, message: str, context: str = "", severity: ErrorSeverity = ErrorSeverity.HIGH
 ) -> str:
     """Create and return JSON resource error response."""
     error = error_handler.create_resource_error(tool_name, message, context, severity)
@@ -262,10 +238,7 @@ def create_resource_error(
 
 
 def handle_tool_exception(
-    tool_name: str,
-    exception: Exception,
-    context: str = "",
-    request_data: Optional[Dict[str, Any]] = None
+    tool_name: str, exception: Exception, context: str = "", request_data: Optional[Dict[str, Any]] = None
 ) -> str:
     """Handle exception and return JSON error response."""
     error = error_handler.handle_exception(tool_name, exception, context, request_data)
@@ -275,7 +248,7 @@ def handle_tool_exception(
 def create_error_response(tool_name: str, error_message: str, context: str = "") -> Dict[str, Any]:
     """
     Legacy function for backward compatibility.
-    
+
     This maintains compatibility with existing code while providing
     the new standardized error structure.
     """
@@ -285,7 +258,7 @@ def create_error_response(tool_name: str, error_message: str, context: str = "")
         category=ErrorCategory.BUSINESS_LOGIC,
         severity=ErrorSeverity.MEDIUM,
         context=context,
-        error_code="LEGACY_ERROR"
+        error_code="LEGACY_ERROR",
     )
     return error.to_dict()
 
@@ -293,6 +266,7 @@ def create_error_response(tool_name: str, error_message: str, context: str = "")
 # Decorator for automatic exception handling
 def mcp_tool_exception_handler(func):
     """Decorator to automatically handle exceptions in MCP tool functions."""
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -300,4 +274,5 @@ def mcp_tool_exception_handler(func):
             tool_name = func.__name__
             context = f"Arguments: {args}, Keyword arguments: {kwargs}"
             return handle_tool_exception(tool_name, e, context)
+
     return wrapper
