@@ -539,14 +539,30 @@ class DatabaseManager:
             logger.error("Failed to create code_constructs table: %s", e)
             raise DatabaseError(f"Failed to create code_constructs table: {e}") from e
 
-    def _load_fts_extension(self, conn: duckdb.DuckDBPyConnection) -> None:
-        """Load the FTS extension if not already loaded."""
+    def _ensure_fts_extension_loaded(self, conn: duckdb.DuckDBPyConnection) -> bool:
+        """
+        Ensure DuckDB FTS extension is installed and loaded.
+
+        Returns:
+            bool: True if FTS extension is available, False otherwise
+        """
         try:
+            # Install and load FTS extension
+            conn.execute("INSTALL fts")
             conn.execute("LOAD fts")
-            logger.debug("FTS extension loaded")
-        except duckdb.Error as e:
-            if "already loaded" not in str(e).lower():
-                logger.warning("FTS extension load failed: %s", e)
+            logger.info("DuckDB FTS extension loaded successfully")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to load DuckDB FTS extension: {e}")
+            return False
+
+    def _load_fts_extension(self, conn: duckdb.DuckDBPyConnection) -> bool:
+        """
+        Alias for _ensure_fts_extension_loaded for backward compatibility.
+        Returns:
+            bool: True if FTS extension is available, False otherwise
+        """
+        return self._ensure_fts_extension_loaded(conn)
 
     def _drop_existing_fts_table(self, conn: duckdb.DuckDBPyConnection, fts_table_name: str) -> None:
         """Drop existing FTS table if it exists."""
@@ -637,32 +653,55 @@ class DatabaseManager:
                 logger.error("Failed to create alternative FTS table: %s", e)
                 raise DatabaseError(f"Failed to create alternative FTS table: {e}") from e
 
-    def create_fts_index(self, table_name: str = "code_files") -> None:
+    def create_fts_index(self, table_name: str = "code_files") -> bool:
         """
-        Create full-text search index for file content using DuckDB's FTS extension.
-
-        This enables exact text matching, Boolean search operators, and fuzzy matching
-        to complement semantic search capabilities.
+        Create FTS index using DuckDB FTS extension.
 
         Args:
-            table_name: Name of the table to create FTS index for (default: code_files)
+            table_name: Base table name for FTS
+
+        Returns:
+            bool: True if FTS index was created successfully
         """
-        logger.info("Creating full-text search index for table %s", table_name)
+        logger.info("Creating DuckDB FTS index for table %s", table_name)
         fts_table_name = f"{table_name}_fts"
 
         try:
             with self.get_connection() as conn:
-                self._load_fts_extension(conn)
+                if not self._ensure_fts_extension_loaded(conn):
+                    return False
+
+                # Drop existing FTS table if it exists
                 self._drop_existing_fts_table(conn, fts_table_name)
 
-                # Try PRAGMA approach first, fallback to alternative if it fails
-                if not self._create_fts_index_pragma(conn, fts_table_name, table_name):
+                # Try PRAGMA approach first using separate method
+                if self._create_fts_index_pragma(conn, fts_table_name, table_name):
+                    logger.info(f"Created DuckDB FTS index using PRAGMA for table: {table_name}")
+                else:
+                    # Use alternative approach if PRAGMA fails
                     self._create_alternative_fts_table(conn, fts_table_name, table_name)
+                    logger.info(f"Created alternative FTS table: {fts_table_name}")
+
+                logger.info(f"DuckDB FTS setup completed for table {table_name}")
+                return True
 
         except Exception as e:
-            logger.error("Failed to create FTS index: %s", e)
-            # Don't raise an error here - FTS is supplementary functionality
-            logger.warning("FTS index creation failed, full-text search will be limited")
+            logger.error(f"Failed to create DuckDB FTS index: {e}")
+            # Fallback to alternative FTS table for compatibility
+            return self._create_alternative_fts_fallback(table_name)
+
+    def _create_alternative_fts_fallback(self, table_name: str) -> bool:
+        """Create fallback FTS table when DuckDB FTS5 is not available."""
+        logger.info("Creating fallback FTS table for %s", table_name)
+        fts_table_name = f"{table_name}_fts"
+
+        try:
+            with self.get_connection() as conn:
+                self._create_alternative_fts_table(conn, fts_table_name, table_name)
+                return True
+        except Exception as e:
+            logger.error("Failed to create fallback FTS table: %s", e)
+            return False
 
     def rebuild_fts_index(self, table_name: str = "code_files") -> None:
         """
@@ -675,29 +714,188 @@ class DatabaseManager:
 
         try:
             with self.get_connection() as conn:
-                fts_table_name = f"{table_name}_fts"
-
-                # Clear existing FTS data
+                # For DuckDB FTS, we need to drop and recreate the index
+                # First, try to drop the existing FTS index
                 try:
-                    conn.execute(f"DELETE FROM {fts_table_name}")
-                except duckdb.Error:
-                    # Table might not exist, create it
-                    self.create_fts_index(table_name)
+                    conn.execute(f"PRAGMA drop_fts_index('{table_name}')")
+                    logger.debug(f"Dropped existing FTS index for {table_name}")
+                except Exception as drop_e:
+                    logger.debug(f"Could not drop FTS index (may not exist): {drop_e}")
+
+                # Recreate the FTS index (this will include all current data)
+                if not self._ensure_fts_extension_loaded(conn):
+                    logger.warning("FTS extension not available for rebuild")
                     return
 
-                # Repopulate FTS table with current data
-                repopulate_sql = f"""
-                INSERT INTO {fts_table_name} (id, path, content)
-                SELECT id, path, content
-                FROM {table_name}
-                WHERE content IS NOT NULL
-                """
-                conn.execute(repopulate_sql)
-
-                logger.info("Successfully rebuilt FTS index for %s", fts_table_name)
+                # Recreate with current data
+                pragma_sql = f"PRAGMA create_fts_index('{table_name}', 'id', 'content', 'path', overwrite=1)"
+                try:
+                    conn.execute(pragma_sql)
+                    logger.info(f"Successfully rebuilt DuckDB FTS index for {table_name}")
+                except Exception as create_e:
+                    logger.warning(f"FTS index recreation failed: {create_e}, trying alternative approach")
+                    
+                    # Fallback to alternative table approach
+                    fts_table_name = f"{table_name}_fts"
+                    try:
+                        conn.execute(f"DROP TABLE IF EXISTS {fts_table_name}")
+                        # Recreate alternative FTS table
+                        self._create_alternative_fts_table(conn, fts_table_name, table_name)
+                        logger.info(f"Successfully rebuilt alternative FTS table {fts_table_name}")
+                    except Exception as fallback_e:
+                        logger.error(f"Failed to rebuild alternative FTS table: {fallback_e}")
 
         except Exception as e:
             logger.error("Failed to rebuild FTS index: %s", e)
+
+    def is_fts_available(self, table_name: str = "code_files") -> bool:
+        """
+        Check if FTS is available and working.
+
+        Args:
+            table_name: Base table name to check FTS for
+
+        Returns:
+            bool: True if FTS is available and functional
+        """
+        try:
+            with self.get_connection() as conn:
+                # Test if DuckDB FTS schema exists and is functional
+                fts_schema = f"fts_main_{table_name}"
+                try:
+                    # Check if FTS schema exists
+                    conn.execute(f"SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{fts_schema}'").fetchone()
+                    
+                    # Test match_bm25 function with a simple query
+                    conn.execute(f"SELECT {fts_schema}.match_bm25('{table_name}', 'test') LIMIT 1")
+                    logger.debug(f"DuckDB FTS is available for table {table_name}")
+                    return True
+                except Exception:
+                    # Fallback: check if alternative FTS table exists
+                    fts_table_name = f"{table_name}_fts"
+                    conn.execute(f"SELECT * FROM {fts_table_name} LIMIT 1")
+                    logger.debug(f"Alternative FTS table available for {table_name}")
+                    return True
+        except Exception:
+            logger.debug(f"FTS not available for table {table_name}")
+            return False
+
+    def _execute_fts_search_duckdb(
+        self, conn: duckdb.DuckDBPyConnection, query: str, limit: int, table_name: str = "code_files"
+    ) -> List[tuple]:
+        """
+        Execute full-text search using DuckDB FTS extension.
+
+        Args:
+            conn: DuckDB connection
+            query: Search query string
+            limit: Maximum number of results
+            table_name: Base table name
+
+        Returns:
+            List of search results with FTS scores
+        """
+        try:
+            fts_table_name = f"{table_name}_fts"
+
+            # Try DuckDB FTS search using match_bm25 function
+            try:
+                fts_schema = f"fts_main_{table_name}"
+                
+                # Use DuckDB's match_bm25 function with correct syntax (id column value, not table name)
+                fts_query = f"""
+                SELECT cf.id, cf.path, cf.content, 
+                       {fts_schema}.match_bm25(cf.id, ?) as fts_score
+                FROM {table_name} cf
+                WHERE {fts_schema}.match_bm25(cf.id, ?) IS NOT NULL 
+                   AND {fts_schema}.match_bm25(cf.id, ?) > 0
+                ORDER BY fts_score DESC
+                LIMIT ?
+                """
+
+                results = conn.execute(fts_query, [query, query, query, limit]).fetchall()
+                logger.debug(f"DuckDB FTS search for '{query}' returned {len(results)} results")
+                return results
+
+            except Exception as fts_error:
+                logger.debug(f"DuckDB FTS search failed: {fts_error}. Trying alternative FTS table.")
+
+                # Alternative approach using the FTS table we created
+                alt_fts_query = f"""
+                SELECT id, path, content,
+                       CASE 
+                           WHEN content_lower LIKE ? THEN 1.0
+                           WHEN path_lower LIKE ? THEN 0.8
+                           WHEN content_lower LIKE ? THEN 0.6
+                           ELSE 0.4
+                       END as fts_score
+                FROM {fts_table_name}
+                WHERE content_lower LIKE ? OR path_lower LIKE ? OR content_lower LIKE ?
+                ORDER BY fts_score DESC
+                LIMIT ?
+                """
+
+                # Create search patterns
+                exact_pattern = f"%{query.lower()}%"
+                fuzzy_pattern = f"%{query.lower().replace(' ', '%')}%"
+
+                results = conn.execute(
+                    alt_fts_query,
+                    [exact_pattern, exact_pattern, fuzzy_pattern, exact_pattern, exact_pattern, fuzzy_pattern, limit],
+                ).fetchall()
+
+                logger.debug(f"Alternative FTS search for '{query}' returned {len(results)} results")
+                return results
+
+        except Exception as e:
+            logger.warning(f"DuckDB FTS search failed: {e}")
+            return []
+
+    def _execute_like_search(
+        self, conn: duckdb.DuckDBPyConnection, query: str, limit: int, table_name: str = "code_files"
+    ) -> List[tuple]:
+        """
+        Execute fallback LIKE-based text search.
+
+        Args:
+            conn: DuckDB connection
+            query: Search query string
+            limit: Maximum number of results
+            table_name: Base table name
+
+        Returns:
+            List of search results with relevance scores
+        """
+        try:
+            search_sql = f"""
+            SELECT
+                id,
+                path,
+                content,
+                CASE
+                    WHEN content ILIKE ? THEN 1.0
+                    WHEN path ILIKE ? THEN 0.8
+                    ELSE 0.5
+                END as relevance_score
+            FROM {table_name}
+            WHERE content ILIKE ? OR path ILIKE ?
+            ORDER BY relevance_score DESC, path
+            LIMIT ?
+            """
+
+            # Create LIKE patterns
+            exact_pattern = f"%{query}%"
+
+            results = conn.execute(
+                search_sql, [exact_pattern, exact_pattern, exact_pattern, exact_pattern, limit]
+            ).fetchall()
+
+            logger.debug(f"LIKE search for '{query}' returned {len(results)} results")
+            return results
+
+        except Exception as e:
+            logger.error(f"LIKE search failed: {e}")
+            return []
 
     def search_full_text(
         self,
@@ -729,48 +927,19 @@ class DatabaseManager:
             List of tuples (id, path, content, relevance_score)
         """
         try:
-            fts_table_name = f"{table_name}_fts"
-
             with self.get_connection() as conn:
-                # Check if FTS table exists
-                try:
-                    conn.execute(f"SELECT COUNT(*) FROM {fts_table_name} LIMIT 1")
-                except duckdb.Error:
-                    logger.warning("FTS table %s doesn't exist, creating it", fts_table_name)
-                    self.create_fts_index(table_name)
+                # Try DuckDB FTS first if available
+                if self.is_fts_available(table_name):
+                    logger.debug("Using DuckDB FTS for search")
+                    fts_results = self._execute_fts_search_duckdb(conn, query, limit, table_name)
 
-                # Process query for FTS
-                self._process_fts_query(query, enable_fuzzy, fuzzy_distance)
+                    if fts_results:
+                        logger.debug(f"Found {len(fts_results)} results using DuckDB FTS")
+                        return fts_results
 
-                # Perform full-text search
-                # Using a simple LIKE-based approach for compatibility
-                # In a production system, this would use proper FTS ranking
-                search_sql = f"""
-                SELECT
-                    f.id,
-                    f.path,
-                    f.content,
-                    CASE
-                        WHEN f.content ILIKE ? THEN 1.0
-                        WHEN f.path ILIKE ? THEN 0.8
-                        ELSE 0.5
-                    END as relevance_score
-                FROM {fts_table_name} f
-                WHERE f.content ILIKE ? OR f.path ILIKE ?
-                ORDER BY relevance_score DESC, f.path
-                LIMIT ?
-                """
-
-                # Create LIKE patterns for different search variations
-                exact_pattern = f"%{query}%"
-                word_pattern = f"%{query.replace(' ', '%')}%"
-
-                results = conn.execute(
-                    search_sql, (exact_pattern, exact_pattern, word_pattern, word_pattern, limit)
-                ).fetchall()
-
-                logger.debug("FTS search for '%s' returned %d results", query, len(results))
-                return results
+                # Fallback to LIKE-based text search
+                logger.debug("Falling back to LIKE-based text search")
+                return self._execute_like_search(conn, query, limit, table_name)
 
         except Exception as e:
             logger.error("Full-text search failed for query '%s': %s", query, e)
@@ -825,6 +994,65 @@ class DatabaseManager:
             processed = processed.replace(placeholder, f'"{phrase}"')
 
         return processed
+
+    def migrate_fts_to_duckdb(self, table_name: str = "code_files") -> bool:
+        """
+        Migrate existing FTS setup to DuckDB-compatible version.
+
+        Args:
+            table_name: Base table name to migrate FTS for
+
+        Returns:
+            bool: True if migration was successful
+        """
+        logger.info("Migrating FTS to DuckDB-compatible version for table %s", table_name)
+
+        try:
+            with self.get_connection() as conn:
+                fts_table_name = f"{table_name}_fts"
+
+                # Drop old PostgreSQL-style FTS artifacts if they exist
+                tables_to_drop = [fts_table_name]  # Old FTS table names
+
+                for table in tables_to_drop:
+                    try:
+                        conn.execute(f"DROP TABLE IF EXISTS {table}")
+                        logger.debug(f"Dropped old FTS table: {table}")
+                    except Exception as e:
+                        logger.debug(f"Could not drop table {table}: {e}")
+                        pass  # Table might not exist
+
+                # Create new DuckDB FTS index
+                return self.create_fts_index(table_name)
+
+        except Exception as e:
+            logger.error(f"FTS migration failed: {e}")
+            return False
+
+    def hybrid_search_with_fallback(self, query: str, table_name: str = "code_files", limit: int = 10) -> list:
+        """
+        Hybrid search with automatic fallback when FTS is unavailable.
+
+        Args:
+            query: Search query string
+            table_name: Base table name
+            limit: Maximum number of results
+
+        Returns:
+            List of search results
+        """
+        try:
+            with self.get_connection() as conn:
+                if self.is_fts_available(table_name):
+                    logger.debug("Using FTS-enabled hybrid search")
+                    return self._execute_fts_search_duckdb(conn, query, limit, table_name)
+                else:
+                    logger.info("FTS not available, using LIKE search")
+                    return self._execute_like_search(conn, query, limit, table_name)
+
+        except Exception as e:
+            logger.error(f"Hybrid search with fallback failed: {e}")
+            return []
 
     def search_by_file_type_fts(self, query: str, file_extensions: list, limit: int = 10) -> list:
         """

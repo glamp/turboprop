@@ -214,7 +214,9 @@ class HybridSearchEngine:
 
         # Ensure FTS index exists
         try:
-            self.db_manager.create_fts_index()
+            fts_created = self.db_manager.create_fts_index()
+            if not fts_created:
+                logger.warning("FTS index creation failed, search will use fallback methods")
         except Exception as e:
             logger.warning("Failed to create FTS index: %s", e)
 
@@ -388,9 +390,9 @@ class HybridSearchEngine:
         return CodeSearchResult(file_path=path, snippet=snippet, similarity_score=score, file_metadata=file_metadata)
 
     def _search_text_only(self, query: str, k: int) -> List[HybridSearchResult]:
-        """Execute text-only search using full-text search."""
+        """Execute text-only search using full-text search with automatic fallback."""
         try:
-            # Perform full-text search
+            # Use the database manager's search_full_text which now handles FTS/fallback automatically
             text_results = self.db_manager.search_full_text(query, limit=k, enable_fuzzy=True)
 
             # Convert to HybridSearchResult
@@ -398,6 +400,9 @@ class HybridSearchEngine:
             for i, (file_id, path, content, relevance_score) in enumerate(text_results):
                 # Create CodeSearchResult using helper method
                 code_result = self._convert_to_code_search_result(path, content, relevance_score, query)
+
+                # Determine if this was from FTS or fallback search
+                search_method = "duckdb_fts" if self.db_manager.is_fts_available() else "like_search"
 
                 hybrid_result = HybridSearchResult(
                     code_result=code_result,
