@@ -18,12 +18,7 @@ import numpy as np
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from mcp_metadata_extractor import MCPMetadataExtractor
-from mcp_metadata_types import (
-    ComplexityAnalysis,
-    MCPToolMetadata,
-    ParameterAnalysis,
-    ToolExample,
-)
+from mcp_metadata_types import ComplexityAnalysis, MCPToolMetadata, ParameterAnalysis, ToolExample
 from mcp_tool_discovery import MCPToolDiscovery
 
 

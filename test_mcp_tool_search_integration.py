@@ -11,7 +11,6 @@ import json
 import tempfile
 from pathlib import Path
 
-
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from tool_search_mcp_tools import (

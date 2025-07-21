@@ -39,10 +39,10 @@ from tqdm import tqdm  # noqa: E402
 from watchdog.events import FileSystemEventHandler  # noqa: E402
 from watchdog.observers import Observer  # noqa: E402
 
+from config import config  # noqa: E402
 from database_manager import DatabaseManager  # noqa: E402
 from embedding_helper import EmbeddingGenerator  # noqa: E402
 from logging_config import get_logger  # noqa: E402
-from config import config  # noqa: E402
 
 # Global database manager instance
 _db_manager = None

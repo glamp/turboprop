@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from indexing_operations import embed_and_store, embed_and_store_single, extract_file_metadata

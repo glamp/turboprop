@@ -482,3 +482,215 @@ class TestIntegrationScenarios:
         """Test that creating multi-snippet result from empty list raises error."""
         with pytest.raises(ValueError, match="At least one snippet is required"):
             CodeSearchResult.from_multi_snippets(file_path="/test/empty.py", snippets=[], similarity_score=0.5)
+
+
+class TestComprehensiveTypeConversion:
+    """Comprehensive tests for type conversion utilities as specified in Issue 000042."""
+
+    def test_ensure_float_with_decimal_input_detailed(self):
+        """Test _ensure_float utility with comprehensive Decimal input cases."""
+        from decimal import Decimal
+
+        from search_result_types import _ensure_float
+
+        # Test with various Decimal values from issue specification
+        test_cases = [
+            (Decimal("0.75"), 0.75),
+            (Decimal("0.0"), 0.0),
+            (Decimal("1.0"), 1.0),
+            (Decimal("0.123456789"), 0.123456789),
+        ]
+
+        for decimal_input, expected_float in test_cases:
+            result = _ensure_float(decimal_input)
+            assert isinstance(result, float)
+            assert abs(result - expected_float) < 1e-10
+
+    def test_ensure_float_with_float_input_detailed(self):
+        """Test _ensure_float utility with comprehensive float input cases."""
+        from search_result_types import _ensure_float
+
+        test_values = [0.75, 0.0, 1.0, 0.123456789]
+
+        for float_input in test_values:
+            result = _ensure_float(float_input)
+            assert isinstance(result, float)
+            assert result == float_input
+
+    def test_similarity_percentage_with_decimal_score_detailed(self):
+        """Test similarity_percentage property with Decimal similarity_score."""
+        from decimal import Decimal
+
+        from search_result_types import CodeSearchResult, CodeSnippet
+
+        snippet = CodeSnippet(text="test code", start_line=1, end_line=3)
+
+        # Test with Decimal similarity score
+        result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=Decimal("0.756"))
+
+        percentage = result.similarity_percentage
+        assert isinstance(percentage, float)
+        assert abs(percentage - 75.6) < 1e-10
+
+    def test_similarity_percentage_with_float_score_detailed(self):
+        """Test similarity_percentage property with float similarity_score."""
+        from search_result_types import CodeSearchResult, CodeSnippet
+
+        snippet = CodeSnippet(text="test code", start_line=1, end_line=3)
+
+        # Test with float similarity score
+        result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=0.756)
+
+        percentage = result.similarity_percentage
+        assert isinstance(percentage, float)
+        assert abs(percentage - 75.6) < 1e-10
+
+    def test_similarity_percentage_edge_cases_detailed(self):
+        """Test similarity_percentage with edge case values."""
+        from decimal import Decimal
+
+        from search_result_types import CodeSearchResult, CodeSnippet
+
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+
+        edge_cases = [
+            # (input_score, expected_percentage)
+            (Decimal("0"), 0.0),
+            (Decimal("1"), 100.0),
+            (0.0, 0.0),
+            (1.0, 100.0),
+            (Decimal("0.001"), 0.1),
+            (0.999, 99.9),
+        ]
+
+        for score, expected in edge_cases:
+            result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=score)
+
+            percentage = result.similarity_percentage
+            assert isinstance(percentage, float)
+            assert abs(percentage - expected) < 1e-10
+
+    def test_post_init_converts_decimal_to_float_detailed(self):
+        """Test that __post_init__ converts Decimal similarity_score to float."""
+        from decimal import Decimal
+
+        from search_result_types import CodeSearchResult, CodeSnippet
+
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+
+        result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=Decimal("0.85"))
+
+        # After __post_init__, similarity_score should be float
+        assert isinstance(result.similarity_score, float)
+        assert abs(result.similarity_score - 0.85) < 1e-10
+
+    def test_type_conversion_with_invalid_inputs_comprehensive(self):
+        """Test type conversion error handling with comprehensive invalid inputs."""
+        from search_result_types import _ensure_float
+
+        invalid_inputs = [None, "string", [], {}, complex(1, 2)]
+
+        for invalid_input in invalid_inputs:
+            with pytest.raises((TypeError, ValueError, AttributeError)):
+                _ensure_float(invalid_input)
+
+
+class TestPerformanceAndPrecision:
+    """Performance and precision tests for type conversion."""
+
+    def test_type_conversion_performance(self):
+        """Test that type conversion doesn't significantly impact performance."""
+        import time
+        from decimal import Decimal
+
+        from search_result_types import _ensure_float
+
+        # Test with large number of conversions
+        decimal_values = [Decimal(str(i / 1000.0)) for i in range(1000)]
+        float_values = [i / 1000.0 for i in range(1000)]
+
+        # Test Decimal conversion performance
+        start = time.time()
+        decimal_results = [_ensure_float(val) for val in decimal_values]
+        decimal_time = time.time() - start
+
+        # Test float passthrough performance
+        start = time.time()
+        float_results = [_ensure_float(val) for val in float_values]
+        float_time = time.time() - start
+
+        # Verify reasonable performance (specific thresholds depend on requirements)
+        assert decimal_time < 1.0  # Should be fast
+        assert float_time < 0.1  # Should be very fast
+
+        # Verify correctness
+        assert len(decimal_results) == 1000
+        assert len(float_results) == 1000
+        assert all(isinstance(r, float) for r in decimal_results)
+        assert all(isinstance(r, float) for r in float_results)
+
+    def test_precision_preservation(self):
+        """Test that type conversion preserves precision appropriately."""
+        from decimal import Decimal
+
+        from search_result_types import _ensure_float
+
+        # Test precision with various decimal values
+        test_cases = [
+            "0.123456789012345",  # High precision
+            "0.1",  # Simple decimal
+            "0.999999999999999",  # Near 1
+            "0.000000000000001",  # Very small
+        ]
+
+        for decimal_str in test_cases:
+            decimal_val = Decimal(decimal_str)
+            float_val = _ensure_float(decimal_val)
+
+            # Convert back to verify reasonable precision preservation
+            # (within float precision limits)
+            assert abs(float(decimal_val) - float_val) < 1e-15
+
+
+class TestCodeSearchResultPostInitBehavior:
+    """Detailed tests for CodeSearchResult __post_init__ behavior."""
+
+    def test_post_init_decimal_conversion_various_values(self):
+        """Test __post_init__ conversion with various Decimal values."""
+        from decimal import Decimal
+
+        from search_result_types import CodeSearchResult, CodeSnippet
+
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+
+        test_decimals = [Decimal("0.1"), Decimal("0.5"), Decimal("0.999"), Decimal("0.123456789")]
+
+        for decimal_score in test_decimals:
+            result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=decimal_score)
+
+            # After __post_init__, similarity_score should be converted to float
+            assert isinstance(result.similarity_score, float)
+            assert abs(result.similarity_score - float(decimal_score)) < 1e-15
+
+            # similarity_percentage should work correctly
+            expected_percentage = float(decimal_score) * 100.0
+            assert abs(result.similarity_percentage - expected_percentage) < 1e-10
+
+    def test_post_init_float_passthrough(self):
+        """Test __post_init__ with float values (should remain unchanged)."""
+        from search_result_types import CodeSearchResult, CodeSnippet
+
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+
+        float_values = [0.1, 0.5, 0.999, 0.123456789]
+
+        for float_score in float_values:
+            result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=float_score)
+
+            # Should remain as float with same value
+            assert isinstance(result.similarity_score, float)
+            assert result.similarity_score == float_score
+
+            # similarity_percentage should work correctly
+            expected_percentage = float_score * 100.0
+            assert abs(result.similarity_percentage - expected_percentage) < 1e-10
