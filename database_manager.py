@@ -25,6 +25,21 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Index naming pattern constants
+INDEX_PREFIX = "idx"
+FTS_CONTENT_INDEX_SUFFIX = "content"
+CODE_CONSTRUCTS_INDEXES = {
+    "file_id": f"{INDEX_PREFIX}_code_constructs_file_id",
+    "type": f"{INDEX_PREFIX}_code_constructs_type",
+    "name": f"{INDEX_PREFIX}_code_constructs_name",
+    "parent": f"{INDEX_PREFIX}_code_constructs_parent",
+}
+REPOSITORY_CONTEXT_INDEXES = {
+    "path": f"{INDEX_PREFIX}_repository_context_path",
+    "type": f"{INDEX_PREFIX}_repository_context_type",
+    "indexed": f"{INDEX_PREFIX}_repository_context_indexed",
+}
+
 
 class ConnectionManager:
     """Manages database connections with lifecycle management."""
@@ -503,10 +518,10 @@ class DatabaseManager:
         """
 
         create_indexes_sql = [
-            "CREATE INDEX IF NOT EXISTS idx_code_constructs_file_id ON code_constructs(file_id)",
-            "CREATE INDEX IF NOT EXISTS idx_code_constructs_type ON code_constructs(construct_type)",
-            "CREATE INDEX IF NOT EXISTS idx_code_constructs_name ON code_constructs(name)",
-            "CREATE INDEX IF NOT EXISTS idx_code_constructs_parent ON code_constructs(parent_construct_id)",
+            f"CREATE INDEX IF NOT EXISTS {CODE_CONSTRUCTS_INDEXES['file_id']} ON code_constructs(file_id)",
+            f"CREATE INDEX IF NOT EXISTS {CODE_CONSTRUCTS_INDEXES['type']} ON code_constructs(construct_type)",
+            f"CREATE INDEX IF NOT EXISTS {CODE_CONSTRUCTS_INDEXES['name']} ON code_constructs(name)",
+            f"CREATE INDEX IF NOT EXISTS {CODE_CONSTRUCTS_INDEXES['parent']} ON code_constructs(parent_construct_id)",
         ]
 
         try:
@@ -560,7 +575,20 @@ class DatabaseManager:
     def _create_alternative_fts_table(
         self, conn: duckdb.DuckDBPyConnection, fts_table_name: str, table_name: str
     ) -> None:
-        """Create alternative FTS table and indexes when PRAGMA approach fails."""
+        """Create alternative FTS table and indexes when PRAGMA approach fails.
+
+        Args:
+            conn: DuckDB connection object to execute SQL commands
+            fts_table_name: Name for the new FTS table to be created
+            table_name: Source table name to copy data from
+
+        Raises:
+            DatabasePermissionError: When permission is denied for table/index creation
+            DatabaseDiskSpaceError: When insufficient disk space for operations
+            DatabaseCorruptionError: When database corruption is detected
+            DatabaseLockError: When database is locked during operations
+            DatabaseError: For other database-related errors
+        """
         try:
             # Create a separate FTS table manually
             fts_create_alt = f"""
@@ -574,16 +602,40 @@ class DatabaseManager:
 
             # Create basic DuckDB-compatible index instead of PostgreSQL gin index
             try:
-                index_sql = f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content " f"ON {fts_table_name} (content)"
+                index_sql = f"CREATE INDEX IF NOT EXISTS {INDEX_PREFIX}_{fts_table_name}_{FTS_CONTENT_INDEX_SUFFIX} ON {fts_table_name} (content)"
                 conn.execute(index_sql)
                 logger.info("Created basic content index on alternative FTS table %s", fts_table_name)
             except duckdb.Error as e:
-                logger.warning("Failed to create content index on fallback table: %s", e)
+                error_msg = str(e).lower()
+                if "permission" in error_msg or "denied" in error_msg:
+                    logger.warning("Permission denied when creating content index on fallback table: %s", e)
+                elif "space" in error_msg or "disk" in error_msg:
+                    logger.warning("Insufficient disk space when creating content index on fallback table: %s", e)
+                elif "lock" in error_msg:
+                    logger.warning("Database locked when creating content index on fallback table: %s", e)
+                else:
+                    logger.warning("Failed to create content index on fallback table: %s", e)
                 logger.info("Alternative FTS table %s created without index", fts_table_name)
 
         except duckdb.Error as e:
-            logger.error("Failed to create alternative FTS table: %s", e)
-            raise
+            error_msg = str(e).lower()
+            if "permission" in error_msg or "denied" in error_msg:
+                logger.error("Permission denied when creating alternative FTS table: %s", e)
+                raise DatabasePermissionError(f"Permission denied when creating alternative FTS table: {e}") from e
+            elif "space" in error_msg or "disk" in error_msg:
+                logger.error("Insufficient disk space when creating alternative FTS table: %s", e)
+                raise DatabaseDiskSpaceError(f"Insufficient disk space when creating alternative FTS table: {e}") from e
+            elif "corrupt" in error_msg:
+                logger.error("Database corruption detected when creating alternative FTS table: %s", e)
+                raise DatabaseCorruptionError(
+                    f"Database corruption detected when creating alternative FTS table: {e}"
+                ) from e
+            elif "lock" in error_msg:
+                logger.error("Database locked when creating alternative FTS table: %s", e)
+                raise DatabaseLockError(f"Database locked when creating alternative FTS table: {e}") from e
+            else:
+                logger.error("Failed to create alternative FTS table: %s", e)
+                raise DatabaseError(f"Failed to create alternative FTS table: {e}") from e
 
     def create_fts_index(self, table_name: str = "code_files") -> None:
         """
@@ -981,9 +1033,9 @@ class DatabaseManager:
         """
 
         create_indexes_sql = [
-            "CREATE INDEX IF NOT EXISTS idx_repository_context_path ON repository_context(repository_path)",
-            "CREATE INDEX IF NOT EXISTS idx_repository_context_type ON repository_context(project_type)",
-            "CREATE INDEX IF NOT EXISTS idx_repository_context_indexed ON repository_context(indexed_at)",
+            f"CREATE INDEX IF NOT EXISTS {REPOSITORY_CONTEXT_INDEXES['path']} ON repository_context(repository_path)",
+            f"CREATE INDEX IF NOT EXISTS {REPOSITORY_CONTEXT_INDEXES['type']} ON repository_context(project_type)",
+            f"CREATE INDEX IF NOT EXISTS {REPOSITORY_CONTEXT_INDEXES['indexed']} ON repository_context(indexed_at)",
         ]
 
         try:
