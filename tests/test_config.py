@@ -457,11 +457,8 @@ class TestEnvironmentVariableHandling:
                 except Exception as e:
                     # Check that it's the right type of exception by name
                     # (to avoid isinstance issues with reloaded modules)
-                    assert (
-                        type(e).__name__ == "ConfigValidationError"
-                    ), (
-                        f"Expected ConfigValidationError, got {type(e).__name__} "
-                        f"for {env_var}={invalid_value}"
+                    assert type(e).__name__ == "ConfigValidationError", (
+                        f"Expected ConfigValidationError, got {type(e).__name__} " f"for {env_var}={invalid_value}"
                     )
 
 

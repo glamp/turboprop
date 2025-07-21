@@ -690,7 +690,7 @@ class TestMCPMetadataExtractor:
         extractor = MCPMetadataExtractor(schema_analyzer, docstring_parser)
 
         tool_def = {"name": "TestTool", "description": "Test", "parameters": {}}
-        metadata = extractor.extract_from_tool_definition(tool_def)
+        _ = extractor.extract_from_tool_definition(tool_def)
 
         # Verify pattern detection and example generation were called
         mock_detector.identify_common_patterns.assert_called_once()

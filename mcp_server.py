@@ -369,7 +369,8 @@ class MCPServerInitializer:
     def initialize_recommendation_engines(self) -> bool:
         """Initialize tool recommendation engines with proper global variable management."""
         try:
-            global _recommendation_engine, _context_analyzer, _parameter_search_engine, _recommendation_tools_initialized
+            global _recommendation_engine, _context_analyzer
+            global _parameter_search_engine, _recommendation_tools_initialized
 
             # Get component classes from registry
             ContextAnalyzer = _tool_registry.get_component("ContextAnalyzer")
@@ -419,7 +420,8 @@ class MCPServerInitializer:
     def initialize_comparison_engines(self) -> bool:
         """Initialize tool comparison engines with proper global variable management."""
         try:
-            global _comparison_engine, _alternative_detector, _relationship_analyzer, _decision_support, _comparison_tools_initialized
+            global _comparison_engine, _alternative_detector
+            global _relationship_analyzer, _decision_support, _comparison_tools_initialized
 
             # Get component classes from registry
             ToolComparisonEngine = _tool_registry.get_component("ToolComparisonEngine")

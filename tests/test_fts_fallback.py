@@ -176,12 +176,12 @@ class TestFTSFallback:
             # Clean up
             try:
                 conn.execute("DROP TABLE IF EXISTS test_files_fts")
-            except:
+            except duckdb.Error:
                 pass
 
     def test_fts_creation_error_handling(self) -> None:
         """Test error handling in FTS index creation."""
-        with self.db_manager.get_connection() as conn:
+        with self.db_manager.get_connection():
             # Don't create the source table - this should trigger an error
             pass
 

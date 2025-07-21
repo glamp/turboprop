@@ -9,12 +9,9 @@ integration, and hybrid search scenarios.
 
 import time
 from decimal import Decimal
-from unittest.mock import Mock, patch
-
-import pytest
 
 from search_operations import format_hybrid_search_results
-from search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
+from search_result_types import CodeSearchResult, CodeSnippet
 
 # Test constants
 BATCH_PROCESSING_TIMEOUT = 5.0  # seconds - maximum time for batch processing tests
@@ -284,6 +281,7 @@ class TestConcurrencyAndBatchProcessing:
     def test_memory_usage_with_large_decimal_conversions(self):
         """Test that type conversion doesn't cause memory leaks with many conversions."""
         import gc
+
         from search_result_types import _ensure_float
 
         # Test many conversions in sequence

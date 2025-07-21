@@ -446,9 +446,7 @@ class {term.title()}Handler_{i}:
                     limit_increase_ratio = next_limit / current_limit
 
                     # Time increase should be less than proportional to limit increase
-                    assert (
-                        time_increase_ratio < limit_increase_ratio * 2
-                    ), (
+                    assert time_increase_ratio < limit_increase_ratio * 2, (
                         f"Search time scaling poor: {time_increase_ratio:.2f}x time "
                         f"for {limit_increase_ratio:.2f}x limit"
                     )
@@ -760,7 +758,7 @@ class TestFTSPerformanceRegression:
                 test_queries = ["baseline", "function", "result"]
                 for query in test_queries:
                     start_time = time.time()
-                    results = self.db_manager.search_full_text(query, limit=10)
+                    _ = self.db_manager.search_full_text(query, limit=10)
                     search_time = time.time() - start_time
                     search_times.append(search_time)
 
@@ -780,7 +778,7 @@ class TestFTSPerformanceRegression:
                 assert avg_search_time < 0.1, f"Search baseline too slow: {avg_search_time:.4f}s"
 
                 # Store baseline for potential future regression testing
-                baseline_metrics = {
+                _ = {
                     "data_insertion_time": data_insertion_time,
                     "index_creation_time": index_creation_time,
                     "avg_search_time": avg_search_time,
@@ -844,7 +842,7 @@ class TestFTSPerformanceRegression:
                     search_time = 0
                     if fts_created:
                         start_time = time.time()
-                        search_results = scenario_db.search_full_text(scenario_name, limit=10)
+                        _ = scenario_db.search_full_text(scenario_name, limit=10)
                         search_time = time.time() - start_time
 
                     results[scenario_name] = {

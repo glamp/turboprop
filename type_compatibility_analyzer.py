@@ -422,7 +422,9 @@ class TypeCompatibilityAnalyzer:
                     compatibility_level=CompatibilityLevel.COMPATIBLE,
                     direct_match=False,
                     conversion_required=False,
-                    compatibility_explanation=f"{source_type} is compatible with {target_type} (supertype relationship)",
+                    compatibility_explanation=(
+                        f"{source_type} is compatible with {target_type} (supertype relationship)"
+                    ),
                     confidence=0.85,
                 )
             elif source_type in subtypes and target_type in subtypes:
@@ -450,7 +452,9 @@ class TypeCompatibilityAnalyzer:
                     direct_match=False,
                     conversion_required=True,
                     conversion_steps=[conversion_step.description],
-                    compatibility_explanation=f"{source_type} can be converted to {target_type}: {conversion_step.description}",
+                    compatibility_explanation=(
+                        f"{source_type} can be converted to {target_type}: {conversion_step.description}"
+                    ),
                     confidence=conversion_step.confidence,
                 )
 

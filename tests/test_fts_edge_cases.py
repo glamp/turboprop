@@ -298,7 +298,7 @@ def function_{i}():
 class Class_{i}:
     def __init__(self):
         self.value_{i} = initialize_value_{i}()
-    
+
     def method_{i}(self, param):
         return self.value_{i} + param + {i}
 """
@@ -449,7 +449,7 @@ def multilingual_function(): pass
                     """
 messages = {
     "en": "Hello World",
-    "es": "Hola Mundo", 
+    "es": "Hola Mundo",
     "ru": "Привет Мир",
     "ja": "こんにちは世界",
     "emoji": "Hello 🌍 World 🚀"
@@ -752,7 +752,7 @@ class TestFTSConcurrencyAndThreadSafety:
         # Test cleanup after database errors
         with patch.object(duckdb, "connect", side_effect=duckdb.Error("Connection failed")):
             try:
-                failing_db = DatabaseManager(self.db_path)
+                _ = DatabaseManager(self.db_path)
                 # Should handle connection failure gracefully
             except Exception:
                 # Expected to fail, but should not cause resource leaks
@@ -774,7 +774,7 @@ class TestFTSConcurrencyAndThreadSafety:
             with patch.object(self.db_manager, "_create_fts_index_pragma", side_effect=Exception("Simulated failure")):
                 try:
                     self.db_manager.create_fts_index("code_files")
-                except:
+                except duckdb.Error:
                     pass
 
                 # Database should still be functional

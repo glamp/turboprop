@@ -251,8 +251,8 @@ class TestRecommendationExplainer:
             "uncertainty_areas",
         ]
 
-        for field in required_fields:
-            assert hasattr(explanation, field), f"Missing field: {field}"
+        for field_name in required_fields:
+            assert hasattr(explanation, field_name), f"Missing field: {field_name}"
 
     def test_explanation_serialization(self, explainer, high_score_recommendation, task_analysis):
         """Test that explanations can be serialized to dict."""

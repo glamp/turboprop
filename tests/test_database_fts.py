@@ -188,7 +188,7 @@ class TestFTSIndexCreation:
                 """
                 CREATE TABLE code_files (
                     id VARCHAR PRIMARY KEY,
-                    path VARCHAR, 
+                    path VARCHAR,
                     content TEXT
                 )
             """
@@ -495,7 +495,7 @@ class TestFTSErrorHandling:
         # Test with permission error simulation
         with patch.object(duckdb, "connect", side_effect=PermissionError("Access denied")):
             try:
-                db_manager = DatabaseManager(self.db_path)
+                _ = DatabaseManager(self.db_path)
                 # Should handle permission error gracefully
             except Exception as e:
                 # Expected to raise DatabasePermissionError or similar

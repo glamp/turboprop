@@ -109,8 +109,7 @@ class TestRecommendationSystemIntegration:
         """Test the complete recommendation flow with complex ML task."""
         request = RecommendationRequest(
             task_description=(
-                "Build a machine learning pipeline with data validation, "
-                "model training, and performance monitoring"
+                "Build a machine learning pipeline with data validation, " "model training, and performance monitoring"
             ),
             max_recommendations=5,
             include_alternatives=True,

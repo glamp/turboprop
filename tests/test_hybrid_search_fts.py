@@ -519,7 +519,7 @@ class TestFTSResultFormatting:
 
             conn.execute(
                 """
-                INSERT INTO code_files VALUES 
+                INSERT INTO code_files VALUES
                 ('1', 'formatter.py', 'def format_results(data): return pretty_print(data)', ?)
             """,
                 ([0.1] * 384,),

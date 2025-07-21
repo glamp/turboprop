@@ -438,7 +438,7 @@ class TestParameterSearchExamples:
         mock_tool_search = Mock()
 
         # Configure mock to return simple results that won't break the complex processing
-        expected_tools = ["read", "bash", "edit"]
+        _ = ["read", "bash", "edit"]  # tools that would be expected
         mock_search_results = Mock()
         mock_search_results.results = []  # Empty results to avoid complex processing
         mock_tool_search.search_by_functionality.return_value = mock_search_results
