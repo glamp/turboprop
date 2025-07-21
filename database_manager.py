@@ -561,23 +561,29 @@ class DatabaseManager:
         self, conn: duckdb.DuckDBPyConnection, fts_table_name: str, table_name: str
     ) -> None:
         """Create alternative FTS table and indexes when PRAGMA approach fails."""
-        # Create a separate FTS table manually
-        fts_create_alt = f"""
-        CREATE TABLE IF NOT EXISTS {fts_table_name} AS
-        SELECT id, path, content
-        FROM {table_name}
-        WHERE content IS NOT NULL
-        """
-        conn.execute(fts_create_alt)
+        try:
+            # Create a separate FTS table manually
+            fts_create_alt = f"""
+            CREATE TABLE IF NOT EXISTS {fts_table_name} AS
+            SELECT id, path, content
+            FROM {table_name}
+            WHERE content IS NOT NULL
+            """
+            conn.execute(fts_create_alt)
+            logger.info("Created alternative FTS table %s", fts_table_name)
 
-        # Create indexes for text search on the FTS table
-        index_sql = (
-            f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content "
-            f"ON {fts_table_name} USING gin(to_tsvector('english', content))"
-        )
-        conn.execute(index_sql)
+            # Create basic DuckDB-compatible index instead of PostgreSQL gin index
+            try:
+                index_sql = f"CREATE INDEX IF NOT EXISTS idx_{fts_table_name}_content " f"ON {fts_table_name} (content)"
+                conn.execute(index_sql)
+                logger.info("Created basic content index on alternative FTS table %s", fts_table_name)
+            except duckdb.Error as e:
+                logger.warning("Failed to create content index on fallback table: %s", e)
+                logger.info("Alternative FTS table %s created without index", fts_table_name)
 
-        logger.info("Created alternative FTS table %s with text indexes", fts_table_name)
+        except duckdb.Error as e:
+            logger.error("Failed to create alternative FTS table: %s", e)
+            raise
 
     def create_fts_index(self, table_name: str = "code_files") -> None:
         """
