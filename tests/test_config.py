@@ -504,6 +504,112 @@ class TestBoundaryConditions:
         assert validate_memory_limit("999GB", "TEST") == "999GB"
 
 
+class TestYAMLConfigurationIntegration:
+    """Test YAML configuration integration with the config system."""
+
+    def test_yaml_config_overrides_defaults(self):
+        """Test that YAML configuration overrides default values."""
+        import tempfile
+        from pathlib import Path
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a test YAML config file
+            config_file = Path(temp_dir) / ".turboprop.yml"
+            config_content = """
+database:
+  threads: 12
+  memory_limit: "3GB"
+  auto_vacuum: false
+            """
+            config_file.write_text(config_content)
+            
+            # Change to the temp directory
+            import os
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(temp_dir)
+                
+                # Reload the config module to pick up the new YAML file
+                import importlib
+                from turboprop import config as config_module
+                importlib.reload(config_module)
+                from turboprop.config import config
+                
+                # Check that YAML values are used
+                assert config.database.THREADS == 12
+                assert config.database.MEMORY_LIMIT == "3GB"
+                assert config.database.AUTO_VACUUM is False
+                
+            finally:
+                os.chdir(original_cwd)
+
+    def test_environment_variables_override_yaml(self):
+        """Test that environment variables override YAML configuration."""
+        import tempfile
+        import os
+        from pathlib import Path
+        from unittest.mock import patch
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a test YAML config file
+            config_file = Path(temp_dir) / ".turboprop.yml"
+            config_content = """
+database:
+  threads: 12
+  memory_limit: "3GB"
+            """
+            config_file.write_text(config_content)
+            
+            # Set environment variables that should override YAML
+            env_vars = {
+                "TURBOPROP_DB_THREADS": "16",
+                "TURBOPROP_DB_MEMORY_LIMIT": "4GB"
+            }
+            
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(temp_dir)
+                
+                with patch.dict(os.environ, env_vars):
+                    # Reload the config module
+                    import importlib
+                    from turboprop import config as config_module
+                    importlib.reload(config_module)
+                    from turboprop.config import config
+                    
+                    # Environment variables should override YAML
+                    assert config.database.THREADS == 16
+                    assert config.database.MEMORY_LIMIT == "4GB"
+                    
+            finally:
+                os.chdir(original_cwd)
+
+    def test_fallback_to_defaults_without_yaml_or_env(self):
+        """Test fallback to defaults when neither YAML nor env vars are set."""
+        import tempfile
+        import os
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # No YAML file, no environment variables
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(temp_dir)
+                
+                # Reload the config module
+                import importlib
+                from turboprop import config as config_module
+                importlib.reload(config_module)
+                from turboprop.config import config
+                
+                # Should use default values
+                assert config.database.THREADS == 4  # default
+                assert config.database.MEMORY_LIMIT == "1GB"  # default
+                assert config.database.AUTO_VACUUM is True  # default
+                
+            finally:
+                os.chdir(original_cwd)
+
+
 class TestConfigurationIntegration:
     """Test configuration integration with other components."""
 

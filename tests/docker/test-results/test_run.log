@@ -1,2 +1,9 @@
-[2025-07-21 12:49:43] Test environment cleanup complete
-[2025-07-21 12:49:44] Test environment cleanup complete
+=== Turboprop uvx MCP Test Run ===
+Started: Mon Jul 21 14:45:57 MDT 2025
+
+[2025-07-21 14:46:08] Test environment setup complete
+[2025-07-21 14:46:08] Building test container...
+[2025-07-21 14:46:09] Running installation tests...
+[2025-07-21 14:46:59] Running functionality validation...
+[2025-07-21 14:48:40] Test environment cleanup complete
+[2025-07-21 14:48:40] Test environment cleanup complete

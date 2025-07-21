@@ -24,7 +24,70 @@ Example usage:
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
+
+from .yaml_config import load_yaml_config, get_config_value
+
+def _get_yaml_config() -> Dict[str, Any]:
+    """Get YAML configuration, loading it fresh each time for dynamic behavior."""
+    try:
+        return load_yaml_config()
+    except Exception:
+        # If YAML loading fails, continue with environment variables only
+        return {}
+
+
+def get_config_with_fallback(
+    yaml_key: str, 
+    env_var: str, 
+    default: Any, 
+    validator=None
+) -> Any:
+    """
+    Get configuration value with fallback chain: environment -> YAML -> default.
+    
+    Args:
+        yaml_key: Dot-separated key path in YAML (e.g., "database.threads")
+        env_var: Environment variable name
+        default: Default value
+        validator: Optional validation function
+        
+    Returns:
+        Configuration value, validated if validator provided
+    """
+    # Load YAML config fresh to pick up any changes
+    yaml_config = _get_yaml_config()
+    
+    # First try environment variable, then YAML, then default
+    value = get_config_value(yaml_config, yaml_key, None, env_var)
+    if value is None:
+        value = default
+    
+    # Apply validation if provided
+    if validator is not None and value is not None:
+        # Convert to string for validation (environment variables are strings)
+        if not isinstance(value, str):
+            value = str(value)
+        # Call validator with the expected signature (value, var_name)
+        return validator(value, env_var)
+    
+    return value
+
+
+# Create validation wrapper functions with consistent signatures for YAML config
+def _validate_positive_int_wrapper(value: str, var_name: str) -> int:
+    """Wrapper for validate_positive_int that doesn't need default parameter."""
+    return validate_positive_int(value, var_name, 0)  # Default not used in validation
+
+
+def _validate_positive_float_wrapper(value: str, var_name: str) -> float:
+    """Wrapper for validate_positive_float that doesn't need default parameter."""
+    return validate_positive_float(value, var_name, 0.0)  # Default not used in validation
+
+
+def _validate_non_negative_float_wrapper(value: str, var_name: str) -> float:
+    """Wrapper for validate_non_negative_float that doesn't need default parameter."""
+    return validate_non_negative_float(value, var_name, 0.0)  # Default not used in validation
 
 
 class ConfigValidationError(ValueError):
@@ -122,34 +185,38 @@ class DatabaseConfig:
     """Database-related configuration constants."""
 
     # DuckDB performance settings
-    MEMORY_LIMIT: str = validate_memory_limit(
-        os.getenv("TURBOPROP_DB_MEMORY_LIMIT", "1GB"), "TURBOPROP_DB_MEMORY_LIMIT"
+    MEMORY_LIMIT: str = get_config_with_fallback(
+        "database.memory_limit", "TURBOPROP_DB_MEMORY_LIMIT", "1GB", validate_memory_limit
     )
-    THREADS: int = validate_positive_int(os.getenv("TURBOPROP_DB_THREADS", "4"), "TURBOPROP_DB_THREADS", 4)
+    THREADS: int = get_config_with_fallback(
+        "database.threads", "TURBOPROP_DB_THREADS", 4, _validate_positive_int_wrapper
+    )
 
     # Database connection and retry settings
-    MAX_RETRIES: int = validate_positive_int(os.getenv("TURBOPROP_DB_MAX_RETRIES", "3"), "TURBOPROP_DB_MAX_RETRIES", 3)
-    RETRY_DELAY: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_RETRY_DELAY", "0.1"), "TURBOPROP_DB_RETRY_DELAY", 0.1
+    MAX_RETRIES: int = get_config_with_fallback(
+        "database.max_retries", "TURBOPROP_DB_MAX_RETRIES", 3, _validate_positive_int_wrapper
+    )
+    RETRY_DELAY: float = get_config_with_fallback(
+        "database.retry_delay", "TURBOPROP_DB_RETRY_DELAY", 0.1, _validate_positive_float_wrapper
     )
 
     # Connection pool and timeout settings
-    MAX_CONNECTIONS_PER_THREAD: int = validate_positive_int(
-        os.getenv("TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", "1"), "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", 1
+    MAX_CONNECTIONS_PER_THREAD: int = get_config_with_fallback(
+        "database.max_connections_per_thread", "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", 1, _validate_positive_int_wrapper
     )
-    CONNECTION_TIMEOUT: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_TIMEOUT", "30.0"), "TURBOPROP_DB_CONNECTION_TIMEOUT", 30.0
+    CONNECTION_TIMEOUT: float = get_config_with_fallback(
+        "database.connection_timeout", "TURBOPROP_DB_CONNECTION_TIMEOUT", 30.0, _validate_positive_float_wrapper
     )
-    STATEMENT_TIMEOUT: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_STATEMENT_TIMEOUT", "60.0"), "TURBOPROP_DB_STATEMENT_TIMEOUT", 60.0
+    STATEMENT_TIMEOUT: float = get_config_with_fallback(
+        "database.statement_timeout", "TURBOPROP_DB_STATEMENT_TIMEOUT", 60.0, _validate_positive_float_wrapper
     )
 
     # File lock settings
-    LOCK_TIMEOUT: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_LOCK_TIMEOUT", "10.0"), "TURBOPROP_DB_LOCK_TIMEOUT", 10.0
+    LOCK_TIMEOUT: float = get_config_with_fallback(
+        "database.lock_timeout", "TURBOPROP_DB_LOCK_TIMEOUT", 10.0, _validate_positive_float_wrapper
     )
-    LOCK_RETRY_INTERVAL: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_LOCK_RETRY_INTERVAL", "0.1"), "TURBOPROP_DB_LOCK_RETRY_INTERVAL", 0.1
+    LOCK_RETRY_INTERVAL: float = get_config_with_fallback(
+        "database.lock_retry_interval", "TURBOPROP_DB_LOCK_RETRY_INTERVAL", 0.1, _validate_positive_float_wrapper
     )
 
     # Database file configuration
@@ -158,23 +225,26 @@ class DatabaseConfig:
     TABLE_NAME: str = "code_files"
 
     # Database optimization settings
-    CHECKPOINT_INTERVAL: int = validate_positive_int(
-        os.getenv("TURBOPROP_DB_CHECKPOINT_INTERVAL", "1000"), "TURBOPROP_DB_CHECKPOINT_INTERVAL", 1000
+    CHECKPOINT_INTERVAL: int = get_config_with_fallback(
+        "database.checkpoint_interval", "TURBOPROP_DB_CHECKPOINT_INTERVAL", 1000, _validate_positive_int_wrapper
     )
-    AUTO_VACUUM: bool = validate_boolean(os.getenv("TURBOPROP_DB_AUTO_VACUUM", "true"), "TURBOPROP_DB_AUTO_VACUUM")
-    TEMP_DIRECTORY: Optional[str] = os.getenv("TURBOPROP_DB_TEMP_DIRECTORY")
+    AUTO_VACUUM: bool = get_config_with_fallback(
+        "database.auto_vacuum", "TURBOPROP_DB_AUTO_VACUUM", True, validate_boolean
+    )
+    TEMP_DIRECTORY: Optional[str] = get_config_with_fallback(
+        "database.temp_directory", "TURBOPROP_DB_TEMP_DIRECTORY", None
+    )
 
     # Connection management settings
-    CONNECTION_MAX_AGE: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_MAX_AGE", "3600.0"), "TURBOPROP_DB_CONNECTION_MAX_AGE", 3600.0
+    CONNECTION_MAX_AGE: float = get_config_with_fallback(
+        "database.connection_max_age", "TURBOPROP_DB_CONNECTION_MAX_AGE", 3600.0, _validate_positive_float_wrapper
     )  # 1 hour
-    CONNECTION_IDLE_TIMEOUT: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", "300.0"), "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", 300.0
+    CONNECTION_IDLE_TIMEOUT: float = get_config_with_fallback(
+        "database.connection_idle_timeout", "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", 300.0, _validate_positive_float_wrapper
     )  # 5 minutes
-    CONNECTION_HEALTH_CHECK_INTERVAL: float = validate_positive_float(
-        os.getenv("TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", "60.0"),
-        "TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL",
-        60.0,
+    CONNECTION_HEALTH_CHECK_INTERVAL: float = get_config_with_fallback(
+        "database.connection_health_check_interval", "TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", 
+        60.0, _validate_positive_float_wrapper
     )  # 1 minute
 
     @classmethod

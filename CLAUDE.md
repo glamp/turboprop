@@ -150,6 +150,97 @@ The system now indexes all Git-tracked files regardless of extension. This inclu
 - **Debounce timing**: Tune `debounce_sec` for watch mode responsiveness
 - **Batch processing**: `embed_and_store()` processes files in batches for efficiency
 
+## Configuration
+
+Turboprop supports configuration through YAML files and environment variables, with environment variables taking precedence.
+
+### YAML Configuration
+
+Create a `.turboprop.yml` file in your repository root to customize settings:
+
+```yaml
+# Database configuration
+database:
+  memory_limit: "2GB"              # Memory limit for DuckDB
+  threads: 8                       # Number of threads for database operations
+  max_retries: 3                   # Maximum connection retry attempts
+  connection_timeout: 60.0         # Connection timeout (seconds)
+  auto_vacuum: true                # Enable automatic database optimization
+
+# File processing configuration
+file_processing:
+  max_file_size_mb: 2.0            # Maximum file size to index (MB)
+  debounce_seconds: 3.0            # Debounce delay for file watching (seconds)
+  batch_size: 200                  # Batch size for processing files
+  max_workers: 8                   # Maximum parallel workers
+
+# Search configuration
+search:
+  default_max_results: 10          # Default number of search results
+  max_results_limit: 50            # Maximum allowed search results
+  min_similarity: 0.2              # Minimum similarity threshold
+
+# Embedding model configuration
+embedding:
+  model: "all-MiniLM-L6-v2"        # SentenceTransformer model name
+  device: "cpu"                    # Device: "cpu", "cuda", or "mps"
+  batch_size: 64                   # Batch size for embedding generation
+
+# HTTP server configuration
+server:
+  host: "127.0.0.1"                # Server bind address
+  port: 8080                       # Server port
+  request_timeout: 60.0            # Request timeout (seconds)
+
+# Logging configuration
+logging:
+  level: "DEBUG"                   # Log level: DEBUG, INFO, WARNING, ERROR
+  file: "turboprop.log"            # Log file path (null for console only)
+```
+
+### Environment Variables
+
+All YAML settings can be overridden with environment variables using the `TURBOPROP_` prefix:
+
+```bash
+# Database settings
+export TURBOPROP_DB_MEMORY_LIMIT="4GB"
+export TURBOPROP_DB_THREADS="16"
+
+# File processing
+export TURBOPROP_MAX_FILE_SIZE_MB="5.0"
+export TURBOPROP_DEBOUNCE_SECONDS="10.0"
+
+# Search settings
+export TURBOPROP_DEFAULT_MAX_RESULTS="15"
+export TURBOPROP_MIN_SIMILARITY="0.3"
+
+# Embedding model
+export TURBOPROP_EMBED_MODEL="sentence-transformers/all-mpnet-base-v2"
+export TURBOPROP_DEVICE="cuda"
+
+# Server settings
+export TURBOPROP_HOST="0.0.0.0"
+export TURBOPROP_PORT="9000"
+
+# Logging
+export TURBOPROP_LOG_LEVEL="INFO"
+export TURBOPROP_LOG_FILE="./logs/turboprop.log"
+```
+
+### Configuration Priority
+
+Configuration is loaded in the following priority order (highest to lowest):
+1. **Environment Variables** - `TURBOPROP_*` variables
+2. **YAML Configuration** - `.turboprop.yml` file in current directory
+3. **Default Values** - Built-in sensible defaults
+
+### Configuration Validation
+
+All configuration values are validated on startup. Invalid values will cause the application to exit with an error message indicating the problem.
+
+**Add `.turboprop.yml` to your `.gitignore`** if you want repository-specific configuration without committing it to version control.
+
 ## Project Structure
 
 ```

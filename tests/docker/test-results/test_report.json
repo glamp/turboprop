@@ -1,0 +1,16 @@
+{
+  "test_summary": {
+    "total_tests": 4,
+    "passed_tests": 4,
+    "failed_tests": 0,
+    "success_rate": "100.0%"
+  },
+  "test_results": {
+    "repository_structure": true,
+    "uvx_available": true,
+    "turboprop_installation": true,
+    "mcp_server_startup": true
+  },
+  "error_messages": [],
+  "timestamp": "2025-07-21 20:47:52"
+}

@@ -1,0 +1,68 @@
+✅ Initialized all-MiniLM-L6-v2 on cpu device
+2025-07-21 20:47:50,452 - turboprop.turboprop.code_index - INFO - Embedding generator initialized successfully
+🚀 Turboprop MCP Server Starting
+========================================
+🤖 Model: all-MiniLM-L6-v2 (384D)
+📁 Repository: /test-repo
+📊 Max file size: 1.0 MB
+⏱️  Debounce delay: 5.0s
+🔍 Auto-index: Yes
+👀 Auto-watch: Yes
+2025-07-21 20:47:50,971 - turboprop.turboprop.database_manager - INFO - Starting schema migration for table code_files
+2025-07-21 20:47:50,976 - turboprop.turboprop.database_manager - INFO - Schema migration completed - no columns needed to be added
+2025-07-21 20:47:50,976 - turboprop.turboprop.database_manager - INFO - Creating repository_context table
+2025-07-21 20:47:50,980 - turboprop.turboprop.database_manager - INFO - Successfully created repository_context table with indexes
+Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+✅ Initialized all-MiniLM-L6-v2 on cpu device
+✅ Embedding generator initialized successfully
+🔍 Checking if repository needs indexing...
+🧠 Smart auto-indexing started in background...
+Starting file watcher for repository: /test-repo
+File watcher started for '/test-repo' (max: 1.0MB, debounce: 5.0s)
+⚠️  Warning: MCP tool search engines not initialized: No module named 'tool_search_mcp_tools'
+Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+⚠️  Warning: Tool recommendation engines not initialized: No module named 'context_analyzer'
+⚠️  Warning: Tool comparison engines not initialized: No module named 'tool_comparison_engine'
+⚠️  Warning: Tool category engines not initialized: No module named 'task_analyzer'
+⚠️  Initialization completed with warnings:
+• MCP tool search initialization failed: No module named 'tool_search_mcp_tools'
+• Recommendation engines initialization failed: No module named 'context_analyzer'
+• Comparison engines initialization failed: No module named 'tool_comparison_engine'
+• Category engines initialization failed: No module named 'task_analyzer'
+🎯 MCP Server ready - listening for tool calls...
+========================================
+🔥 AVAILABLE TOOLS (use 'tp:' prefix):
+• tp:search_code - Find code by meaning (semantic search)
+• tp:index_repository - Build searchable code index
+• tp:get_index_status - Check index health & stats
+• tp:watch_repository - Live index updates
+• tp:list_indexed_files - Browse indexed files
+🧰 MCP TOOL SEARCH:
+• tp:search_mcp_tools - Find MCP tools by functionality
+• tp:get_tool_details - Get comprehensive tool information
+• tp:list_tool_categories - Browse tools by category
+• tp:search_tools_by_capability - Find tools by specific capabilities
+🧠 INTELLIGENT TOOL RECOMMENDATIONS (NEW!):
+• tp:recommend_tools_for_task - Get smart tool recommendations for tasks
+• tp:analyze_task_requirements - Analyze task complexity and requirements
+• tp:suggest_tool_alternatives - Find alternative tools with comparisons
+• tp:recommend_tool_sequence - Get tool sequences for complex workflows
+🔄 TOOL COMPARISON & ANALYSIS (NEW!):
+• tp:compare_mcp_tools - Compare multiple tools across dimensions
+• tp:find_tool_alternatives - Find alternative tools with similarity analysis
+• tp:analyze_tool_relationships - Understand tool connections and dependencies
+📂 TOOL CATEGORY BROWSING (NEW!):
+• tp:browse_tools_by_category - Browse tools by functional categories
+• tp:get_category_overview - Get ecosystem overview and statistics
+• tp:get_tool_selection_guidance - Get intelligent tool selection guidance
+⚡ SLASH COMMANDS (type '/' to see all):
+• /mcp__turboprop__search <query> - Fast semantic search
+• /mcp__turboprop__status - Show index status
+• /mcp__turboprop__files [limit] - List indexed files
+• /mcp__turboprop__help_commands - Show all slash commands
+💡 START HERE: '/mcp__turboprop__search "your query"' or '/mcp__turboprop__status'
+========================================
+📊 Index status: Index is empty
+📊 Total files: 0
+🔍 Index is empty, building index...
+📂 Scanning for code files (max size: 1.0 MB)...

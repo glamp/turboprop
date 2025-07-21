@@ -62,7 +62,7 @@ class TestConnectionLifecycle:
                     assert thread_id in db_manager._connections
 
                 # Manually set last access time to simulate idle timeout
-                db_manager._connection_last_access[thread_id] = time.time() - 0.2
+                db_manager._connection_last_used[thread_id] = time.time() - 0.2
 
                 # Test the cleanup method
                 cleaned_count = db_manager.cleanup_idle_connections()

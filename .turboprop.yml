@@ -1,0 +1,70 @@
+# Turboprop Configuration File
+# This file configures the semantic code search and indexing system.
+# All settings are optional - if not specified, environment variables 
+# (TURBOPROP_*) and built-in defaults will be used.
+
+# Database configuration
+database:
+  memory_limit: "1GB"              # Memory limit for DuckDB
+  threads: 4                       # Number of threads for database operations
+  max_retries: 3                   # Maximum connection retry attempts
+  retry_delay: 0.1                 # Delay between retries (seconds)
+  connection_timeout: 30.0         # Connection timeout (seconds)
+  statement_timeout: 60.0          # SQL statement timeout (seconds)
+  lock_timeout: 10.0               # File lock timeout (seconds)
+  auto_vacuum: true                # Enable automatic database optimization
+
+# File processing configuration
+file_processing:
+  max_file_size_mb: 1.0            # Maximum file size to index (MB)
+  debounce_seconds: 5.0            # Debounce delay for file watching (seconds)
+  preview_length: 200              # Length of file previews (characters)
+  snippet_length: 300              # Length of search snippets (characters)
+  batch_size: 100                  # Batch size for processing files
+  max_workers: 4                   # Maximum parallel workers
+  enable_language_detection: true  # Enable programming language detection
+
+# Search configuration
+search:
+  default_max_results: 5           # Default number of search results
+  max_results_limit: 20            # Maximum allowed search results
+  min_similarity: 0.1              # Minimum similarity threshold
+  high_confidence_threshold: 0.8   # High confidence similarity threshold
+  medium_confidence_threshold: 0.6 # Medium confidence similarity threshold
+
+# Embedding model configuration
+embedding:
+  model: "all-MiniLM-L6-v2"        # SentenceTransformer model name
+  dimensions: 384                  # Embedding vector dimensions
+  device: "cpu"                    # Device: "cpu", "cuda", or "mps"
+  batch_size: 32                   # Batch size for embedding generation
+  max_retries: 3                   # Maximum embedding retry attempts
+  retry_base_delay: 1.0            # Base delay for embedding retries
+
+# HTTP server configuration
+server:
+  host: "0.0.0.0"                  # Server bind address
+  port: 8000                       # Server port
+  watch_directory: "."             # Directory to watch for changes
+  watch_max_file_size_mb: 1.0      # Max file size for watching (MB)
+  watch_debounce_seconds: 5.0      # Debounce for file watching (seconds)
+  request_timeout: 30.0            # Request timeout (seconds)
+  max_concurrent_requests: 10      # Maximum concurrent requests
+
+# Logging configuration
+logging:
+  level: "INFO"                    # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null                       # Log file path (null for console only)
+  max_size: 10485760               # Maximum log file size in bytes (10MB)
+  backup_count: 5                  # Number of backup log files to keep
+
+# MCP (Model Context Protocol) configuration
+mcp:
+  default_max_file_size_mb: 1.0    # Default max file size for MCP operations
+  default_debounce_seconds: 5.0    # Default debounce for MCP file watching
+  max_files_list: 100              # Maximum files to list in MCP responses
+  max_search_results: 20           # Maximum search results for MCP
+  default_max_recommendations: 5   # Default max tool recommendations
+  default_max_alternatives: 5      # Default max alternative tools
+  max_task_description_length: 2000 # Maximum task description length

@@ -44,6 +44,9 @@ dependencies = [
     # Progress bars and CLI utilities
     "tqdm>=4.65.0",         # Progress bars for better user experience
     
+    # Configuration file support
+    "PyYAML>=6.0",          # YAML configuration file parsing
+    
     # Model Context Protocol server
     "mcp>=1.0.0",           # MCP SDK for building MCP servers
 ]
