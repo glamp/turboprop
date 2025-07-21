@@ -156,7 +156,7 @@ class TestComparisonMCPTools:
         # Mock the comparison engine result to avoid JSON serialization errors
         mock_comparison_result = Mock()
         mock_comparison_result.comparison_matrix = {"read": {"edit": 0.8, "multiedit": 0.7}}
-        mock_comparison_result.overall_ranking = ["read", "edit", "multiedit"] 
+        mock_comparison_result.overall_ranking = ["read", "edit", "multiedit"]
         mock_comparison_result.key_differentiators = ["functionality", "complexity"]
         self.mock_comparison_engine.compare_tools.return_value = mock_comparison_result
 

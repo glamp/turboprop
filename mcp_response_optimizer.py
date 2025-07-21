@@ -1,8 +1,22 @@
 import hashlib
 import logging
-import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+
+from mcp_response_config import (
+    DEBUG_INFO_SIZE_THRESHOLD,
+    DEFAULT_TOOL_RESPONSE_TIME,
+    ESSENTIAL_RESULT_FIELDS_LIMIT,
+    LARGE_OBJECT_SUMMARIZATION_THRESHOLD,
+    RESPONSE_SIZE_LARGE_THRESHOLD,
+    RESPONSE_SIZE_VERY_LARGE_THRESHOLD,
+    RESULT_COMPLEXITY_MULTIPLIER_HIGH,
+    RESULT_COMPLEXITY_MULTIPLIER_MEDIUM,
+    RESULT_COUNT_COMPLEX_RESPONSE,
+    RESULT_COUNT_SUMMARY_THRESHOLD,
+    TOOL_RESPONSE_TIME_ESTIMATES,
+    TOP_CATEGORIES_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +55,15 @@ class ResponseCompressor:
         import json
 
         try:
-            return len(json.dumps(response)) > 10000  # 10KB threshold
-        except:
+            return len(json.dumps(response)) > RESPONSE_SIZE_LARGE_THRESHOLD
+        except (TypeError, ValueError, RecursionError) as e:
+            logger.warning(f"Failed to calculate response size: {e}")
             return False
 
     def _remove_redundant_metadata(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Remove redundant metadata from large responses"""
         # Keep essential fields, remove verbose debugging info
-        if "debug_info" in response and len(str(response)) > 50000:
+        if "debug_info" in response and len(str(response)) > DEBUG_INFO_SIZE_THRESHOLD:
             response["debug_info"] = {"summarized": True}
 
         return response
@@ -95,7 +110,7 @@ class MCPResponseOptimizer:
             response["results"] = [self._flatten_result_structure(result) for result in response["results"]]
 
         # Create result summaries for large result sets
-        if len(response.get("results", [])) > 10:
+        if len(response.get("results", [])) > RESULT_COUNT_SUMMARY_THRESHOLD:
             response["result_summary"] = {
                 "total_count": len(response["results"]),
                 "top_categories": self._extract_top_categories(response["results"]),
@@ -109,7 +124,7 @@ class MCPResponseOptimizer:
         flattened = {}
 
         for key, value in result.items():
-            if isinstance(value, dict) and len(str(value)) > 1000:
+            if isinstance(value, dict) and len(str(value)) > LARGE_OBJECT_SUMMARIZATION_THRESHOLD:
                 # Flatten large nested objects
                 flattened[key] = self._summarize_large_object(value)
             else:
@@ -121,7 +136,7 @@ class MCPResponseOptimizer:
         """Summarize large nested objects"""
         summary = {
             "summarized": True,
-            "original_keys": list(obj.keys())[:5],  # First 5 keys
+            "original_keys": list(obj.keys())[:ESSENTIAL_RESULT_FIELDS_LIMIT],  # First N keys
             "total_keys": len(obj.keys()),
         }
 
@@ -141,9 +156,9 @@ class MCPResponseOptimizer:
             category = result.get("category") or result.get("type") or "uncategorized"
             category_counts[category] += 1
 
-        # Return top 3 categories
+        # Return top N categories
         sorted_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
-        return [cat for cat, count in sorted_categories[:3]]
+        return [cat for cat, count in sorted_categories[:TOP_CATEGORIES_LIMIT]]
 
     def _extract_confidence_summary(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Extract confidence score summary"""
@@ -211,16 +226,16 @@ class MCPResponseOptimizer:
     def _is_complex_response(self, response: Dict[str, Any]) -> bool:
         """Check if response is complex enough to need progressive disclosure"""
         # Consider complex if:
-        # - Has more than 10 results
+        # - Has more than threshold results
         # - Response size is large
         # - Has multiple data sections
 
         result_count = len(response.get("results", []))
-        if result_count > 10:
+        if result_count > RESULT_COUNT_COMPLEX_RESPONSE:
             return True
 
         response_size = len(str(response))
-        if response_size > 20000:  # 20KB
+        if response_size > RESPONSE_SIZE_VERY_LARGE_THRESHOLD:
             return True
 
         data_sections = sum(

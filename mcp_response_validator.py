@@ -2,7 +2,15 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List
+
+from mcp_response_config import (
+    EXECUTION_TIME_OPTIMAL,
+    EXECUTION_TIME_WARNING,
+    RESPONSE_SIZE_CRITICAL_THRESHOLD,
+    RESPONSE_SIZE_WARNING_THRESHOLD,
+    RESULT_COUNT_PERFORMANCE_WARNING,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -241,26 +249,27 @@ class MCPResponseValidator:
         # Check response size
         try:
             response_size = len(json.dumps(response))
-            if response_size > 100000:  # 100KB
+            if response_size > RESPONSE_SIZE_CRITICAL_THRESHOLD:
                 warnings.append(f"Response size ({response_size} bytes) is very large and may impact performance")
-            elif response_size > 50000:  # 50KB
+            elif response_size > RESPONSE_SIZE_WARNING_THRESHOLD:
                 warnings.append(f"Response size ({response_size} bytes) is large")
-        except:
+        except (TypeError, ValueError, RecursionError) as e:
+            logger.warning(f"Could not calculate response size: {e}")
             warnings.append("Could not calculate response size")
 
         # Check execution time if available
         if "performance" in response and "execution_time" in response["performance"]:
             exec_time = response["performance"]["execution_time"]
             if isinstance(exec_time, (int, float)):
-                if exec_time > 5.0:
-                    warnings.append(f"Execution time ({exec_time:.2f}s) exceeds recommended 5 second threshold")
-                elif exec_time > 2.0:
+                if exec_time > EXECUTION_TIME_WARNING:
+                    warnings.append(f"Execution time ({exec_time:.2f}s) exceeds recommended threshold")
+                elif exec_time > EXECUTION_TIME_OPTIMAL:
                     warnings.append(f"Execution time ({exec_time:.2f}s) is slower than optimal")
 
         # Check result count efficiency
         if "results" in response:
             result_count = len(response["results"])
-            if result_count > 100:
+            if result_count > RESULT_COUNT_PERFORMANCE_WARNING:
                 warnings.append(f"Large result count ({result_count}) may impact processing performance")
 
         return warnings

@@ -9,10 +9,7 @@ proper integration and functionality.
 import json
 import time
 import unittest
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import Mock, patch
 
 from mcp_response_optimizer import MCPResponseOptimizer, ResponseCompressor
 from mcp_response_standardizer import (
@@ -24,8 +21,8 @@ from mcp_response_standardizer import (
     get_relevant_documentation,
     standardize_mcp_tool_response,
 )
-from mcp_response_validator import MCPResponseValidator, ResponseValidationError
-from tool_search_response_cache import CacheEntry, CacheStats, ToolSearchResponseCache
+from mcp_response_validator import MCPResponseValidator
+from tool_search_response_cache import CacheStats, ToolSearchResponseCache
 
 
 class TestMCPResponseStandardizer(unittest.TestCase):
@@ -161,7 +158,7 @@ class TestStandardizationDecorator(unittest.TestCase):
         # Should be standardized JSON string, not original response
         self.assertIsInstance(result, str)
         result_dict = json.loads(result)
-        
+
         self.assertIn("success", result_dict)
         self.assertIn("tool", result_dict)
         self.assertIn("timestamp", result_dict)
@@ -181,7 +178,7 @@ class TestStandardizationDecorator(unittest.TestCase):
         # Should return standardized error response as JSON string
         self.assertIsInstance(result, str)
         result_dict = json.loads(result)
-        
+
         self.assertFalse(result_dict["success"])
         self.assertEqual(result_dict["tool"], "failing_function")
         self.assertIn("error", result_dict)

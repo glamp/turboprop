@@ -2,8 +2,21 @@ import hashlib
 import json
 import logging
 import time
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
+from mcp_response_config import (
+    CONTROL_CHARS_PATTERN,
+    DANGEROUS_HTML_TAGS,
+    JAVASCRIPT_SAFE_INTEGER,
+    MAX_DICT_SIZE,
+    MAX_KEY_LENGTH,
+    MAX_LIST_SIZE,
+    MAX_STRING_LENGTH,
+    MAX_TOOL_NAME_LENGTH,
+    RESPONSE_FORMAT_VERSION,
+    SAFE_KEY_PATTERN,
+    SAFE_TOOL_NAME_PATTERN,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,19 +124,24 @@ class MCPResponseStandardizer:
     ) -> Dict[str, Any]:
         """Standardize tool search response format"""
 
+        # Sanitize and validate inputs
+        sanitized_response_data = self._sanitize_response_data(response_data)
+        sanitized_tool_name = self._sanitize_tool_name(tool_name)
+        sanitized_query_context = self._sanitize_query_context(query_context)
+
         # Add standard metadata
         standardized = {
             "success": True,
-            "tool": tool_name,
+            "tool": sanitized_tool_name,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "version": "1.0",
+            "version": RESPONSE_FORMAT_VERSION,
             "response_id": generate_response_id(),
-            **response_data,
+            **sanitized_response_data,
         }
 
         # Add query context if available
-        if query_context:
-            standardized["query_context"] = query_context
+        if sanitized_query_context:
+            standardized["query_context"] = sanitized_query_context
 
         # Add performance metadata
         standardized["performance"] = {
@@ -154,7 +172,7 @@ class MCPResponseStandardizer:
             "success": False,
             "tool": tool_name,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "version": "1.0",
+            "version": RESPONSE_FORMAT_VERSION,
             "response_id": generate_response_id(),
             "error": {
                 "message": error_message,
@@ -248,6 +266,144 @@ class MCPResponseStandardizer:
             if isinstance(comparison, dict) and "tools" in comparison:
                 return len(comparison["tools"])
         return 0
+
+    def _sanitize_response_data(self, response_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanitize response data to prevent injection attacks"""
+        if not isinstance(response_data, dict):
+            logger.warning(f"Invalid response_data type: {type(response_data)}, using empty dict")
+            return {}
+
+        sanitized = {}
+        for key, value in response_data.items():
+            sanitized_key = self._sanitize_string_key(key)
+            sanitized_value = self._sanitize_value(value)
+            if sanitized_key and sanitized_value is not None:
+                sanitized[sanitized_key] = sanitized_value
+
+        return sanitized
+
+    def _sanitize_tool_name(self, tool_name: str) -> str:
+        """Sanitize tool name to prevent injection"""
+        if not isinstance(tool_name, str):
+            logger.warning(f"Invalid tool_name type: {type(tool_name)}, using 'unknown'")
+            return "unknown"
+
+        # Allow only alphanumeric characters, underscores, and hyphens
+        import re
+
+        sanitized = re.sub(r"[^a-zA-Z0-9_-]", "", tool_name)
+
+        if not sanitized:
+            logger.warning(f"Tool name '{tool_name}' sanitized to empty string, using 'unknown'")
+            return "unknown"
+
+        # Limit length to prevent buffer overflow attacks
+        return sanitized[:MAX_TOOL_NAME_LENGTH]
+
+    def _sanitize_query_context(self, query_context: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Sanitize query context to prevent injection"""
+        if query_context is None:
+            return None
+
+        if not isinstance(query_context, dict):
+            logger.warning(f"Invalid query_context type: {type(query_context)}, ignoring")
+            return None
+
+        sanitized = {}
+        for key, value in query_context.items():
+            sanitized_key = self._sanitize_string_key(key)
+            sanitized_value = self._sanitize_value(value)
+            if sanitized_key and sanitized_value is not None:
+                sanitized[sanitized_key] = sanitized_value
+
+        return sanitized if sanitized else None
+
+    def _sanitize_string_key(self, key: str) -> str:
+        """Sanitize dictionary keys"""
+        if not isinstance(key, str):
+            logger.warning(f"Non-string key detected: {type(key)}, converting to string")
+            key = str(key)
+
+        # Remove potentially dangerous characters
+        import re
+
+        sanitized = re.sub(SAFE_KEY_PATTERN, "", key)
+
+        # Limit key length
+        return sanitized[:MAX_KEY_LENGTH] if sanitized else ""
+
+    def _sanitize_value(self, value: Any) -> Any:
+        """Sanitize values recursively"""
+        if value is None:
+            return None
+        elif isinstance(value, bool):
+            return value
+        elif isinstance(value, (int, float)):
+            # Validate numeric ranges to prevent overflow
+            if isinstance(value, int) and abs(value) > JAVASCRIPT_SAFE_INTEGER:  # JavaScript safe integer
+                logger.warning(f"Integer value too large: {value}, capping to safe range")
+                return JAVASCRIPT_SAFE_INTEGER if value > 0 else -JAVASCRIPT_SAFE_INTEGER
+            elif isinstance(value, float) and (value != value or abs(value) == float("inf")):  # NaN or Inf
+                logger.warning(f"Invalid float value: {value}, replacing with 0")
+                return 0.0
+            return value
+        elif isinstance(value, str):
+            return self._sanitize_string_value(value)
+        elif isinstance(value, (list, tuple)):
+            # Limit list/tuple size to prevent DoS
+            if len(value) > MAX_LIST_SIZE:
+                logger.warning(f"Sequence too large ({len(value)} items), truncating to {MAX_LIST_SIZE}")
+                value = value[:MAX_LIST_SIZE]
+            sanitized_items = [self._sanitize_value(item) for item in value]
+            # Preserve original type (list or tuple)
+            return type(value)(sanitized_items)
+        elif isinstance(value, dict):
+            # Limit dict size to prevent DoS
+            if len(value) > MAX_DICT_SIZE:
+                logger.warning(f"Dict too large ({len(value)} keys), truncating")
+                value = dict(list(value.items())[:MAX_DICT_SIZE])
+            sanitized_dict = {}
+            for k, v in value.items():
+                sanitized_key = self._sanitize_string_key(str(k))
+                sanitized_val = self._sanitize_value(v)
+                if sanitized_key and sanitized_val is not None:
+                    sanitized_dict[sanitized_key] = sanitized_val
+            return sanitized_dict
+        else:
+            # Convert unknown types to string and sanitize
+            logger.warning(f"Unknown value type: {type(value)}, converting to string")
+            return self._sanitize_string_value(str(value))
+
+    def _sanitize_string_value(self, value: str) -> str:
+        """Sanitize string values to prevent injection"""
+        if not isinstance(value, str):
+            value = str(value)
+
+        # Limit string length to prevent buffer overflow
+        if len(value) > MAX_STRING_LENGTH:  # 100KB limit
+            logger.warning(f"String too long ({len(value)} chars), truncating to {MAX_STRING_LENGTH}")
+            value = value[:MAX_STRING_LENGTH]
+
+        # Remove or escape potentially dangerous patterns
+        import re
+
+        # Remove null bytes and other control characters except common ones
+        value = re.sub(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]", "", value)
+
+        # Remove script tags and javascript: URLs (case insensitive)
+        value = re.sub(r"<\s*script[^>]*>.*?</\s*script\s*>", "", value, flags=re.IGNORECASE | re.DOTALL)
+        value = re.sub(r"javascript\s*:", "", value, flags=re.IGNORECASE)
+
+        # Remove other potentially dangerous HTML tags
+        dangerous_tags = ["iframe", "object", "embed", "applet", "meta", "link"]
+        for tag in dangerous_tags:
+            value = re.sub(rf"<\s*{tag}[^>]*>.*?</\s*{tag}\s*>", "", value, flags=re.IGNORECASE | re.DOTALL)
+            value = re.sub(rf"<\s*{tag}[^>]*/?>", "", value, flags=re.IGNORECASE)
+
+        # Remove event handlers
+        value = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', "", value, flags=re.IGNORECASE)
+
+        return value
 
 
 def standardize_mcp_tool_response(func):
