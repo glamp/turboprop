@@ -137,7 +137,7 @@ class ComparisonMetrics:
         try:
             tool_metrics = self._calculate_individual_tool_metrics(tool, context)
             tool_metrics = self._normalize_all_scores(tool_metrics)
-            
+
             logger.debug(f"Calculated metrics for {tool.name}: {tool_metrics}")
             return tool_metrics
 
@@ -164,9 +164,7 @@ class ComparisonMetrics:
 
     def _get_default_metrics(self) -> Dict[str, float]:
         """Get default metrics when calculation fails."""
-        return {
-            metric: self.scoring_config["default_score"] for metric in self.metric_definitions.keys()
-        }
+        return {metric: self.scoring_config["default_score"] for metric in self.metric_definitions.keys()}
 
     def calculate_functionality_score(self, tool: ToolSearchResult) -> float:
         """

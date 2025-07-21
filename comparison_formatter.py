@@ -559,7 +559,7 @@ Complexity: {alternative.complexity_comparison} | Learning Curve: {alternative.l
         if not guidance:
             return "No guidance available"
 
-        if hasattr(guidance, 'recommendation'):
+        if hasattr(guidance, "recommendation"):
             return self._wrap_text(guidance.recommendation)
         elif isinstance(guidance, str):
             return self._wrap_text(guidance)

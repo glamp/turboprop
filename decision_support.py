@@ -10,12 +10,7 @@ import statistics
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from comparison_constants import (
-    CONFIDENCE_FACTORS,
-    DECISION_THRESHOLDS,
-    SCORE_LIMITS,
-    TASK_SCORING_WEIGHTS,
-)
+from comparison_constants import CONFIDENCE_FACTORS, DECISION_THRESHOLDS, SCORE_LIMITS, TASK_SCORING_WEIGHTS
 from context_analyzer import TaskContext
 from logging_config import get_logger
 from tool_search_results import ToolSearchResult
@@ -338,7 +333,9 @@ class DecisionSupport:
                 metrics = comparison_result.comparison_matrix[tool_id]
 
                 # Calculate priority score
-                priority_score = statistics.mean(metrics.get(metric, SCORE_LIMITS["default_score"]) for metric in priority_metrics)
+                priority_score = statistics.mean(
+                    metrics.get(metric, SCORE_LIMITS["default_score"]) for metric in priority_metrics
+                )
 
                 # Overall score (priority metrics weighted more heavily)
                 all_metrics_score = statistics.mean(metrics.values()) if metrics else SCORE_LIMITS["default_score"]
@@ -351,7 +348,10 @@ class DecisionSupport:
 
         # Find best tool
         if not tool_scores:
-            return comparison_result.compared_tools[0] if comparison_result.compared_tools else "unknown", SCORE_LIMITS["default_score"]
+            return (
+                comparison_result.compared_tools[0] if comparison_result.compared_tools else "unknown",
+                SCORE_LIMITS["default_score"],
+            )
 
         recommended_tool = max(tool_scores.keys(), key=lambda t: tool_scores[t])
         confidence = min(
@@ -438,7 +438,9 @@ class DecisionSupport:
             return comparison_result.compared_tools[1:3] if len(comparison_result.compared_tools) > 1 else []
 
         recommended_metrics = comparison_result.comparison_matrix[recommended_tool]
-        recommended_score = statistics.mean(recommended_metrics.values()) if recommended_metrics else SCORE_LIMITS["default_score"]
+        recommended_score = (
+            statistics.mean(recommended_metrics.values()) if recommended_metrics else SCORE_LIMITS["default_score"]
+        )
 
         # Find tools with similar overall scores
         alternatives = []

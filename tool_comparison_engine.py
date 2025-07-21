@@ -167,10 +167,12 @@ class ToolComparisonEngine:
 
             # Perform the comparison analysis
             comparison_data = self._perform_comparison_analysis(tool_ids, comparison_criteria, context)
-            
+
             # Create and cache the final result
-            result = self._create_final_comparison_result(comparison_data, tool_ids, comparison_criteria, context, start_time)
-            
+            result = self._create_final_comparison_result(
+                comparison_data, tool_ids, comparison_criteria, context, start_time
+            )
+
             # Update performance tracking
             self._update_comparison_performance_metrics(start_time)
 
@@ -347,7 +349,8 @@ class ToolComparisonEngine:
             key_differentiators=comparison_data["key_differentiators"],
             trade_off_analysis=comparison_data["trade_offs"],
             decision_guidance=None,  # Will be filled next
-            comparison_criteria=comparison_criteria or list(comparison_data["comparison_matrix"].get(tool_ids[0], {}).keys()),
+            comparison_criteria=comparison_criteria
+            or list(comparison_data["comparison_matrix"].get(tool_ids[0], {}).keys()),
             context_factors=self._extract_context_factors(context),
             confidence_scores=comparison_data["confidence_scores"],
         )
@@ -363,7 +366,8 @@ class ToolComparisonEngine:
             key_differentiators=comparison_data["key_differentiators"],
             trade_off_analysis=comparison_data["trade_offs"],
             decision_guidance=decision_guidance,
-            comparison_criteria=comparison_criteria or list(comparison_data["comparison_matrix"].get(tool_ids[0], {}).keys()),
+            comparison_criteria=comparison_criteria
+            or list(comparison_data["comparison_matrix"].get(tool_ids[0], {}).keys()),
             context_factors=self._extract_context_factors(context),
             confidence_scores=comparison_data["confidence_scores"],
             execution_time=time.time() - start_time,
@@ -373,7 +377,7 @@ class ToolComparisonEngine:
         # Cache result
         cache_key = self._generate_comparison_cache_key(tool_ids, comparison_criteria, context)
         self.comparison_cache[cache_key] = result
-        
+
         return result
 
     def _update_comparison_performance_metrics(self, start_time: float) -> None:
