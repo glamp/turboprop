@@ -112,9 +112,6 @@ class ExplanationGenerator:
         self, required_capabilities: List[str], tool_capabilities: List[str], match_score: float
     ) -> str:
         """Generate explanation for capability matching."""
-        # Determine match quality
-        match_quality = self._get_match_quality(match_score)
-
         # Find common and missing capabilities
         required_set = set(required_capabilities)
         tool_set = set(tool_capabilities)
@@ -122,14 +119,19 @@ class ExplanationGenerator:
         missing = required_set - tool_set
 
         if match_score >= self.capability_thresholds["excellent"]:
-            return f"Excellent capability match - tool provides {len(common)}/{len(required_set)} required capabilities including {', '.join(list(common)[:3])}."
+            common_caps = ', '.join(list(common)[:3])
+            return f"Excellent capability match - tool provides {len(common)}/{len(required_set)} required capabilities including {common_caps}."
         elif match_score >= self.capability_thresholds["good"]:
-            return f"Good capability match - tool covers most required functionality with {len(common)}/{len(required_set)} matching capabilities."
+            match_ratio = f"{len(common)}/{len(required_set)}"
+            return f"Good capability match - tool covers most required functionality with {match_ratio} matching capabilities."
         elif match_score >= self.capability_thresholds["adequate"]:
             missing_str = f", missing {', '.join(list(missing)[:2])}" if missing else ""
-            return f"Adequate capability match - tool provides {len(common)}/{len(required_set)} required capabilities{missing_str}."
+            match_ratio = f"{len(common)}/{len(required_set)}"
+            return f"Adequate capability match - tool provides {match_ratio} required capabilities{missing_str}."
         else:
-            return f"Limited capability match - tool provides only {len(common)}/{len(required_set)} required capabilities. Missing key features: {', '.join(list(missing)[:3])}."
+            match_ratio = f"{len(common)}/{len(required_set)}"
+            missing_features = ', '.join(list(missing)[:3])
+            return f"Limited capability match - tool provides only {match_ratio} required capabilities. Missing key features: {missing_features}."
 
     def generate_complexity_explanation(
         self, task_complexity: str, tool_complexity: str, alignment_score: float
@@ -140,16 +142,29 @@ class ExplanationGenerator:
 
         if alignment_score >= 0.9:
             return (
-                f"Perfect complexity alignment - both task and tool are {task_complexity}, ensuring optimal usability."
+                f"Perfect complexity alignment - both task and tool are {task_complexity}, "
+                "ensuring optimal usability."
             )
         elif alignment_score >= 0.7:
-            return f"Good complexity match - task is {task_desc} and tool is {tool_desc}, providing appropriate functionality."
+            return (
+                f"Good complexity match - task is {task_desc} and tool is {tool_desc}, "
+                "providing appropriate functionality."
+            )
         elif task_complexity == "simple" and tool_complexity in ["moderate", "complex"]:
-            return f"Tool complexity exceeds task requirements - tool is {tool_desc} for a {task_desc} task, but offers room to grow."
+            return (
+                f"Tool complexity exceeds task requirements - tool is {tool_desc} "
+                f"for a {task_desc} task, but offers room to grow."
+            )
         elif task_complexity in ["moderate", "complex"] and tool_complexity == "simple":
-            return f"Tool may be too simple - {tool_desc} tool for a {task_desc} task may lack advanced features."
+            return (
+                f"Tool may be too simple - {tool_desc} tool for a {task_desc} task "
+                "may lack advanced features."
+            )
         else:
-            return f"Complexity mismatch - task requires {task_complexity} approach but tool is {tool_complexity}."
+            return (
+                f"Complexity mismatch - task requires {task_complexity} approach "
+                f"but tool is {tool_complexity}."
+            )
 
     def generate_parameter_explanation(self, tool_parameters: Dict[str, Any], task_requirements: Dict[str, Any]) -> str:
         """Generate explanation for parameter compatibility."""

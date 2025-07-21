@@ -12,6 +12,11 @@ import pytest
 
 from search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
 
+# Test constants for improved maintainability
+PRECISION_TOLERANCE_STANDARD = 1e-10  # standard precision tolerance for float comparisons
+PERFORMANCE_TIMEOUT_FAST = 0.1  # seconds - for very fast operations
+PERFORMANCE_TIMEOUT_MODERATE = 1.0  # seconds - for moderate performance requirements
+
 
 class TestCodeSnippet:
     """Test the CodeSnippet dataclass."""
@@ -132,7 +137,7 @@ class TestCodeSearchResult:
         assert len(tuple_result) == 3
         assert tuple_result[0] == "hello.py"
         assert tuple_result[1] == "print('hello')"
-        assert abs(tuple_result[2] - 0.2) < 1e-10  # distance = 1 - similarity with tolerance
+        assert abs(tuple_result[2] - 0.2) < PRECISION_TOLERANCE_STANDARD  # distance = 1 - similarity
 
     def test_code_search_result_str_backward_compatibility(self):
         """Test that string representation matches legacy tuple format for compatibility."""
@@ -530,7 +535,7 @@ class TestComprehensiveTypeConversion:
 
         percentage = result.similarity_percentage
         assert isinstance(percentage, float)
-        assert abs(percentage - 75.6) < 1e-10
+        assert abs(percentage - 75.6) < PRECISION_TOLERANCE_STANDARD
 
     def test_similarity_percentage_with_float_score_detailed(self):
         """Test similarity_percentage property with float similarity_score."""
@@ -543,7 +548,7 @@ class TestComprehensiveTypeConversion:
 
         percentage = result.similarity_percentage
         assert isinstance(percentage, float)
-        assert abs(percentage - 75.6) < 1e-10
+        assert abs(percentage - 75.6) < PRECISION_TOLERANCE_STANDARD
 
     def test_similarity_percentage_edge_cases_detailed(self):
         """Test similarity_percentage with edge case values."""
@@ -582,7 +587,7 @@ class TestComprehensiveTypeConversion:
 
         # After __post_init__, similarity_score should be float
         assert isinstance(result.similarity_score, float)
-        assert abs(result.similarity_score - 0.85) < 1e-10
+        assert abs(result.similarity_score - 0.85) < PRECISION_TOLERANCE_STANDARD
 
     def test_type_conversion_with_invalid_inputs_comprehensive(self):
         """Test type conversion error handling with comprehensive invalid inputs."""
@@ -620,8 +625,8 @@ class TestPerformanceAndPrecision:
         float_time = time.time() - start
 
         # Verify reasonable performance (specific thresholds depend on requirements)
-        assert decimal_time < 1.0  # Should be fast
-        assert float_time < 0.1  # Should be very fast
+        assert decimal_time < PERFORMANCE_TIMEOUT_MODERATE  # Should be reasonably fast
+        assert float_time < PERFORMANCE_TIMEOUT_FAST  # Should be very fast
 
         # Verify correctness
         assert len(decimal_results) == 1000

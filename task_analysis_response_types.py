@@ -2,7 +2,7 @@
 """
 task_analysis_response_types.py: Refactored response types for task analysis MCP tools.
 
-This module defines focused, single-responsibility dataclasses for MCP tool recommendation 
+This module defines focused, single-responsibility dataclasses for MCP tool recommendation
 responses. The classes are split to reduce complexity and interdependencies.
 
 Core Classes:

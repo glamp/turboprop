@@ -402,9 +402,6 @@ class HybridSearchEngine:
                 # Create CodeSearchResult using helper method
                 code_result = self._convert_to_code_search_result(path, content, relevance_score, query)
 
-                # Determine if this was from FTS or fallback search
-                search_method = "duckdb_fts" if self.db_manager.is_fts_available() else "like_search"
-
                 hybrid_result = HybridSearchResult(
                     code_result=code_result,
                     semantic_score=0.0,

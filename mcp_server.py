@@ -59,6 +59,12 @@ from search_operations import (
     search_with_intelligent_routing,
 )
 
+# Tool engine imports for type hints
+from context_analyzer import ContextAnalyzer
+from parameter_search_engine import ParameterSearchEngine
+from tool_comparison_engine import ToolComparisonEngine
+from tool_recommendation_engine import ToolRecommendationEngine
+
 # MCP tool dependencies - imported last and with lazy loading where possible
 
 
@@ -266,8 +272,8 @@ class MCPServerInitializer:
     def initialize_database_and_embedder(self) -> tuple[bool, Optional[str]]:
         """Initialize database and embedder components."""
         try:
-            db_connection = get_db_connection()
-            embedder = get_embedder()
+            get_db_connection()
+            get_embedder()
             return True, None
         except Exception as e:
             error_msg = f"Failed to initialize database/embedder: {e}"
@@ -356,7 +362,8 @@ class MCPServerInitializer:
             return True
         except Exception as e:
             print(f"⚠️  Warning: MCP tool search engines not initialized: {e}", file=sys.stderr)
-            self.initialization_errors.append(f"MCP tool search initialization failed: {e}")
+            error_msg = f"MCP tool search initialization failed: {e}"
+            self.initialization_errors.append(error_msg)
             return False
 
     def initialize_recommendation_engines(self) -> bool:
@@ -405,7 +412,8 @@ class MCPServerInitializer:
         except Exception as e:
             print(f"⚠️  Warning: Tool recommendation engines not initialized: {e}", file=sys.stderr)
             _recommendation_tools_initialized = False
-            self.initialization_errors.append(f"Recommendation engines initialization failed: {e}")
+            error_msg = f"Recommendation engines initialization failed: {e}"
+            self.initialization_errors.append(error_msg)
             return False
 
     def initialize_comparison_engines(self) -> bool:
@@ -2800,7 +2808,7 @@ def main():
 
     # Initialize all server components using the new initializer class
     initializer = MCPServerInitializer()
-    initialization_success = initializer.run_initialization()
+    initializer.run_initialization()
 
     # Print initialization summary
     print(file=sys.stderr)

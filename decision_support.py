@@ -483,9 +483,18 @@ class DecisionSupport:
     ) -> Dict[str, str]:
         """Generate guidance for different user contexts."""
         guidance = {
-            "beginner": f"Start with '{recommended_tool}' - it offers the best balance of capability and ease of use for beginners",
-            "advanced": f"'{recommended_tool}' is recommended, but consider the trade-offs based on your specific requirements",
-            "performance": f"For performance-critical scenarios, '{recommended_tool}' provides good efficiency while maintaining functionality",
+            "beginner": (
+                f"Start with '{recommended_tool}' - it offers the best balance of "
+                "capability and ease of use for beginners"
+            ),
+            "advanced": (
+                f"'{recommended_tool}' is recommended, but consider the trade-offs "
+                "based on your specific requirements"
+            ),
+            "performance": (
+                f"For performance-critical scenarios, '{recommended_tool}' provides "
+                "good efficiency while maintaining functionality"
+            ),
         }
 
         # Customize based on actual metrics

@@ -136,7 +136,9 @@ class TaskPatternRecognizer:
         """Initialize the pattern recognizer."""
         self.pattern_definitions = {
             "file_conversion": r"\b(convert|transform|change).*\b(to|into|as)\b",
-            "data_format_transformation": r"\b(csv|json|xml|parquet|excel|pdf|text)\b.*\b(csv|json|xml|parquet|excel|pdf|text)\b",
+            "data_format_transformation": (
+                r"\b(csv|json|xml|parquet|excel|pdf|text)\b.*\b(csv|json|xml|parquet|excel|pdf|text)\b"
+            ),
             "data_cleaning": r"\b(clean|remove\s+duplicates|missing\s+values|normalize)\b",
             "data_preprocessing": r"\b(preprocess|prepare|clean|normalize|transform)\s+data",
             "database_backup": r"\b(backup|copy)\s+database\b",

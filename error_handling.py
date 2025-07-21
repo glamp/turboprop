@@ -83,8 +83,6 @@ class StandardErrorHandler:
         context: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Handle error by returning a default value."""
-        error_code = f"{self.module_name.upper()}_OPERATION_FAILED"
-
         # Log the error
         self.logger.error("Error in %s.%s: %s", self.module_name, operation, str(exception))
 

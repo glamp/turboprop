@@ -15,6 +15,11 @@ import pytest
 
 from search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
 
+# Test constants
+BATCH_PROCESSING_TIMEOUT = 5.0  # seconds - maximum time for batch processing tests
+PRECISION_TOLERANCE_HIGH = 1e-15  # high precision tolerance for exact comparisons
+PRECISION_TOLERANCE_STANDARD = 1e-10  # standard precision tolerance for float comparisons
+
 
 class TestSearchResultFormattingWithDecimalScores:
     """Test search result formatting functions handle Decimal scores correctly."""
@@ -238,8 +243,8 @@ class TestErrorHandlingAndEdgeCases:
 
         # Verify the data is preserved correctly
         parsed = json.loads(json_str)
-        assert abs(parsed["similarity_score"] - 0.847) < 1e-10
-        assert abs(parsed["similarity_percentage"] - 84.7) < 1e-10
+        assert abs(parsed["similarity_score"] - 0.847) < PRECISION_TOLERANCE_STANDARD
+        assert abs(parsed["similarity_percentage"] - 84.7) < PRECISION_TOLERANCE_STANDARD
 
     def test_legacy_tuple_conversion_with_decimal_input(self):
         """Test legacy tuple conversion handles Decimal similarity scores."""
@@ -257,7 +262,7 @@ class TestErrorHandlingAndEdgeCases:
         assert tuple_result[0] == "legacy.py"
         assert tuple_result[1] == "legacy test"
         # Distance should be 1 - similarity = 1 - 0.83 = 0.17
-        assert abs(tuple_result[2] - 0.17) < 1e-10
+        assert abs(tuple_result[2] - 0.17) < PRECISION_TOLERANCE_STANDARD
 
     def test_round_trip_legacy_conversion_with_decimals(self):
         """Test round-trip conversion through legacy format preserves data."""
@@ -306,7 +311,7 @@ class TestConcurrencyAndBatchProcessing:
         processing_time = time.time() - start_time
 
         # Verify reasonable batch processing performance
-        assert processing_time < 5.0  # Should process 500 results in under 5 seconds
+        assert processing_time < BATCH_PROCESSING_TIMEOUT  # Should process 500 results quickly
         assert len(results) == batch_size
 
         # Verify all conversions were successful
@@ -358,7 +363,7 @@ class TestRegressionSafety:
         # Legacy operations should work
         tuple_format = result.to_tuple()
         assert len(tuple_format) == 3
-        assert abs(tuple_format[2] - 0.15) < 1e-10  # distance = 1 - similarity
+        assert abs(tuple_format[2] - 0.15) < PRECISION_TOLERANCE_STANDARD  # distance = 1 - similarity
 
     def test_metadata_and_context_preservation(self):
         """Test that metadata and context are preserved during type conversion."""
@@ -386,7 +391,7 @@ class TestRegressionSafety:
 
         # Verify type conversion occurred
         assert isinstance(result.similarity_score, float)
-        assert abs(result.similarity_score - 0.789) < 1e-15
+        assert abs(result.similarity_score - 0.789) < PRECISION_TOLERANCE_HIGH
 
         # Verify all metadata is preserved
         assert result.file_metadata == metadata

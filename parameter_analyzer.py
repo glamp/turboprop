@@ -206,7 +206,6 @@ class ParameterAnalyzer:
         # Build parameter name sets for quick lookup
         tool_param_names = {p.name.lower() for p in tool_parameters}
         tool_param_types = {p.name.lower(): p.type.lower() for p in tool_parameters}
-        required_tool_params = {p.name.lower() for p in tool_parameters if p.required}
 
         # Track matches
         required_matches = []

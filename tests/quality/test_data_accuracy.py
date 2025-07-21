@@ -639,9 +639,11 @@ class TestSearchResultRelevance:
                     # Check if results are approximately sorted (allow minor variations)
                     score_diff = abs(scores[0] - sorted_scores[0])
                     if score_diff > 0.1:  # Only fail if significantly unsorted
-                        print(
-                            f"Warning: Results not perfectly sorted by relevance. Actual: {scores}, Expected: {sorted_scores}"
+                        warning_msg = (
+                            f"Warning: Results not perfectly sorted by relevance. "
+                            f"Actual: {scores}, Expected: {sorted_scores}"
                         )
+                        print(warning_msg)
                         # Don't fail the test for mock results, just warn
 
                 # Top results should have reasonable relevance

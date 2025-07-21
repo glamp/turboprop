@@ -258,9 +258,8 @@ class RecommendationAlgorithms:
         # Sort by recommendation score (descending)
         recommendations.sort(key=lambda x: x.recommendation_score, reverse=True)
 
-        logger.info(
-            f"Ensemble ranking complete, top recommendation: {recommendations[0].tool.name if recommendations else 'none'}"
-        )
+        top_tool = recommendations[0].tool.name if recommendations else 'none'
+        logger.info(f"Ensemble ranking complete, top recommendation: {top_tool}")
         return recommendations
 
     def calculate_recommendation_confidence(

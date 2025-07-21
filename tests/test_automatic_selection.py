@@ -534,8 +534,6 @@ class TestIntegrationRealComponents:
 
         # Simulate user selection and outcome
         if result.suggested_tools:
-            selected_tool = result.suggested_tools[0]
-
             # Simulate successful outcome
             self.effectiveness_tracker.update_selection_outcome(
                 event_id=f"test_event_{int(time.time())}", outcome_success=True, completion_time=2.5, user_feedback=0.8
@@ -551,8 +549,6 @@ class TestIntegrationRealComponents:
             {"task": "file_search", "user_input": "locate test files", "domain": "development"},
             {"task": "file_search", "user_input": "search for documentation", "domain": "development"},
         ]
-
-        initial_preferences = self.learning_system.get_learned_preferences(contexts[0], None)
 
         # Simulate multiple successful interactions
         for i, context in enumerate(contexts):
@@ -684,7 +680,7 @@ class TestIntegrationRealComponents:
         context = {"task": "persistence_test", "user_input": "test storage"}
 
         # Generate some data
-        result = self.selector.analyze_and_suggest(current_context=context)
+        self.selector.analyze_and_suggest(current_context=context)
 
         # Force a save
         if hasattr(self.learning_system, "_save_model"):

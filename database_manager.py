@@ -632,7 +632,8 @@ class DatabaseManager:
     def _create_fts_content_index(self, conn: duckdb.DuckDBPyConnection, fts_table_name: str) -> None:
         """Create content index on FTS table, with graceful fallback if it fails."""
         try:
-            index_sql = f"CREATE INDEX IF NOT EXISTS {INDEX_PREFIX}_{fts_table_name}_{FTS_CONTENT_INDEX_SUFFIX} ON {fts_table_name} (content)"
+            index_name = f"{INDEX_PREFIX}_{fts_table_name}_{FTS_CONTENT_INDEX_SUFFIX}"
+            index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {fts_table_name} (content)"
             conn.execute(index_sql)
             logger.info("Created basic content index on alternative FTS table %s", fts_table_name)
         except duckdb.Error as e:
@@ -836,10 +837,10 @@ class DatabaseManager:
 
             # Use DuckDB's match_bm25 function with correct syntax
             fts_query = f"""
-            SELECT cf.id, cf.path, cf.content, 
+            SELECT cf.id, cf.path, cf.content,
                    {fts_schema}.match_bm25(cf.id, ?) as fts_score
             FROM {table_name} cf
-            WHERE {fts_schema}.match_bm25(cf.id, ?) IS NOT NULL 
+            WHERE {fts_schema}.match_bm25(cf.id, ?) IS NOT NULL
                AND {fts_schema}.match_bm25(cf.id, ?) > 0
             ORDER BY fts_score DESC
             LIMIT ?
@@ -861,7 +862,7 @@ class DatabaseManager:
 
         alt_fts_query = f"""
         SELECT id, path, content,
-               CASE 
+               CASE
                    WHEN content_lower LIKE ? THEN 1.0
                    WHEN path_lower LIKE ? THEN 0.8
                    WHEN content_lower LIKE ? THEN 0.6

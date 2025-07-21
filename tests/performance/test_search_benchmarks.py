@@ -670,7 +670,10 @@ class TestRegressionBenchmarks:
 
                 assert (
                     current_metrics["files_per_second"] >= baseline["files_per_second"] * 0.8
-                ), f"Indexing rate regression: {current_metrics['files_per_second']} < {baseline['files_per_second']} * 0.8"
+                ), (
+                    f"Indexing rate regression: {current_metrics['files_per_second']} < "
+                    f"{baseline['files_per_second']} * 0.8"
+                )
 
             # Store current metrics
             store_benchmark(benchmark_name, current_metrics)

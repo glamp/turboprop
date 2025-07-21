@@ -2,8 +2,8 @@
 """
 Automatic Tool Selection Configuration
 
-This module contains all configurable constants and parameters for the 
-automatic tool selection system. All hard-coded values are centralized 
+This module contains all configurable constants and parameters for the
+automatic tool selection system. All hard-coded values are centralized
 here to allow easy customization and tuning.
 """
 

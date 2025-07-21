@@ -72,8 +72,9 @@ class MCPExplanationFormatter:
             except Exception as e:
                 logger.warning(f"Failed to generate explanation for {rec.core.tool_name}: {e}")
                 # Fallback explanation
+                confidence = f"{rec.core.confidence_score:.1%}"
                 explanations.append(
-                    f"#{i+1} {rec.core.tool_name}: Recommended for your task with {rec.core.confidence_score:.1%} confidence."
+                    f"#{i+1} {rec.core.tool_name}: Recommended for your task with {confidence} confidence."
                 )
 
         return explanations

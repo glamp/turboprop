@@ -3,7 +3,7 @@
 task_analysis_mcp_responses.py: Response types for task analysis MCP tools.
 
 This module defines comprehensive dataclasses for MCP tool recommendation responses
-that provide structured JSON data for task analysis, tool recommendations, and 
+that provide structured JSON data for task analysis, tool recommendations, and
 alternative suggestions.
 
 Classes:

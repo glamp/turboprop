@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional
 
 from automatic_selection_config import CONFIG
+from automatic_tool_selector import AutomaticSelectionResult
 from logging_config import get_logger
 from proactive_suggestion_engine import ProactiveSuggestion
 from storage_manager import get_storage_manager
@@ -273,7 +274,7 @@ class SelectionEffectivenessTracker:
         self,
         context: Dict[str, Any],
         suggestions: List[ProactiveSuggestion],
-        selection_result: "AutomaticSelectionResult",
+        selection_result: AutomaticSelectionResult,
     ) -> str:
         """Track a selection event and return event ID."""
 
@@ -586,14 +587,14 @@ class SelectionEffectivenessTracker:
                     metrics = ToolMetrics(tool_id=tool_id)
 
                     # Update metrics with loaded data
-                    for field, value in metrics_data.items():
-                        if hasattr(metrics, field) and field != "tool_id":
-                            if field.startswith("recent_"):
+                    for field_name, value in metrics_data.items():
+                        if hasattr(metrics, field_name) and field_name != "tool_id":
+                            if field_name.startswith("recent_"):
                                 # Handle deque fields
-                                deque_field = getattr(metrics, field)
+                                deque_field = getattr(metrics, field_name)
                                 deque_field.extend(value)
                             else:
-                                setattr(metrics, field, value)
+                                setattr(metrics, field_name, value)
 
                     self.effectiveness_metrics[tool_id] = metrics
 
