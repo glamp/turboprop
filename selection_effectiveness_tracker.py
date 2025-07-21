@@ -15,9 +15,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional
 
+from automatic_selection_config import CONFIG
 from logging_config import get_logger
 from proactive_suggestion_engine import ProactiveSuggestion
-from automatic_selection_config import CONFIG
 from storage_manager import get_storage_manager
 
 logger = get_logger(__name__)
@@ -262,7 +262,7 @@ class SelectionEffectivenessTracker:
         # Configuration from centralized config
         memory_config = CONFIG["memory_config"]
         self.max_history_size = memory_config["max_history_size"]
-        self.cleanup_threshold = memory_config["history_cleanup_threshold"] 
+        self.cleanup_threshold = memory_config["history_cleanup_threshold"]
         self.batch_size = memory_config["batch_size"]
         self.save_frequency = 25  # Save every N events
         self.event_counter = 0
@@ -609,45 +609,41 @@ class SelectionEffectivenessTracker:
     def _cleanup_history_if_needed(self):
         """Clean up history when size limits are exceeded."""
         current_size = len(self.selection_history)
-        
+
         if current_size <= self.max_history_size:
             return  # No cleanup needed
-        
+
         # Aggressive cleanup when threshold is exceeded
         if current_size >= self.cleanup_threshold:
             # Keep only the most recent events up to max_history_size
             events_to_keep = self.max_history_size
             events_to_remove = current_size - events_to_keep
-            
+
             logger.info(
                 "Cleaning up history: removing %d old events, keeping %d recent events",
                 events_to_remove,
-                events_to_keep
+                events_to_keep,
             )
-            
+
             self.selection_history = self.selection_history[-events_to_keep:]
-            
+
         else:
             # Gentle cleanup - remove a batch of old events
             events_to_remove = min(self.batch_size, current_size - self.max_history_size)
-            
-            logger.debug(
-                "Gentle cleanup: removing %d old events from history of %d",
-                events_to_remove,
-                current_size
-            )
-            
+
+            logger.debug("Gentle cleanup: removing %d old events from history of %d", events_to_remove, current_size)
+
             self.selection_history = self.selection_history[events_to_remove:]
 
     def get_memory_usage_stats(self) -> Dict[str, Any]:
         """Get current memory usage statistics."""
         current_size = len(self.selection_history)
         metrics_count = len(self.effectiveness_metrics)
-        
+
         # Calculate approximate memory usage
         estimated_bytes = current_size * 500  # Rough estimate per event
         estimated_mb = estimated_bytes / (1024 * 1024)
-        
+
         return {
             "current_history_size": current_size,
             "max_history_size": self.max_history_size,

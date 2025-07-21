@@ -600,7 +600,7 @@ async def run_advanced_examples():
         result = await recovery_chain.execute_with_fallbacks(
             "experimental_tool", "process data with experimental algorithm"
         )
-        if result['success']:
+        if result["success"]:
             print(f"✅ Recovery chain succeeded with tool: {result.get('tool_used', 'unknown')}")
             print(f"   Attempts made: {len(result.get('log', []))}")
         else:

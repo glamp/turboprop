@@ -11,10 +11,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from automatic_selection_config import CONFIG
+from error_handling import ErrorSeverity, create_error_handler
 from logging_config import get_logger
 from proactive_suggestion_engine import ProactiveSuggestion
-from error_handling import create_error_handler, ErrorSeverity
-from automatic_selection_config import CONFIG
 
 logger = get_logger(__name__)
 
@@ -175,7 +175,7 @@ class AutomaticToolSelector:
                     reasoning=[f"Analysis failed: {str(e)}"],
                 ),
                 severity=ErrorSeverity.HIGH,
-                context={"user_context": current_context}
+                context={"user_context": current_context},
             )
 
     def pre_rank_tools_for_context(self, available_tools: List[str], context: Dict[str, Any]) -> List[ToolRanking]:
@@ -215,15 +215,15 @@ class AutomaticToolSelector:
                 exception=e,
                 default_value=[
                     ToolRanking(
-                        tool_id=tool_id, 
-                        ranking_score=CONFIG["default_values"]["default_ranking_score"], 
-                        context=context, 
-                        factors={"default": CONFIG["default_values"]["default_score"]}
+                        tool_id=tool_id,
+                        ranking_score=CONFIG["default_values"]["default_ranking_score"],
+                        context=context,
+                        factors={"default": CONFIG["default_values"]["default_score"]},
                     )
                     for tool_id in available_tools
                 ],
                 severity=ErrorSeverity.MEDIUM,
-                context={"available_tools": available_tools, "context": context}
+                context={"available_tools": available_tools, "context": context},
             )
 
     def _calculate_confidence_scores(self, suggestions: List[ProactiveSuggestion]) -> Dict[str, float]:
@@ -243,8 +243,10 @@ class AutomaticToolSelector:
                 )
 
                 # Combine factors using configured weights
-                confidence = (pattern_confidence * config["pattern_weight"] + 
-                            historical_effectiveness * config["historical_weight"])
+                confidence = (
+                    pattern_confidence * config["pattern_weight"]
+                    + historical_effectiveness * config["historical_weight"]
+                )
                 scores[suggestion.tool_id] = min(config["max_confidence"], confidence)
 
         except Exception as e:
@@ -304,9 +306,11 @@ class AutomaticToolSelector:
         factors["historical_effectiveness"] = effectiveness_score
 
         # Calculate weighted final score using configured weights
-        final_score = (user_score * weights["user_preference_weight"] + 
-                      context_score * weights["context_suitability_weight"] + 
-                      effectiveness_score * weights["historical_effectiveness_weight"])
+        final_score = (
+            user_score * weights["user_preference_weight"]
+            + context_score * weights["context_suitability_weight"]
+            + effectiveness_score * weights["historical_effectiveness_weight"]
+        )
 
         return ToolRanking(
             tool_id=tool_id,

@@ -226,9 +226,7 @@ async def error_handling_example():
             if error_type == "VALIDATION_ERROR":
                 print("Validation error detected - checking parameter values")
                 # Retry with corrected parameters
-                corrected_results = await search_mcp_tools(
-                    query="file operations", max_results=5
-                )
+                corrected_results = await search_mcp_tools(query="file operations", max_results=5)
                 if corrected_results["success"]:
                     print("✅ Retry successful after parameter correction")
                     return corrected_results
@@ -250,26 +248,26 @@ async def error_handling_example():
         print(f"⚠️  Import error: {str(e)}")
         print("This example requires MCP tools to be properly configured.")
         print("Please ensure the MCP Tool Search System is installed and available.")
-    
+
     except ConnectionError as e:
         print(f"🔗 Connection error: {str(e)}")
         print("Unable to connect to MCP Tool Search System.")
         print("Please check network connectivity and service availability.")
-    
+
     except TimeoutError as e:
         print(f"⏱️  Timeout error: {str(e)}")
         print("Search operation timed out. Consider:")
         print("  • Reducing max_results parameter")
         print("  • Simplifying search query")
         print("  • Checking system performance")
-    
+
     except ValueError as e:
         print(f"📝 Parameter error: {str(e)}")
         print("Invalid parameter provided. Please check:")
         print("  • Query is not empty")
         print("  • max_results is between 1-50")
         print("  • search_mode is one of: semantic, hybrid, keyword")
-    
+
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}")
         print("Falling back to basic tool discovery...")
@@ -278,7 +276,7 @@ async def error_handling_example():
         try:
             fallback_tools = ["read", "write", "edit", "bash"]
             print(f"📋 Available fallback tools: {', '.join(fallback_tools)}")
-            
+
             # Simulate basic tool information
             for tool in fallback_tools[:2]:  # Show first 2 as examples
                 print(f"  • {tool}: Basic {tool} operations")
@@ -306,45 +304,45 @@ async def run_all_examples():
 
     failed_examples = []
     successful_examples = []
-    
+
     for i, example in enumerate(examples, 1):
         example_name = example.__name__
         print(f"\n▶️  Running Example {i}: {example_name}")
-        
+
         try:
             await example()
             successful_examples.append(example_name)
             print(f"✅ {example_name} completed successfully")
             print("\n" + "-" * 50)
-            
+
         except ImportError as e:
             error_msg = f"Import error in {example_name}: {str(e)}"
             print(f"⚠️  {error_msg}")
             print("This example requires MCP tools to be available.")
             failed_examples.append((example_name, "Import Error", str(e)))
             print("-" * 50)
-            
+
         except ConnectionError as e:
             error_msg = f"Connection error in {example_name}: {str(e)}"
             print(f"🔗 {error_msg}")
             print("Unable to connect to MCP Tool Search System.")
             failed_examples.append((example_name, "Connection Error", str(e)))
             print("-" * 50)
-            
+
         except TimeoutError as e:
             error_msg = f"Timeout in {example_name}: {str(e)}"
             print(f"⏱️  {error_msg}")
             print("Example execution timed out.")
             failed_examples.append((example_name, "Timeout Error", str(e)))
             print("-" * 50)
-            
+
         except Exception as e:
             error_msg = f"Unexpected error in {example_name}: {str(e)}"
             print(f"❌ {error_msg}")
             print("This is likely a system or implementation error.")
             failed_examples.append((example_name, "Unexpected Error", str(e)))
             print("-" * 50)
-    
+
     # Print summary
     print("\n" + "=" * 50)
     print("EXECUTION SUMMARY")
@@ -353,7 +351,7 @@ async def run_all_examples():
     if successful_examples:
         for name in successful_examples:
             print(f"   • {name}")
-    
+
     if failed_examples:
         print(f"\n❌ Failed examples: {len(failed_examples)}/{len(examples)}")
         for name, error_type, error_msg in failed_examples:
@@ -362,10 +360,10 @@ async def run_all_examples():
                 print(f"     {error_msg[:60]}...")
             else:
                 print(f"     {error_msg}")
-    
+
     print("\nFor troubleshooting failed examples, please check:")
     print("• MCP Tool Search System installation and configuration")
-    print("• Network connectivity and service availability") 
+    print("• Network connectivity and service availability")
     print("• System resources and performance")
     print("=" * 50)
 

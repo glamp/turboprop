@@ -7,6 +7,7 @@ in search results, providing structured data for AI reasoning.
 """
 
 from dataclasses import asdict
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -165,6 +166,101 @@ class TestCodeSearchResult:
         assert result_dict["snippet"]["text"] == "return 42"
         assert result_dict["file_metadata"]["language"] == "python"
         assert result_dict["confidence_level"] == "high"
+
+    def test_code_search_result_with_decimal_similarity_score(self):
+        """Test CodeSearchResult handles Decimal similarity scores from DuckDB."""
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+        # Simulate DuckDB returning a Decimal
+        decimal_score = Decimal("0.8547")
+
+        result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=decimal_score)
+
+        # After __post_init__, similarity_score should be converted to float
+        assert isinstance(result.similarity_score, float)
+        assert result.similarity_score == 0.8547
+
+        # similarity_percentage should work without TypeError
+        percentage = result.similarity_percentage
+        assert percentage == 85.47
+
+    def test_code_search_result_similarity_percentage_with_decimal(self):
+        """Test similarity_percentage calculation with Decimal input."""
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+
+        # Test with various Decimal values
+        test_cases = [
+            (Decimal("0.75"), 75.0),
+            (Decimal("0.0"), 0.0),
+            (Decimal("1.0"), 100.0),
+            (Decimal("0.123456"), 12.3456),
+        ]
+
+        for decimal_score, expected_percentage in test_cases:
+            result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=decimal_score)
+            assert result.similarity_percentage == expected_percentage
+
+    def test_code_search_result_similarity_percentage_with_float(self):
+        """Test similarity_percentage calculation still works with float input."""
+        snippet = CodeSnippet(text="test", start_line=1, end_line=1)
+
+        # Test with various float values (backward compatibility)
+        test_cases = [
+            (0.75, 75.0),
+            (0.0, 0.0),
+            (1.0, 100.0),
+            (0.123456, 12.3456),
+        ]
+
+        for float_score, expected_percentage in test_cases:
+            result = CodeSearchResult(file_path="test.py", snippet=snippet, similarity_score=float_score)
+            assert result.similarity_percentage == expected_percentage
+
+
+class TestTypeConversion:
+    """Test type conversion utilities for Decimal/float handling."""
+
+    def test_ensure_float_with_float_input(self):
+        """Test _ensure_float with float input (should return unchanged)."""
+        from search_result_types import _ensure_float
+
+        test_values = [0.0, 0.5, 1.0, 0.123456789]
+        for value in test_values:
+            result = _ensure_float(value)
+            assert result == value
+            assert isinstance(result, float)
+
+    def test_ensure_float_with_decimal_input(self):
+        """Test _ensure_float with Decimal input (should convert to float)."""
+        from search_result_types import _ensure_float
+
+        test_cases = [
+            (Decimal("0.0"), 0.0),
+            (Decimal("0.5"), 0.5),
+            (Decimal("1.0"), 1.0),
+            (Decimal("0.123456789"), 0.123456789),
+            (Decimal("0.999999"), 0.999999),
+        ]
+
+        for decimal_value, expected_float in test_cases:
+            result = _ensure_float(decimal_value)
+            assert result == expected_float
+            assert isinstance(result, float)
+
+    def test_ensure_float_edge_cases(self):
+        """Test _ensure_float with edge cases."""
+        from search_result_types import _ensure_float
+
+        # Very small decimal
+        small_decimal = Decimal("0.000001")
+        result = _ensure_float(small_decimal)
+        assert result == 0.000001
+        assert isinstance(result, float)
+
+        # Very large decimal (within float range)
+        large_decimal = Decimal("999999.999999")
+        result = _ensure_float(large_decimal)
+        assert result == 999999.999999
+        assert isinstance(result, float)
 
 
 class TestSearchMetadata:

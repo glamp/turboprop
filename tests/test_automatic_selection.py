@@ -487,15 +487,15 @@ class TestIntegrationRealComponents:
         # Use temporary directories for testing
         import tempfile
         from pathlib import Path
-        
+
         self.temp_dir = Path(tempfile.mkdtemp(prefix="test_automatic_selection_"))
-        
+
         # Create real components with test storage paths
         self.usage_analyzer = UsagePatternAnalyzer()
         self.suggestion_engine = ProactiveSuggestionEngine()
         self.learning_system = ToolLearningSystem(storage_dir=self.temp_dir)
         self.effectiveness_tracker = SelectionEffectivenessTracker(storage_path=self.temp_dir / "effectiveness.json")
-        
+
         # Create integrated system
         self.selector = AutomaticToolSelector(
             usage_analyzer=self.usage_analyzer,
@@ -507,6 +507,7 @@ class TestIntegrationRealComponents:
     def teardown_method(self):
         """Clean up test files."""
         import shutil
+
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
 
@@ -517,12 +518,12 @@ class TestIntegrationRealComponents:
             "task": "search_files",
             "user_input": "find all Python files in the project",
             "complexity": "medium",
-            "urgency": "normal"
+            "urgency": "normal",
         }
-        
+
         # First selection - cold start
         result = self.selector.analyze_and_suggest(current_context=context)
-        
+
         # Verify we got a real result
         assert isinstance(result, AutomaticSelectionResult)
         assert result.context == context
@@ -530,23 +531,20 @@ class TestIntegrationRealComponents:
         assert isinstance(result.confidence_scores, dict)
         assert isinstance(result.reasoning, list)
         assert result.selection_timestamp > 0
-        
+
         # Verify the system generated some suggestions
         # Even with cold start, the system should provide some default suggestions
         assert len(result.reasoning) > 0
-        
+
         # Simulate user selection and outcome
         if result.suggested_tools:
             selected_tool = result.suggested_tools[0]
-            
+
             # Simulate successful outcome
             self.effectiveness_tracker.update_selection_outcome(
-                event_id=f"test_event_{int(time.time())}",
-                outcome_success=True,
-                completion_time=2.5,
-                user_feedback=0.8
+                event_id=f"test_event_{int(time.time())}", outcome_success=True, completion_time=2.5, user_feedback=0.8
             )
-            
+
             # Verify the effectiveness tracker recorded the outcome
             assert len(self.effectiveness_tracker.selection_history) > 0
 
@@ -557,36 +555,34 @@ class TestIntegrationRealComponents:
             {"task": "file_search", "user_input": "locate test files", "domain": "development"},
             {"task": "file_search", "user_input": "search for documentation", "domain": "development"},
         ]
-        
+
         initial_preferences = self.learning_system.get_learned_preferences(contexts[0], None)
-        
+
         # Simulate multiple successful interactions
         for i, context in enumerate(contexts):
             result = self.selector.analyze_and_suggest(current_context=context)
-            
+
             if result.suggested_tools:
                 # Simulate positive outcomes
                 event_id = f"learning_test_{i}_{int(time.time())}"
                 self.effectiveness_tracker.track_selection_event(
-                    context=context,
-                    suggestions=result.suggested_tools,
-                    selection_result=result
+                    context=context, suggestions=result.suggested_tools, selection_result=result
                 )
-                
+
                 # Add positive outcome
                 self.effectiveness_tracker.update_selection_outcome(
                     event_id=event_id,
                     outcome_success=True,
                     completion_time=1.0 + (i * 0.2),  # Improving performance
-                    user_feedback=0.7 + (i * 0.1)    # Increasing satisfaction
+                    user_feedback=0.7 + (i * 0.1),  # Increasing satisfaction
                 )
-        
+
         # Check if learning system has adapted
         final_preferences = self.learning_system.get_learned_preferences(contexts[0], None)
-        
+
         # The preferences should exist (may be same or different, but should be populated)
         assert isinstance(final_preferences, dict)
-        
+
         # Check that effectiveness tracking has data
         assert len(self.effectiveness_tracker.selection_history) >= len(contexts)
 
@@ -596,39 +592,41 @@ class TestIntegrationRealComponents:
         scenarios = [
             {
                 "context": {"task": "file_operations", "user_input": "need to read and process large files"},
-                "expected_categories": ["file", "read"]
+                "expected_categories": ["file", "read"],
             },
             {
-                "context": {"task": "data_analysis", "user_input": "analyze CSV data for patterns"}, 
-                "expected_categories": ["analysis", "data"]
+                "context": {"task": "data_analysis", "user_input": "analyze CSV data for patterns"},
+                "expected_categories": ["analysis", "data"],
             },
             {
                 "context": {"task": "search", "user_input": "find specific functions in codebase"},
-                "expected_categories": ["search", "code"]
-            }
+                "expected_categories": ["search", "code"],
+            },
         ]
-        
+
         for scenario in scenarios:
             # Use the usage analyzer to get patterns
             patterns = self.usage_analyzer.analyze_current_session(
-                context=scenario["context"],
-                task=scenario["context"]["task"]
+                context=scenario["context"], task=scenario["context"]["task"]
             )
-            
+
             # Generate suggestions
             suggestions = self.suggestion_engine.generate_proactive_suggestions(
-                patterns=patterns,
-                context=scenario["context"]
+                patterns=patterns, context=scenario["context"]
             )
-            
+
             # Verify we got suggestions
             assert isinstance(suggestions, list)
-            
+
             # Test suggestion structure
             for suggestion in suggestions:
                 assert isinstance(suggestion, ProactiveSuggestion)
                 assert suggestion.tool_id is not None
-                assert suggestion.suggestion_type in ["tool_replacement", "workflow_improvement", "parameter_optimization"]
+                assert suggestion.suggestion_type in [
+                    "tool_replacement",
+                    "workflow_improvement",
+                    "parameter_optimization",
+                ]
                 assert 0.0 <= suggestion.confidence <= 1.0
                 assert isinstance(suggestion.reasoning, str)
                 assert suggestion.reasoning != ""  # Should have actual reasoning
@@ -637,25 +635,23 @@ class TestIntegrationRealComponents:
         """Test that the system uses configuration correctly."""
         # Test that the system respects configuration limits
         context = {"task": "test", "user_input": "simple test"}
-        
+
         # Generate multiple events to test memory management
         for i in range(15):  # Create more than typical batch size
             result = self.selector.analyze_and_suggest(current_context=context)
-            
+
             # Add some tracking events
             if result.suggested_tools:
                 self.effectiveness_tracker.track_selection_event(
-                    context=context,
-                    suggestions=result.suggested_tools,
-                    selection_result=result
+                    context=context, suggestions=result.suggested_tools, selection_result=result
                 )
-        
+
         # Check that memory limits are respected
         memory_stats = self.effectiveness_tracker.get_memory_usage_stats()
         assert isinstance(memory_stats, dict)
         assert "current_history_size" in memory_stats
         assert "max_history_size" in memory_stats
-        
+
         # History size should be managed according to configuration
         assert memory_stats["current_history_size"] <= memory_stats["max_history_size"] * 1.2  # Allow some buffer
 
@@ -668,21 +664,21 @@ class TestIntegrationRealComponents:
             {"task": "test", "user_input": ""},  # Empty input
             {"task": "test", "user_input": "x" * 10000},  # Very long input
         ]
-        
+
         for context in problematic_contexts:
             try:
                 result = self.selector.analyze_and_suggest(current_context=context)
-                
+
                 # Should still get a valid result object
                 assert isinstance(result, AutomaticSelectionResult)
                 assert result.context == context
                 assert isinstance(result.suggested_tools, list)
                 assert isinstance(result.reasoning, list)
-                
+
                 # System should handle edge cases gracefully
                 # No suggestions is acceptable for problematic contexts
                 # The important thing is we get a valid result object
-                    
+
             except Exception as e:
                 # If exceptions occur, they should be logged and handled gracefully
                 assert False, f"System should handle errors gracefully, but got: {e}"
@@ -690,24 +686,24 @@ class TestIntegrationRealComponents:
     def test_storage_persistence(self):
         """Test that data persists correctly across sessions."""
         context = {"task": "persistence_test", "user_input": "test storage"}
-        
+
         # Generate some data
         result = self.selector.analyze_and_suggest(current_context=context)
-        
+
         # Force a save
-        if hasattr(self.learning_system, '_save_model'):
+        if hasattr(self.learning_system, "_save_model"):
             self.learning_system._save_model()
-        if hasattr(self.effectiveness_tracker, '_save_tracking_data'):
+        if hasattr(self.effectiveness_tracker, "_save_tracking_data"):
             self.effectiveness_tracker._save_tracking_data()
-        
+
         # Create new instances (simulating restart)
         new_learning_system = ToolLearningSystem(storage_dir=self.temp_dir)
         new_effectiveness_tracker = SelectionEffectivenessTracker(storage_path=self.temp_dir / "effectiveness.json")
-        
+
         # Check that they loaded previous data
         new_preferences = new_learning_system.get_learned_preferences(context, None)
         assert isinstance(new_preferences, dict)
-        
+
         # Check effectiveness tracker
         assert isinstance(new_effectiveness_tracker.selection_history, list)
         assert isinstance(new_effectiveness_tracker.effectiveness_metrics, dict)

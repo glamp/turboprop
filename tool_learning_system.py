@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from logging_config import get_logger
-from usage_pattern_analyzer import UsagePatternAnalysis
 from storage_manager import get_storage_manager
+from usage_pattern_analyzer import UsagePatternAnalysis
 
 logger = get_logger(__name__)
 
@@ -52,14 +52,14 @@ class UserPreferenceModel:
                 "tool_preferences": {},
                 "context_preferences": {},
                 "learning_metadata": {"total_samples": 0, "last_updated": time.time(), "model_version": "1.0"},
-            }
+            },
         )
 
     def _save_preferences(self):
         """Save preferences to storage."""
         # Update metadata
         self.preferences_data["learning_metadata"]["last_updated"] = time.time()
-        
+
         # Use storage manager for thread-safe, atomic saves
         if not self.storage_manager.save_json_data(self.storage_path, self.preferences_data):
             logger.error("Failed to save preferences to %s", self.storage_path)
@@ -245,14 +245,14 @@ class ToolEffectivenessModel:
                 "tool_effectiveness": {},
                 "context_effectiveness": {},
                 "learning_metadata": {"total_updates": 0, "last_updated": time.time(), "model_version": "1.0"},
-            }
+            },
         )
 
     def _save_effectiveness(self):
         """Save effectiveness data to storage."""
         # Update metadata
         self.effectiveness_data["learning_metadata"]["last_updated"] = time.time()
-        
+
         # Use storage manager for thread-safe, atomic saves
         if not self.storage_manager.save_json_data(self.storage_path, self.effectiveness_data):
             logger.error("Failed to save effectiveness data to %s", self.storage_path)
@@ -416,7 +416,7 @@ class ContextPatternModel:
                 "context_patterns": {},
                 "pattern_outcomes": {},
                 "learning_metadata": {"total_patterns": 0, "last_updated": time.time()},
-            }
+            },
         )
 
     def update_context_patterns(self, context: Dict[str, Any], tool: str, outcome: bool):

@@ -13,11 +13,27 @@ Classes:
 """
 
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from config import config
 from ide_integration import SyntaxHighlightingHint, get_ide_navigation_urls, get_mcp_navigation_actions
+
+
+def _ensure_float(value: Union[float, Decimal]) -> float:
+    """
+    Safely convert numeric values to float, handling both float and Decimal types.
+
+    Args:
+        value: Numeric value (float or Decimal)
+
+    Returns:
+        float: The value as a float
+    """
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
 
 
 @dataclass
@@ -75,7 +91,7 @@ class CodeSearchResult:
 
     file_path: str
     snippet: CodeSnippet
-    similarity_score: float
+    similarity_score: Union[float, Decimal]
     file_metadata: Optional[Dict[str, Any]] = None
     confidence_level: Optional[str] = None
     # Additional snippets from the same file (for multi-snippet support)
@@ -93,6 +109,9 @@ class CodeSearchResult:
 
     def __post_init__(self):
         """Initialize default values after dataclass construction."""
+        # Convert similarity_score to float for consistency
+        self.similarity_score = _ensure_float(self.similarity_score)
+
         if self.file_metadata is None:
             self.file_metadata = {}
 
@@ -210,7 +229,7 @@ class CodeSearchResult:
         Returns:
             Similarity score as percentage (0-100)
         """
-        return self.similarity_score * 100.0
+        return _ensure_float(self.similarity_score) * 100.0
 
     def get_relative_path(self, base_path: str) -> str:
         """

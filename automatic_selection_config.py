@@ -7,8 +7,7 @@ automatic tool selection system. All hard-coded values are centralized
 here to allow easy customization and tuning.
 """
 
-from typing import Dict, Any
-
+from typing import Any, Dict
 
 # Complexity Scoring Configuration
 COMPLEXITY_SCORING = {
@@ -38,23 +37,9 @@ RANKING_WEIGHTS = {
 
 # Tool Suitability Rules
 TOOL_SUITABILITY_RULES: Dict[str, Dict[str, float]] = {
-    "search": {
-        "search_files": 0.9,
-        "grep": 0.8,
-        "find": 0.7,
-        "analyze": 0.4
-    },
-    "file": {
-        "read": 0.9,
-        "write": 0.9,
-        "edit": 0.8,
-        "search": 0.6
-    },
-    "analysis": {
-        "analyze": 0.9,
-        "search": 0.7,
-        "read": 0.6
-    }
+    "search": {"search_files": 0.9, "grep": 0.8, "find": 0.7, "analyze": 0.4},
+    "file": {"read": 0.9, "write": 0.9, "edit": 0.8, "search": 0.6},
+    "analysis": {"analyze": 0.9, "search": 0.7, "read": 0.6},
 }
 
 # Default Values
@@ -86,7 +71,7 @@ STORAGE_CONFIG = {
     "effectiveness_data_file": "effectiveness_data.json",
 }
 
-# Memory Management Configuration  
+# Memory Management Configuration
 MEMORY_CONFIG = {
     "max_history_size": 1000,
     "history_cleanup_threshold": 1200,
@@ -121,13 +106,13 @@ def load_config_from_file(config_path: str) -> Dict[str, Any]:
     """Load configuration from JSON file, falling back to defaults."""
     import json
     from pathlib import Path
-    
+
     try:
         config_file = Path(config_path)
         if config_file.exists():
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 file_config = json.load(f)
-            
+
             # Merge with defaults (file config takes precedence)
             default_config = get_config()
             for key, value in file_config.items():
@@ -135,12 +120,12 @@ def load_config_from_file(config_path: str) -> Dict[str, Any]:
                     default_config[key].update(value)
                 else:
                     default_config[key] = value
-            
+
             return default_config
     except Exception as e:
         # Log error and return defaults
         print(f"Warning: Could not load config from {config_path}: {e}")
-    
+
     return get_config()
 
 
