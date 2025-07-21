@@ -219,48 +219,87 @@ class TestCodeSearchResult:
 class TestTypeConversion:
     """Test type conversion utilities for Decimal/float handling."""
 
-    def test_ensure_float_with_float_input(self):
-        """Test _ensure_float with float input (should return unchanged)."""
+    @pytest.mark.parametrize(
+        "input_value,expected_output",
+        [
+            # Float inputs (should return unchanged)
+            (0.0, 0.0),
+            (0.5, 0.5),
+            (1.0, 1.0),
+            (0.123456789, 0.123456789),
+            (0.000001, 0.000001),
+            (0.999999, 0.999999),
+        ],
+    )
+    def test_ensure_float_with_float_input(self, input_value, expected_output):
+        """Test _ensure_float with valid float inputs."""
         from search_result_types import _ensure_float
 
-        test_values = [0.0, 0.5, 1.0, 0.123456789]
-        for value in test_values:
-            result = _ensure_float(value)
-            assert result == value
-            assert isinstance(result, float)
+        result = _ensure_float(input_value)
+        assert result == expected_output
+        assert isinstance(result, float)
 
-    def test_ensure_float_with_decimal_input(self):
-        """Test _ensure_float with Decimal input (should convert to float)."""
-        from search_result_types import _ensure_float
-
-        test_cases = [
+    @pytest.mark.parametrize(
+        "decimal_input,expected_float",
+        [
+            # Decimal inputs (should convert to float)
             (Decimal("0.0"), 0.0),
             (Decimal("0.5"), 0.5),
             (Decimal("1.0"), 1.0),
             (Decimal("0.123456789"), 0.123456789),
+            (Decimal("0.000001"), 0.000001),
             (Decimal("0.999999"), 0.999999),
-        ]
-
-        for decimal_value, expected_float in test_cases:
-            result = _ensure_float(decimal_value)
-            assert result == expected_float
-            assert isinstance(result, float)
-
-    def test_ensure_float_edge_cases(self):
-        """Test _ensure_float with edge cases."""
+        ],
+    )
+    def test_ensure_float_with_decimal_input(self, decimal_input, expected_float):
+        """Test _ensure_float with valid Decimal inputs."""
         from search_result_types import _ensure_float
 
-        # Very small decimal
-        small_decimal = Decimal("0.000001")
-        result = _ensure_float(small_decimal)
-        assert result == 0.000001
+        result = _ensure_float(decimal_input)
+        assert result == expected_float
         assert isinstance(result, float)
 
-        # Very large decimal (within float range)
-        large_decimal = Decimal("999999.999999")
-        result = _ensure_float(large_decimal)
-        assert result == 999999.999999
-        assert isinstance(result, float)
+    def test_ensure_float_with_none_input(self):
+        """Test _ensure_float with None input (should raise ValueError)."""
+        from search_result_types import _ensure_float
+
+        with pytest.raises(ValueError, match="Similarity score cannot be None"):
+            _ensure_float(None)
+
+    @pytest.mark.parametrize(
+        "invalid_type",
+        [
+            "0.5",  # string
+            [0.5],  # list
+            {"value": 0.5},  # dict
+            complex(0.5, 0),  # complex number
+        ],
+    )
+    def test_ensure_float_with_invalid_types(self, invalid_type):
+        """Test _ensure_float with invalid input types."""
+        from search_result_types import _ensure_float
+
+        with pytest.raises(TypeError, match="Unsupported type for similarity score"):
+            _ensure_float(invalid_type)
+
+    @pytest.mark.parametrize(
+        "out_of_bounds_value",
+        [
+            -0.1,  # negative
+            -1.0,  # negative
+            1.1,  # greater than 1.0
+            2.0,  # much greater than 1.0
+            float("inf"),  # infinity
+            Decimal("-0.1"),  # negative Decimal
+            Decimal("1.1"),  # Decimal greater than 1.0
+        ],
+    )
+    def test_ensure_float_out_of_bounds(self, out_of_bounds_value):
+        """Test _ensure_float with values outside the valid range [0.0, 1.0]."""
+        from search_result_types import _ensure_float
+
+        with pytest.raises(ValueError, match="Similarity score must be between 0.0 and 1.0"):
+            _ensure_float(out_of_bounds_value)
 
 
 class TestSearchMetadata:

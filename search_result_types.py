@@ -20,20 +20,51 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from config import config
 from ide_integration import SyntaxHighlightingHint, get_ide_navigation_urls, get_mcp_navigation_actions
 
+# Constants
+PERCENTAGE_MULTIPLIER = 100.0
 
-def _ensure_float(value: Union[float, Decimal]) -> float:
+
+def _ensure_float(value: Union[float, Decimal, None]) -> float:
     """
     Safely convert numeric values to float, handling both float and Decimal types.
 
+    Validates that similarity scores are within the expected range (0.0 to 1.0) and
+    handles type conversion between float and Decimal types as returned by DuckDB.
+
     Args:
-        value: Numeric value (float or Decimal)
+        value: Numeric value (float or Decimal), or None
 
     Returns:
         float: The value as a float
+
+    Raises:
+        ValueError: If value is None, negative, or outside the range [0.0, 1.0]
+        TypeError: If value is not a supported numeric type
+
+    Examples:
+        >>> _ensure_float(0.85)  # float input
+        0.85
+        >>> from decimal import Decimal
+        >>> _ensure_float(Decimal('0.92'))  # Decimal input from DuckDB
+        0.92
     """
+    if value is None:
+        raise ValueError("Similarity score cannot be None")
+
+    if not isinstance(value, (float, Decimal)):
+        raise TypeError(f"Unsupported type for similarity score: {type(value)}. Expected float or Decimal.")
+
+    # Convert to float
     if isinstance(value, Decimal):
-        return float(value)
-    return value
+        float_value = float(value)
+    else:
+        float_value = value
+
+    # Validate bounds for similarity scores
+    if float_value < 0.0 or float_value > 1.0:
+        raise ValueError(f"Similarity score must be between 0.0 and 1.0, got: {float_value}")
+
+    return float_value
 
 
 @dataclass
@@ -189,7 +220,7 @@ class CodeSearchResult:
         cls,
         file_path: str,
         snippets: List[CodeSnippet],
-        similarity_score: float,
+        similarity_score: Union[float, Decimal],
         file_metadata: Optional[Dict[str, Any]] = None,
         repository_context: Optional[Dict[str, Any]] = None,
     ) -> "CodeSearchResult":
@@ -229,7 +260,7 @@ class CodeSearchResult:
         Returns:
             Similarity score as percentage (0-100)
         """
-        return _ensure_float(self.similarity_score) * 100.0
+        return _ensure_float(self.similarity_score) * PERCENTAGE_MULTIPLIER
 
     def get_relative_path(self, base_path: str) -> str:
         """
