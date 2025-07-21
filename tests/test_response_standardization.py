@@ -11,8 +11,8 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from mcp_response_optimizer import MCPResponseOptimizer, ResponseCompressor
-from mcp_response_standardizer import (
+from turboprop.mcp_response_optimizer import MCPResponseOptimizer, ResponseCompressor
+from turboprop.mcp_response_standardizer import (
     MCPResponseStandardizer,
     classify_error,
     generate_error_suggestions,
@@ -21,8 +21,8 @@ from mcp_response_standardizer import (
     get_relevant_documentation,
     standardize_mcp_tool_response,
 )
-from mcp_response_validator import MCPResponseValidator
-from tool_search_response_cache import CacheStats, ToolSearchResponseCache
+from turboprop.mcp_response_validator import MCPResponseValidator
+from turboprop.tool_search_response_cache import CacheStats, ToolSearchResponseCache
 
 
 class TestMCPResponseStandardizer(unittest.TestCase):
@@ -692,9 +692,9 @@ class TestIntegrationScenarios(unittest.TestCase):
         json_str = json.dumps(error_response)
         self.assertIsInstance(json_str, str)
 
-    @patch("mcp_response_validator.MCPResponseValidator")
-    @patch("mcp_response_optimizer.MCPResponseOptimizer")
-    @patch("tool_search_response_cache.ToolSearchResponseCache")
+    @patch("turboprop.mcp_response_validator.MCPResponseValidator")
+    @patch("turboprop.mcp_response_optimizer.MCPResponseOptimizer")
+    @patch("turboprop.tool_search_response_cache.ToolSearchResponseCache")
     def test_component_integration(self, mock_cache, mock_optimizer, mock_validator):
         """Test integration between standardizer components."""
         # Setup mocks

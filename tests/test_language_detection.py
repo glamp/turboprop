@@ -1,5 +1,5 @@
 """Tests for language detection functionality."""
-from language_detection import LanguageDetector
+from turboprop.language_detection import LanguageDetector
 
 
 class TestLanguageDetector:

@@ -16,9 +16,9 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from database_manager import DatabaseManager
-from hybrid_search import HybridSearchEngine, SearchMode
-from search_result_types import CodeSearchResult
+from turboprop.database_manager import DatabaseManager
+from turboprop.hybrid_search import HybridSearchEngine, SearchMode
+from turboprop.search_result_types import CodeSearchResult
 
 
 class TestFTSBasicFunctionality:

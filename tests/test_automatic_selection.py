@@ -13,11 +13,11 @@ This module tests all components of the automatic tool selection system:
 import time
 from unittest.mock import MagicMock
 
-from automatic_tool_selector import AutomaticSelectionResult, AutomaticToolSelector, ToolRanking
-from proactive_suggestion_engine import ProactiveSuggestion, ProactiveSuggestionEngine
-from selection_effectiveness_tracker import SelectionEffectivenessTracker
-from tool_learning_system import ToolLearningSystem
-from usage_pattern_analyzer import InefficiencyPattern, UsagePatternAnalysis, UsagePatternAnalyzer
+from turboprop.automatic_tool_selector import AutomaticSelectionResult, AutomaticToolSelector, ToolRanking
+from turboprop.proactive_suggestion_engine import ProactiveSuggestion, ProactiveSuggestionEngine
+from turboprop.selection_effectiveness_tracker import SelectionEffectivenessTracker
+from turboprop.tool_learning_system import ToolLearningSystem
+from turboprop.usage_pattern_analyzer import InefficiencyPattern, UsagePatternAnalysis, UsagePatternAnalyzer
 
 
 class TestAutomaticToolSelector:

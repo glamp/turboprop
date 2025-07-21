@@ -18,11 +18,11 @@ from unittest.mock import Mock, patch
 
 import duckdb
 import pytest
-from code_index import embed_and_store, init_db, reindex_all, scan_repo, search_index
-from config import config
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from exceptions import DatabaseError, DatabaseTimeoutError, EmbeddingError, SearchError
+from turboprop.code_index import embed_and_store, init_db, reindex_all, scan_repo, search_index
+from turboprop.config import config
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.exceptions import DatabaseError, DatabaseTimeoutError, EmbeddingError, SearchError
 
 
 class TestCorruptedFileHandling:

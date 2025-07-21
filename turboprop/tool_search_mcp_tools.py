@@ -798,7 +798,7 @@ def search_tools_by_capability(
         parameter_search_engine = _get_parameter_search_engine()
 
         # Convert complexity preference
-        from parameter_ranking import ComplexityPreference
+        from .parameter_ranking import ComplexityPreference
 
         complexity_map = {
             "simple": ComplexityPreference.SIMPLE,

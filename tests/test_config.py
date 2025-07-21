@@ -13,7 +13,7 @@ from unittest.mock import patch
 import pytest
 
 # Import the config module and all its components
-from config import (
+from turboprop.config import (
     Config,
     ConfigValidationError,
     DatabaseConfig,
@@ -238,25 +238,27 @@ class TestDatabaseConfig:
         """Test DatabaseConfig with environment variable override."""
         # Need to reload the module to pick up new env vars
         import importlib
+        from turboprop import config as config_module
 
-        import config
-
-        importlib.reload(config)
+        importlib.reload(config_module)
+        from turboprop.config import config
 
         # Check that environment variable is used
-        assert config.DatabaseConfig.MEMORY_LIMIT == "2GB"
+        assert config.database.MEMORY_LIMIT == "2GB"
 
     @patch.dict(os.environ, {"TURBOPROP_DB_THREADS": "invalid"})
     def test_database_config_invalid_env_var(self):
         """Test DatabaseConfig with invalid environment variable."""
         # This should fail during class initialization
         import importlib
+        from turboprop import config as config_module
 
-        import config
+        from turboprop.config import config
 
         # Manually check for the exception
         try:
-            importlib.reload(config)
+            importlib.reload(config_module)
+            from turboprop.config import config
             # If we get here, the test should fail
             assert False, "Expected ConfigValidationError to be raised"
         except Exception as e:
@@ -397,7 +399,7 @@ class TestMainConfig:
 
     def test_global_config_instance(self):
         """Test that global config instance is properly initialized."""
-        from config import config as global_config
+        from turboprop.config import config as global_config
 
         # Check by class name to avoid isinstance issues with reloaded modules
         assert type(global_config).__name__ == "Config", f"Expected Config, got {type(global_config).__name__}"
@@ -421,17 +423,17 @@ class TestEnvironmentVariableHandling:
         with patch.dict(os.environ, env_vars):
             # Need to reload the module to pick up new env vars
             import importlib
+            from turboprop import config as config_module
 
-            import config
-
-            importlib.reload(config)
+            importlib.reload(config_module)
+            from turboprop.config import config
 
             # Check that environment variables are used
-            assert config.DatabaseConfig.THREADS == 8
-            assert config.FileProcessingConfig.MAX_FILE_SIZE_MB == 2.5
-            assert config.LoggingConfig.LOG_LEVEL == "DEBUG"
-            assert config.EmbeddingConfig.DEVICE == "cuda"
-            assert config.DatabaseConfig.AUTO_VACUUM is False
+            assert config.database.THREADS == 8
+            assert config.file_processing.MAX_FILE_SIZE_MB == 2.5
+            assert config.logging.LOG_LEVEL == "DEBUG"
+            assert config.embedding.DEVICE == "cuda"
+            assert config.database.AUTO_VACUUM is False
 
     def test_invalid_environment_variables(self):
         """Test handling of invalid environment variables."""
@@ -447,11 +449,11 @@ class TestEnvironmentVariableHandling:
             with patch.dict(os.environ, {env_var: invalid_value}):
                 # This should fail during module reload
                 import importlib
-
-                import config
+                from turboprop import config as config_module
 
                 try:
-                    importlib.reload(config)
+                    importlib.reload(config_module)
+                    from turboprop.config import config
                     # If we get here, the test should fail
                     assert False, f"Expected ConfigValidationError to be raised " f"for {env_var}={invalid_value}"
                 except Exception as e:
@@ -486,11 +488,11 @@ class TestBoundaryConditions:
         # Other validators should handle leading/trailing whitespace
         with patch.dict(os.environ, {"TURBOPROP_DB_THREADS": " 4 "}):
             import importlib
+            from turboprop import config as config_module
 
-            import config
-
-            importlib.reload(config)
-            assert config.DatabaseConfig.THREADS == 4
+            importlib.reload(config_module)
+            from turboprop.config import config
+            assert config.database.THREADS == 4
 
     def test_very_large_numbers(self):
         """Test handling of very large numbers."""
@@ -539,7 +541,7 @@ class TestConfigurationIntegration:
     def test_config_get_validation_status_with_errors(self):
         """Test get_validation_status with validation errors."""
         # Import ConfigValidationError from config module to avoid namespace issues
-        from config import ConfigValidationError as ConfigError
+        from turboprop.config import ConfigValidationError as ConfigError
 
         with patch.object(Config, "validate") as mock_validate:
             mock_validate.side_effect = ConfigError("Test error")

@@ -14,11 +14,11 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from mcp_metadata_extractor import MCPMetadataExtractor
-from mcp_metadata_types import ComplexityAnalysis, MCPToolMetadata, ParameterAnalysis, ToolExample
-from mcp_tool_discovery import MCPToolDiscovery
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.mcp_metadata_extractor import MCPMetadataExtractor
+from turboprop.mcp_metadata_types import ComplexityAnalysis, MCPToolMetadata, ParameterAnalysis, ToolExample
+from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
 
 class TestToolStorageOperations(unittest.TestCase):
@@ -37,7 +37,7 @@ class TestToolStorageOperations(unittest.TestCase):
 
     def test_store_tool_batch_handles_empty_list(self):
         """Test that store_tool_batch handles empty tool list correctly."""
-        from tool_storage_operations import ToolStorageOperations
+        from turboprop.tool_storage_operations import ToolStorageOperations
 
         storage_ops = ToolStorageOperations(self.db_manager)
         result = storage_ops.store_tool_batch([])
@@ -48,8 +48,8 @@ class TestToolStorageOperations(unittest.TestCase):
 
     def test_store_tool_batch_handles_single_tool(self):
         """Test storing a single tool via batch operation."""
-        from mcp_metadata_types import MCPToolMetadata
-        from tool_storage_operations import ToolStorageOperations
+        from turboprop.mcp_metadata_types import MCPToolMetadata
+        from turboprop.tool_storage_operations import ToolStorageOperations
 
         storage_ops = ToolStorageOperations(self.db_manager)
 
@@ -78,7 +78,7 @@ class TestToolStorageOperations(unittest.TestCase):
 
     def test_store_tool_batch_handles_transaction_rollback_on_error(self):
         """Test that batch operations rollback on error."""
-        from tool_storage_operations import ToolStorageOperations
+        from turboprop.tool_storage_operations import ToolStorageOperations
 
         storage_ops = ToolStorageOperations(self.db_manager)
 
@@ -112,7 +112,7 @@ class TestToolEmbeddingPipeline(unittest.TestCase):
 
     def test_generate_tool_embeddings_processes_single_tool(self):
         """Test embedding generation for a single tool."""
-        from tool_embedding_pipeline import ToolEmbeddingPipeline
+        from turboprop.tool_embedding_pipeline import ToolEmbeddingPipeline
 
         pipeline = ToolEmbeddingPipeline(self.mock_embedding_generator)
 
@@ -128,7 +128,7 @@ class TestToolEmbeddingPipeline(unittest.TestCase):
 
     def test_generate_tool_embeddings_handles_batch_processing(self):
         """Test batch processing of multiple tool embeddings."""
-        from tool_embedding_pipeline import ToolEmbeddingPipeline
+        from turboprop.tool_embedding_pipeline import ToolEmbeddingPipeline
 
         pipeline = ToolEmbeddingPipeline(self.mock_embedding_generator)
 
@@ -144,7 +144,7 @@ class TestToolEmbeddingPipeline(unittest.TestCase):
 
     def test_generate_parameter_embeddings_includes_type_info(self):
         """Test that parameter embeddings include type and constraint information."""
-        from tool_embedding_pipeline import ToolEmbeddingPipeline
+        from turboprop.tool_embedding_pipeline import ToolEmbeddingPipeline
 
         pipeline = ToolEmbeddingPipeline(self.mock_embedding_generator)
 
@@ -165,7 +165,7 @@ class TestToolEmbeddingPipeline(unittest.TestCase):
 
     def test_validate_embedding_quality_detects_zero_embeddings(self):
         """Test that embedding validation detects zero/invalid embeddings."""
-        from tool_embedding_pipeline import ToolEmbeddingPipeline
+        from turboprop.tool_embedding_pipeline import ToolEmbeddingPipeline
 
         pipeline = ToolEmbeddingPipeline(self.mock_embedding_generator)
 
@@ -178,7 +178,7 @@ class TestToolEmbeddingPipeline(unittest.TestCase):
 
     def test_validate_embedding_quality_accepts_normal_embeddings(self):
         """Test that embedding validation accepts normal embeddings."""
-        from tool_embedding_pipeline import ToolEmbeddingPipeline
+        from turboprop.tool_embedding_pipeline import ToolEmbeddingPipeline
 
         pipeline = ToolEmbeddingPipeline(self.mock_embedding_generator)
 
@@ -223,7 +223,7 @@ class TestToolRelationshipDetector(unittest.TestCase):
 
     def test_detect_alternatives_finds_similar_tools(self):
         """Test detection of alternative tools with similar functionality."""
-        from tool_relationship_detector import ToolRelationshipDetector
+        from turboprop.tool_relationship_detector import ToolRelationshipDetector
 
         detector = ToolRelationshipDetector()
 
@@ -254,7 +254,7 @@ class TestToolRelationshipDetector(unittest.TestCase):
 
     def test_detect_complements_finds_workflow_tools(self):
         """Test detection of complementary tools that work together."""
-        from tool_relationship_detector import ToolRelationshipDetector
+        from turboprop.tool_relationship_detector import ToolRelationshipDetector
 
         detector = ToolRelationshipDetector()
         relationships = detector.detect_complements(self.test_tools)
@@ -272,7 +272,7 @@ class TestToolRelationshipDetector(unittest.TestCase):
 
     def test_detect_prerequisites_identifies_setup_tools(self):
         """Test detection of prerequisite tool relationships."""
-        from tool_relationship_detector import ToolRelationshipDetector
+        from turboprop.tool_relationship_detector import ToolRelationshipDetector
 
         detector = ToolRelationshipDetector()
 
@@ -291,7 +291,7 @@ class TestToolRelationshipDetector(unittest.TestCase):
 
     def test_calculate_similarity_score_handles_identical_descriptions(self):
         """Test similarity calculation for identical tool descriptions."""
-        from tool_relationship_detector import ToolRelationshipDetector
+        from turboprop.tool_relationship_detector import ToolRelationshipDetector
 
         detector = ToolRelationshipDetector()
 
@@ -303,7 +303,7 @@ class TestToolRelationshipDetector(unittest.TestCase):
 
     def test_calculate_similarity_score_handles_different_descriptions(self):
         """Test similarity calculation for different tool descriptions."""
-        from tool_relationship_detector import ToolRelationshipDetector
+        from turboprop.tool_relationship_detector import ToolRelationshipDetector
 
         detector = ToolRelationshipDetector()
 
@@ -319,7 +319,7 @@ class TestCatalogValidator(unittest.TestCase):
 
     def test_validate_tool_metadata_accepts_complete_metadata(self):
         """Test validation of complete, valid tool metadata."""
-        from catalog_validator import CatalogValidator
+        from turboprop.catalog_validator import CatalogValidator
 
         validator = CatalogValidator()
 
@@ -350,7 +350,7 @@ class TestCatalogValidator(unittest.TestCase):
 
     def test_validate_tool_metadata_identifies_missing_fields(self):
         """Test validation identifies missing required fields."""
-        from catalog_validator import CatalogValidator
+        from turboprop.catalog_validator import CatalogValidator
 
         validator = CatalogValidator()
 
@@ -370,7 +370,7 @@ class TestCatalogValidator(unittest.TestCase):
 
     def test_validate_catalog_consistency_checks_database_integrity(self):
         """Test catalog consistency validation checks database integrity."""
-        from catalog_validator import CatalogValidator
+        from turboprop.catalog_validator import CatalogValidator
 
         temp_dir = tempfile.mkdtemp()
         db_path = Path(temp_dir) / "test_validation.duckdb"
@@ -390,7 +390,7 @@ class TestCatalogValidator(unittest.TestCase):
 
     def test_generate_quality_metrics_calculates_coverage_stats(self):
         """Test quality metrics generation calculates proper coverage statistics."""
-        from catalog_validator import CatalogValidator
+        from turboprop.catalog_validator import CatalogValidator
 
         temp_dir = tempfile.mkdtemp()
         db_path = Path(temp_dir) / "test_metrics.duckdb"
@@ -462,7 +462,7 @@ class TestToolCatalogManager(unittest.TestCase):
 
     def test_full_catalog_rebuild_completes_successfully(self):
         """Test that full catalog rebuild completes all phases successfully."""
-        from tool_catalog_manager import ToolCatalogManager
+        from turboprop.tool_catalog_manager import ToolCatalogManager
 
         manager = ToolCatalogManager(
             db_manager=self.db_manager,
@@ -480,7 +480,7 @@ class TestToolCatalogManager(unittest.TestCase):
 
     def test_incremental_catalog_update_identifies_changes(self):
         """Test that incremental updates identify and process only changed tools."""
-        from tool_catalog_manager import ToolCatalogManager
+        from turboprop.tool_catalog_manager import ToolCatalogManager
 
         manager = ToolCatalogManager(
             db_manager=self.db_manager,
@@ -503,11 +503,11 @@ class TestToolCatalogManager(unittest.TestCase):
         self.assertGreaterEqual(result.tools_updated, 0)
         self.assertGreaterEqual(result.tools_removed, 0)
 
-    @patch("tool_catalog_manager.ToolRelationshipDetector")
+    @patch("turboprop.tool_catalog_manager.ToolRelationshipDetector")
     def test_validate_catalog_health_returns_comprehensive_report(self, mock_relationship_detector_class):
         """Test that catalog health validation returns comprehensive health report."""
-        from tool_catalog_manager import ToolCatalogManager
-        from tool_relationship_detector import ToolRelationship
+        from turboprop.tool_catalog_manager import ToolCatalogManager
+        from turboprop.tool_relationship_detector import ToolRelationship
 
         # Mock the relationship detector to return some fake relationships
         mock_detector_instance = Mock()
@@ -558,7 +558,7 @@ class TestToolCatalogManager(unittest.TestCase):
 
     def test_catalog_operations_handle_database_errors_gracefully(self):
         """Test that catalog operations handle database errors gracefully."""
-        from tool_catalog_manager import ToolCatalogManager
+        from turboprop.tool_catalog_manager import ToolCatalogManager
 
         # Create manager with invalid database to simulate error
         invalid_db_manager = Mock()
@@ -602,8 +602,8 @@ class TestPerformanceRequirements(unittest.TestCase):
 
     def test_catalog_rebuild_completes_under_30_seconds(self):
         """Test that catalog rebuild for system tools completes under 30 seconds."""
-        from mcp_tool_discovery import MCPToolDiscovery
-        from tool_catalog_manager import ToolCatalogManager
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.tool_catalog_manager import ToolCatalogManager
 
         discovery_engine = MCPToolDiscovery(self.db_manager, self.mock_embedding_generator)
 
@@ -628,7 +628,7 @@ class TestPerformanceRequirements(unittest.TestCase):
 
     def test_batch_operations_handle_large_tool_sets_efficiently(self):
         """Test that batch operations can handle large sets of tools efficiently."""
-        from tool_storage_operations import ToolStorageOperations
+        from turboprop.tool_storage_operations import ToolStorageOperations
 
         storage_ops = ToolStorageOperations(self.db_manager)
 

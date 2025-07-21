@@ -10,8 +10,8 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
-from mcp_metadata_types import ToolId
-from mcp_tool_search_responses import (
+from turboprop.mcp_metadata_types import ToolId
+from turboprop.mcp_tool_search_responses import (
     CapabilityMatch,
     CapabilitySearchResponse,
     ToolCategoriesResponse,
@@ -20,21 +20,21 @@ from mcp_tool_search_responses import (
     ToolSearchMCPResponse,
     create_error_response,
 )
-from mcp_tool_validator import (
+from turboprop.mcp_tool_validator import (
     MCPToolValidator,
     ValidatedCapabilityParams,
     ValidatedSearchParams,
     ValidatedToolDetailsParams,
     generate_error_suggestions,
 )
-from tool_search_mcp_tools import (
+from turboprop.tool_search_mcp_tools import (
     get_tool_details,
     initialize_search_engines,
     list_tool_categories,
     search_mcp_tools,
     search_tools_by_capability,
 )
-from tool_search_results import ToolSearchResult
+from turboprop.tool_search_results import ToolSearchResult
 
 
 class TestMCPToolValidator:
@@ -283,8 +283,8 @@ class TestMCPToolSearchFunctions:
         self.mock_validator = Mock()
         self.mock_db_manager = Mock()
 
-    @patch("tool_search_mcp_tools._get_search_engine")
-    @patch("tool_search_mcp_tools._get_validator")
+    @patch("turboprop.tool_search_mcp_tools._get_search_engine")
+    @patch("turboprop.tool_search_mcp_tools._get_validator")
     def test_search_mcp_tools_success(self, mock_get_validator, mock_get_search_engine):
         """Test successful MCP tool search."""
         # Setup mocks
@@ -316,7 +316,7 @@ class TestMCPToolSearchFunctions:
             confidence_level="high",
         )
 
-        from tool_search_results import ToolSearchResponse
+        from turboprop.tool_search_results import ToolSearchResponse
 
         mock_search_response = ToolSearchResponse(
             query="file operations", results=[tool_result], search_strategy="hybrid"
@@ -331,7 +331,7 @@ class TestMCPToolSearchFunctions:
         assert result_dict["success"] is True
         assert result_dict["query"] == "file operations"
 
-    @patch("tool_search_mcp_tools._get_validator")
+    @patch("turboprop.tool_search_mcp_tools._get_validator")
     def test_search_mcp_tools_validation_error(self, mock_get_validator):
         """Test MCP tool search with validation error."""
         # Setup validator to raise error
@@ -347,8 +347,8 @@ class TestMCPToolSearchFunctions:
         assert result_dict["success"] is False
         assert "Invalid query" in result_dict["error"]["message"]
 
-    @patch("tool_search_mcp_tools.tool_exists")
-    @patch("tool_search_mcp_tools._get_validator")
+    @patch("turboprop.tool_search_mcp_tools.tool_exists")
+    @patch("turboprop.tool_search_mcp_tools._get_validator")
     def test_get_tool_details_tool_not_found(self, mock_get_validator, mock_tool_exists):
         """Test get_tool_details with non-existent tool."""
         # Setup mocks
@@ -362,8 +362,8 @@ class TestMCPToolSearchFunctions:
         assert result_dict["success"] is False
         assert "not found" in result_dict["error"]["message"]
 
-    @patch("tool_search_mcp_tools.get_representative_tools")
-    @patch("tool_search_mcp_tools.load_tool_categories")
+    @patch("turboprop.tool_search_mcp_tools.get_representative_tools")
+    @patch("turboprop.tool_search_mcp_tools.load_tool_categories")
     def test_list_tool_categories_success(self, mock_load_categories, mock_get_representative_tools):
         """Test successful tool categories listing."""
         # Setup mock categories
@@ -385,8 +385,8 @@ class TestMCPToolSearchFunctions:
         assert len(result_dict["categories"]) == 2
         assert result_dict["total_categories"] == 2
 
-    @patch("tool_search_mcp_tools._get_parameter_search_engine")
-    @patch("tool_search_mcp_tools._get_validator")
+    @patch("turboprop.tool_search_mcp_tools._get_parameter_search_engine")
+    @patch("turboprop.tool_search_mcp_tools._get_validator")
     def test_search_tools_by_capability_success(self, mock_get_validator, mock_get_parameter_engine):
         """Test successful capability search."""
         # Setup mocks
@@ -454,9 +454,9 @@ class TestErrorSuggestions:
 class TestInitialization:
     """Test search engine initialization."""
 
-    @patch("tool_search_mcp_tools.MCPToolSearchEngine")
-    @patch("tool_search_mcp_tools.ParameterSearchEngine")
-    @patch("tool_search_mcp_tools.MCPToolValidator")
+    @patch("turboprop.tool_search_mcp_tools.MCPToolSearchEngine")
+    @patch("turboprop.tool_search_mcp_tools.ParameterSearchEngine")
+    @patch("turboprop.tool_search_mcp_tools.MCPToolValidator")
     def test_initialize_search_engines(self, mock_validator_class, mock_param_engine_class, mock_search_engine_class):
         """Test search engine initialization."""
         # Setup mocks

@@ -11,7 +11,7 @@ import json
 from unittest.mock import Mock
 
 import pytest
-from mcp_response_types import (
+from turboprop.mcp_response_types import (
     IndexResponse,
     QueryAnalysis,
     ResultCluster,
@@ -19,14 +19,14 @@ from mcp_response_types import (
     StatusResponse,
     create_search_response_from_results,
 )
-from search_operations import (
+from turboprop.search_operations import (
     _analyze_search_query,
     cluster_results_by_confidence,
     cluster_results_by_directory,
     cluster_results_by_language,
     generate_cross_references,
 )
-from search_result_types import CodeSearchResult, CodeSnippet
+from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
 
 class TestQueryAnalysis:

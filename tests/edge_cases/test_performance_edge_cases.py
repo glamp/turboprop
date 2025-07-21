@@ -22,10 +22,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from mcp_tool_search_engine import MCPToolSearchEngine
-from tool_search_results import ProcessedQuery, ToolSearchResponse
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.mcp_tool_search_engine import MCPToolSearchEngine
+from turboprop.tool_search_results import ProcessedQuery, ToolSearchResponse
 
 
 class TestPerformanceRequirements:

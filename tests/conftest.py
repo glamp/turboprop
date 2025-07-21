@@ -25,9 +25,9 @@ import pytest
 # Set environment variable to avoid tokenizers warning
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-from .config import config
-from .database_manager import DatabaseManager
-from .embedding_helper import EmbeddingGenerator
+from turboprop.config import config
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
 
 # Test data constants
 SAMPLE_PYTHON_CODE = """
@@ -679,7 +679,7 @@ def test_queries():
 @pytest.fixture
 def sample_search_results():
     """Generate sample search results for testing."""
-    from search_result_types import CodeSearchResult, CodeSnippet
+    from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
     def create_results(count=5):
         results = []
@@ -707,7 +707,7 @@ def cleanup_test_files():
     yield
     # Reset global database manager to ensure clean state between tests
     try:
-        from code_index import reset_db
+        from turboprop.code_index import reset_db
 
         reset_db()
     except ImportError:
@@ -739,7 +739,7 @@ def fully_mock_db_manager():
 @pytest.fixture
 def mock_mcp_server():
     """Mock MCP server for integration testing."""
-    from mcp_server import TurbopropServer
+    from turboprop.mcp_server import TurbopropServer
 
     server = Mock(spec=TurbopropServer)
     server.index_repository = Mock(return_value={"status": "success", "files": 10})
@@ -752,7 +752,7 @@ def mock_mcp_server():
 @pytest.fixture
 def mock_ide_integration():
     """Mock IDE integration for testing."""
-    from ide_integration import IDEIntegration
+    from turboprop.ide_integration import IDEIntegration
 
     integration = Mock(spec=IDEIntegration)
     integration.get_current_file = Mock(return_value="/test/current.py")

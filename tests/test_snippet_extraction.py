@@ -13,9 +13,9 @@ Tests for the snippet_extractor module including:
 from unittest.mock import Mock
 
 import pytest
-from language_detection import LanguageDetectionResult, LanguageDetector
-from search_result_types import CodeSnippet
-from snippet_extractor import (
+from turboprop.language_detection import LanguageDetectionResult, LanguageDetector
+from turboprop.search_result_types import CodeSnippet
+from turboprop.snippet_extractor import (
     ExtractedSnippet,
     GenericSnippetExtractor,
     JavaScriptSnippetExtractor,
@@ -454,7 +454,7 @@ search_operations.py: Search functionality for code search.
 
 import logging
 from typing import List, Optional
-from database_manager import DatabaseManager
+from turboprop.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

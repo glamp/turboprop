@@ -9,14 +9,14 @@ variables) from source code files using AST parsing and pattern matching.
 import tempfile
 from pathlib import Path
 
-from code_construct_extractor import (
+from turboprop.code_construct_extractor import (
     CodeConstruct,
     CodeConstructExtractor,
     JavaScriptConstructExtractor,
     PythonConstructExtractor,
 )
-from database_manager import DatabaseManager
-from language_detection import LanguageDetector
+from turboprop.database_manager import DatabaseManager
+from turboprop.language_detection import LanguageDetector
 
 
 class TestCodeConstruct:

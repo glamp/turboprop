@@ -10,20 +10,20 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
-from comparison_response_types import (
+from turboprop.comparison_response_types import (
     AlternativeAnalysis,
     AlternativesFoundResponse,
     ToolComparisonMCPResponse,
     create_error_response,
 )
-from tool_category_mcp_tools import (
+from turboprop.tool_category_mcp_tools import (
     browse_tools_by_category,
     find_tools_by_complexity,
     get_category_overview,
     get_tool_selection_guidance,
     initialize_category_tools,
 )
-from tool_comparison_mcp_tools import (
+from turboprop.tool_comparison_mcp_tools import (
     analyze_tool_relationships,
     compare_mcp_tools,
     find_tool_alternatives,
@@ -50,7 +50,7 @@ class TestComparisonMCPTools:
             self.mock_relationship_analyzer,
         )
 
-    @patch("tool_comparison_mcp_tools.tool_exists")
+    @patch("turboprop.tool_comparison_mcp_tools.tool_exists")
     def test_compare_mcp_tools_success(self, mock_tool_exists):
         """Test successful tool comparison."""
         # Setup
@@ -63,7 +63,7 @@ class TestComparisonMCPTools:
         self.mock_comparison_engine.compare_tools.return_value = mock_result
 
         # Mock decision guidance with real dataclass
-        from decision_support import SelectionGuidance
+        from turboprop.decision_support import SelectionGuidance
 
         mock_guidance = SelectionGuidance(
             recommended_tool="read",
@@ -91,7 +91,7 @@ class TestComparisonMCPTools:
         assert result_dict["tool_ids"] == tool_ids
         self.mock_comparison_engine.compare_tools.assert_called_once()
 
-    @patch("tool_comparison_mcp_tools.tool_exists")
+    @patch("turboprop.tool_comparison_mcp_tools.tool_exists")
     def test_compare_mcp_tools_invalid_tool_count(self, mock_tool_exists):
         """Test comparison with invalid number of tools."""
         # Test too few tools
@@ -107,7 +107,7 @@ class TestComparisonMCPTools:
         assert result_dict["success"] is False
         assert "Maximum 10 tools" in result_dict["error"]
 
-    @patch("tool_comparison_mcp_tools.tool_exists")
+    @patch("turboprop.tool_comparison_mcp_tools.tool_exists")
     def test_compare_mcp_tools_missing_tools(self, mock_tool_exists):
         """Test comparison with non-existent tools."""
         # Setup - first tool exists, second doesn't
@@ -119,7 +119,7 @@ class TestComparisonMCPTools:
         assert result_dict["success"] is False
         assert "Tools not found: nonexistent" in result_dict["error"]
 
-    @patch("tool_comparison_mcp_tools.tool_exists")
+    @patch("turboprop.tool_comparison_mcp_tools.tool_exists")
     def test_find_tool_alternatives_success(self, mock_tool_exists):
         """Test successful alternative finding."""
         # Setup
@@ -164,7 +164,7 @@ class TestComparisonMCPTools:
         assert len(result_dict["alternatives"]) == 2
         self.mock_alternative_detector.find_alternatives.assert_called_once()
 
-    @patch("tool_comparison_mcp_tools.tool_exists")
+    @patch("turboprop.tool_comparison_mcp_tools.tool_exists")
     def test_find_tool_alternatives_nonexistent_tool(self, mock_tool_exists):
         """Test alternative finding with non-existent reference tool."""
         mock_tool_exists.return_value = False
@@ -175,7 +175,7 @@ class TestComparisonMCPTools:
         assert result_dict["success"] is False
         assert "Reference tool 'nonexistent' not found" in result_dict["error"]
 
-    @patch("tool_comparison_mcp_tools.tool_exists")
+    @patch("turboprop.tool_comparison_mcp_tools.tool_exists")
     def test_analyze_tool_relationships_success(self, mock_tool_exists):
         """Test successful relationship analysis."""
         # Setup
@@ -225,7 +225,7 @@ class TestCategoryMCPTools:
     def test_browse_tools_by_category_success(self):
         """Test successful category browsing."""
         # Setup
-        from comparison_response_types import ToolSearchResult
+        from turboprop.comparison_response_types import ToolSearchResult
 
         mock_tools = [
             ToolSearchResult(
@@ -291,7 +291,7 @@ class TestCategoryMCPTools:
         self.mock_task_analyzer.analyze_task.return_value = mock_task_analysis
 
         # Mock decision guidance with real dataclass
-        from decision_support import SelectionGuidance
+        from turboprop.decision_support import SelectionGuidance
 
         mock_guidance = SelectionGuidance(
             recommended_tool="read",
@@ -353,7 +353,7 @@ class TestResponseTypes:
 
     def test_tool_comparison_mcp_response_creation(self):
         """Test ToolComparisonMCPResponse creation and serialization."""
-        from tool_comparison_engine import ToolComparisonResult
+        from turboprop.tool_comparison_engine import ToolComparisonResult
 
         # Create mock comparison result
         mock_comparison_result = Mock(spec=ToolComparisonResult)

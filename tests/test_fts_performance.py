@@ -18,9 +18,9 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from database_manager import DatabaseManager
-from hybrid_search import HybridSearchEngine
-from logging_config import get_logger
+from turboprop.database_manager import DatabaseManager
+from turboprop.hybrid_search import HybridSearchEngine
+from turboprop.logging_config import get_logger
 
 logger = get_logger(__name__)
 

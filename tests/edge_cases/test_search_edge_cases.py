@@ -21,12 +21,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from exceptions import DatabaseTimeoutError, EmbeddingError
-from mcp_tool_search_engine import MCPToolSearchEngine
-from tool_query_processor import ToolQueryProcessor
-from tool_search_results import ProcessedQuery, ToolSearchResponse
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.exceptions import DatabaseTimeoutError, EmbeddingError
+from turboprop.mcp_tool_search_engine import MCPToolSearchEngine
+from turboprop.tool_query_processor import ToolQueryProcessor
+from turboprop.tool_search_results import ProcessedQuery, ToolSearchResponse
 
 
 class TestLargeResultSets:

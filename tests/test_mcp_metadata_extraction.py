@@ -10,20 +10,20 @@ recognition, and example generation.
 from unittest.mock import Mock, patch
 
 import pytest
-from docstring_parser import DocstringParser
-from example_generator import ExampleGenerator
+from turboprop.docstring_parser import DocstringParser
+from turboprop.example_generator import ExampleGenerator
 
 # Import the modules we're testing (these will be created)
-from mcp_metadata_extractor import MCPMetadataExtractor
-from mcp_metadata_types import (
+from turboprop.mcp_metadata_extractor import MCPMetadataExtractor
+from turboprop.mcp_metadata_types import (
     ComplexityAnalysis,
     DocumentationAnalysis,
     MCPToolMetadata,
     ParameterAnalysis,
     ToolExample,
 )
-from schema_analyzer import SchemaAnalyzer
-from usage_pattern_detector import UsagePatternDetector
+from turboprop.schema_analyzer import SchemaAnalyzer
+from turboprop.usage_pattern_detector import UsagePatternDetector
 
 
 class TestSchemaAnalyzer:
@@ -655,8 +655,8 @@ class TestMCPMetadataExtractor:
         schema_analyzer.analyze_schema.assert_called_once()
         docstring_parser.parse_structured_docstring.assert_called_once()
 
-    @patch("mcp_metadata_extractor.UsagePatternDetector")
-    @patch("mcp_metadata_extractor.ExampleGenerator")
+    @patch("turboprop.mcp_metadata_extractor.UsagePatternDetector")
+    @patch("turboprop.mcp_metadata_extractor.ExampleGenerator")
     def test_integration_with_pattern_detector(self, mock_example_gen, mock_pattern_detector):
         """Test integration with usage pattern detector and example generator."""
         # Setup mocks

@@ -20,8 +20,8 @@ from unittest.mock import Mock, patch
 
 import duckdb
 import pytest
-from database_manager import DatabaseManager
-from hybrid_search import HybridSearchEngine, SearchMode
+from turboprop.database_manager import DatabaseManager
+from turboprop.hybrid_search import HybridSearchEngine, SearchMode
 
 
 class TestFTSMalformedQueries:

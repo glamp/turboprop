@@ -13,12 +13,12 @@ This module tests all aspects of the construct search implementation including:
 from unittest.mock import Mock, patch
 
 import pytest
-from construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from exceptions import SearchError
-from search_operations import format_hybrid_search_results, search_hybrid
-from search_result_types import CodeSearchResult, CodeSnippet
+from turboprop.construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.exceptions import SearchError
+from turboprop.search_operations import format_hybrid_search_results, search_hybrid
+from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
 
 class TestConstructSearchResult:
@@ -483,8 +483,8 @@ class TestHybridSearch:
         ]
         self.mock_db_manager.create_fts_index.return_value = True
 
-    @patch("search_operations.ConstructSearchOperations")
-    @patch("search_operations.search_index_enhanced")
+    @patch("turboprop.search_operations.ConstructSearchOperations")
+    @patch("turboprop.search_operations.search_index_enhanced")
     def test_search_hybrid_basic(self, mock_search_enhanced, mock_construct_ops_class):
         """Test basic hybrid search functionality."""
         # Mock construct search results

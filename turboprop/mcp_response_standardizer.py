@@ -108,9 +108,9 @@ class MCPResponseStandardizer:
     """Standardize response formats across all tool search MCP tools"""
 
     def __init__(self):
-        from mcp_response_optimizer import MCPResponseOptimizer
-        from mcp_response_validator import MCPResponseValidator
-        from tool_search_response_cache import ToolSearchResponseCache
+        from .mcp_response_optimizer import MCPResponseOptimizer
+        from .mcp_response_validator import MCPResponseValidator
+        from .tool_search_response_cache import ToolSearchResponseCache
 
         self.validator = MCPResponseValidator()
         self.optimizer = MCPResponseOptimizer()

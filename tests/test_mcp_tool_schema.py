@@ -12,9 +12,9 @@ from unittest.mock import patch
 
 import duckdb
 import pytest
-from database_manager import DatabaseManager
-from exceptions import DatabaseError, DatabaseMigrationError
-from mcp_tool_schema import (
+from turboprop.database_manager import DatabaseManager
+from turboprop.exceptions import DatabaseError, DatabaseMigrationError
+from turboprop.mcp_tool_schema import (
     MCPToolMigration,
     MCPToolSchema,
     generate_example_id,

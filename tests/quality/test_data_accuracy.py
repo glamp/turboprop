@@ -15,12 +15,12 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
-from code_construct_extractor import CodeConstructExtractor
-from code_index import init_db, reindex_all, search_index
-from config import config
-from construct_search import ConstructSearchOperations
-from hybrid_search import HybridSearchEngine, SearchMode
-from language_detection import LanguageDetector, detect_language_from_extension
+from turboprop.code_construct_extractor import CodeConstructExtractor
+from turboprop.code_index import init_db, reindex_all, search_index
+from turboprop.config import config
+from turboprop.construct_search import ConstructSearchOperations
+from turboprop.hybrid_search import HybridSearchEngine, SearchMode
+from turboprop.language_detection import LanguageDetector, detect_language_from_extension
 
 
 class TestLanguageDetectionAccuracy:
@@ -681,8 +681,8 @@ class TestSearchResultRelevance:
             ("id2", str(sample_repo / "data_processor.py"), "authentication method", 0.7),
         ]
 
-        with patch("search_utils.search_index_enhanced") as mock_semantic:
-            from search_result_types import CodeSearchResult, CodeSnippet
+        with patch("turboprop.search_utils.search_index_enhanced") as mock_semantic:
+            from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
             semantic_results = [
                 CodeSearchResult(

@@ -10,16 +10,16 @@ import json
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from context_analyzer import ContextAnalyzer, EnvironmentalConstraints, TaskContext
-from parameter_search_engine import ParameterSearchEngine
-from task_analyzer import TaskAnalysis, TaskAnalyzer
-from tool_recommendation_engine import (
+from turboprop.context_analyzer import ContextAnalyzer, EnvironmentalConstraints, TaskContext
+from turboprop.parameter_search_engine import ParameterSearchEngine
+from turboprop.task_analyzer import TaskAnalysis, TaskAnalyzer
+from turboprop.tool_recommendation_engine import (
     AlternativeResponse,
     RecommendationResponse,
     ToolRecommendationEngine,
     ToolSequenceResponse,
 )
-from tool_recommendation_mcp_tools import (
+from turboprop.tool_recommendation_mcp_tools import (
     analyze_task_requirements,
     create_task_context,
     get_tool_availability_status,
@@ -69,7 +69,7 @@ class TestToolRecommendationMCPTools:
     @pytest.fixture
     def sample_recommendation_response(self):
         """Sample recommendation response for testing."""
-        from recommendation_algorithms import ToolRecommendation
+        from turboprop.recommendation_algorithms import ToolRecommendation
 
         # Create mock tool
         mock_tool = Mock()
@@ -193,7 +193,7 @@ class TestAnalyzeTaskRequirements(TestToolRecommendationMCPTools):
         """Test basic task analysis functionality."""
         self.mock_task_analyzer.analyze_task.return_value = sample_task_analysis
 
-        from task_analyzer import TaskRequirements
+        from turboprop.task_analyzer import TaskRequirements
 
         mock_requirements = TaskRequirements(
             functional_requirements=["file_reading"],
@@ -218,7 +218,7 @@ class TestAnalyzeTaskRequirements(TestToolRecommendationMCPTools):
         """Test analysis with different detail levels."""
         self.mock_task_analyzer.analyze_task.return_value = sample_task_analysis
 
-        from task_analyzer import TaskRequirements
+        from turboprop.task_analyzer import TaskRequirements
 
         mock_requirements = TaskRequirements(
             functional_requirements=[],
@@ -249,7 +249,7 @@ class TestAnalyzeTaskRequirements(TestToolRecommendationMCPTools):
 
         self.mock_task_analyzer.analyze_task.return_value = low_confidence_analysis
 
-        from task_analyzer import TaskRequirements
+        from turboprop.task_analyzer import TaskRequirements
 
         mock_requirements = TaskRequirements(
             functional_requirements=[],
@@ -409,7 +409,7 @@ class TestErrorHandling:
     def test_uninitialized_engines(self):
         """Test behavior when engines are not initialized."""
         # Reset global state
-        import tool_recommendation_mcp_tools
+        import turboprop.tool_recommendation_mcp_tools as tool_recommendation_mcp_tools
 
         tool_recommendation_mcp_tools._recommendation_engine = None
         tool_recommendation_mcp_tools._task_analyzer = None
@@ -446,8 +446,8 @@ class TestErrorHandling:
 class TestIntegration:
     """Integration tests for the complete workflow."""
 
-    @patch("tool_recommendation_mcp_tools._recommendation_engine")
-    @patch("tool_recommendation_mcp_tools._task_analyzer")
+    @patch("turboprop.tool_recommendation_mcp_tools._recommendation_engine")
+    @patch("turboprop.tool_recommendation_mcp_tools._task_analyzer")
     def test_end_to_end_recommendation_workflow(self, mock_analyzer, mock_engine):
         """Test complete end-to-end recommendation workflow."""
         # Setup realistic mock responses
@@ -473,7 +473,7 @@ class TestIntegration:
         mock_tool.name = "read"
         mock_tool.tool_id = "read"
 
-        from recommendation_algorithms import ToolRecommendation
+        from turboprop.recommendation_algorithms import ToolRecommendation
 
         mock_recommendation = Mock(spec=ToolRecommendation)
         mock_recommendation.tool = mock_tool

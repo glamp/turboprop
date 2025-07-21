@@ -16,7 +16,7 @@ import time
 from unittest.mock import Mock, patch
 
 import pytest
-from code_index import (
+from turboprop.code_index import (
     DebouncedHandler,
     build_full_index,
     embed_and_store,
@@ -25,10 +25,10 @@ from code_index import (
     scan_repo,
     search_index,
 )
-from config import config
-from construct_search import ConstructSearchOperations
-from hybrid_search import HybridSearchEngine, SearchMode
-from search_operations import search_with_construct_focus
+from turboprop.config import config
+from turboprop.construct_search import ConstructSearchOperations
+from turboprop.hybrid_search import HybridSearchEngine, SearchMode
+from turboprop.search_operations import search_with_construct_focus
 
 
 class TestFullIndexingWorkflow:
@@ -204,8 +204,8 @@ class TestHybridSearchIntegration:
         ]
 
         # Mock semantic search results
-        with patch("hybrid_search.search_index_enhanced") as mock_search:
-            from search_result_types import CodeSearchResult, CodeSnippet
+        with patch("turboprop.hybrid_search.search_index_enhanced") as mock_search:
+            from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
             mock_result = CodeSearchResult(
                 file_path=str(sample_repo / "auth.js"),
@@ -226,8 +226,8 @@ class TestHybridSearchIntegration:
     def test_search_with_construct_focus(self, sample_repo, mock_db_manager, mock_embedder):
         """Test search with construct focus integration."""
         # Mock construct search operations
-        with patch("search_operations.ConstructSearchOperations") as mock_construct_ops_class:
-            from construct_search import ConstructSearchResult
+        with patch("turboprop.search_operations.ConstructSearchOperations") as mock_construct_ops_class:
+            from turboprop.construct_search import ConstructSearchResult
 
             # Mock construct search results
             mock_construct_result = ConstructSearchResult.create(
@@ -246,8 +246,8 @@ class TestHybridSearchIntegration:
             mock_construct_ops_class.return_value = mock_construct_ops
 
             # Mock file search
-            with patch("search_operations.search_index_enhanced") as mock_search:
-                from search_result_types import CodeSearchResult, CodeSnippet
+            with patch("turboprop.search_operations.search_index_enhanced") as mock_search:
+                from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
                 mock_file_result = CodeSearchResult(
                     file_path=str(sample_repo / "data_processor.py"),
@@ -381,7 +381,7 @@ class TestFileWatchingIntegration:
 class TestConstructSearchIntegration:
     """Test construct-level search integration."""
 
-    @patch("construct_search.ConstructSearchOperations")
+    @patch("turboprop.construct_search.ConstructSearchOperations")
     def test_construct_search_operations(self, mock_construct_ops_class, mock_db_manager, mock_embedder):
         """Test construct search operations integration."""
         mock_construct_ops = Mock()
@@ -424,7 +424,7 @@ class TestConstructSearchIntegration:
         imports = construct_ops.search_imports("import statement", k=5)
         assert isinstance(imports, list)
 
-    @patch("construct_search.ConstructSearchOperations")
+    @patch("turboprop.construct_search.ConstructSearchOperations")
     def test_construct_statistics_integration(self, mock_construct_ops_class, mock_db_manager, mock_embedder):
         """Test construct statistics gathering."""
         mock_construct_ops = Mock()
@@ -463,8 +463,8 @@ class TestCrossComponentIntegration:
         mock_search_full_text.return_value = [("id1", str(sample_repo / "auth.js"), "authenticate function", 0.9)]
         mock_db_manager.search_full_text = mock_search_full_text
 
-        with patch("search_utils.search_index_enhanced") as mock_semantic:
-            from search_result_types import CodeSearchResult, CodeSnippet
+        with patch("turboprop.search_utils.search_index_enhanced") as mock_semantic:
+            from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
             mock_result = CodeSearchResult(
                 file_path=str(sample_repo / "auth.js"),

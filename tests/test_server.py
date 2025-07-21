@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Import the server app
-from server import app
+from turboprop.server import app
 
 
 class TestServerBasicFunctionality:

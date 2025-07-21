@@ -11,16 +11,16 @@ from unittest.mock import Mock, patch
 import pytest
 
 # Import modules that will be implemented
-from alternative_detector import AlternativeAdvantageAnalysis, AlternativeAnalysis, AlternativeDetector
-from comparison_formatter import ComparisonFormatter
-from comparison_metrics import ComparisonMetrics
+from turboprop.alternative_detector import AlternativeAdvantageAnalysis, AlternativeAnalysis, AlternativeDetector
+from turboprop.comparison_formatter import ComparisonFormatter
+from turboprop.comparison_metrics import ComparisonMetrics
 
 # Import existing dependencies
-from context_analyzer import TaskContext
-from decision_support import DecisionSupport, SelectionGuidance, TradeOffAnalysis
-from mcp_metadata_types import ParameterAnalysis, ToolId
-from tool_comparison_engine import DetailedComparison, TaskComparisonResult, ToolComparisonEngine, ToolComparisonResult
-from tool_search_results import ToolSearchResult
+from turboprop.context_analyzer import TaskContext
+from turboprop.decision_support import DecisionSupport, SelectionGuidance, TradeOffAnalysis
+from turboprop.mcp_metadata_types import ParameterAnalysis, ToolId
+from turboprop.tool_comparison_engine import DetailedComparison, TaskComparisonResult, ToolComparisonEngine, ToolComparisonResult
+from turboprop.tool_search_results import ToolSearchResult
 
 
 class TestToolComparisonEngine:

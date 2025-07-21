@@ -28,10 +28,10 @@ pytestmark = pytest.mark.skipif(
     else True,
     reason="Performance tests skipped (use --benchmark to run)"
 )
-from code_index import init_db, reindex_all, scan_repo, search_index
-from config import config
-from construct_search import ConstructSearchOperations
-from hybrid_search import HybridSearchEngine, SearchMode
+from turboprop.code_index import init_db, reindex_all, scan_repo, search_index
+from turboprop.config import config
+from turboprop.construct_search import ConstructSearchOperations
+from turboprop.hybrid_search import HybridSearchEngine, SearchMode
 
 
 class PerformanceMetrics:
@@ -163,7 +163,7 @@ class TestSearchPerformance:
         ]
 
         with patch("hybrid_search.search_index_enhanced") as mock_search:
-            from search_result_types import CodeSearchResult, CodeSnippet
+            from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
             # Create multiple mock results for performance testing
             mock_results = []
@@ -377,7 +377,7 @@ class TestIndexingPerformance:
             metrics.start_monitoring()
 
             # Simulate the embed_and_store process focusing on DB writes
-            from code_index import embed_and_store
+            from turboprop.code_index import embed_and_store
 
             processed_count, skipped_count = embed_and_store(db_manager, mock_embedder, files)
 

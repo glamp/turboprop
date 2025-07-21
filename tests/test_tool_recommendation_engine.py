@@ -11,9 +11,9 @@ from typing import Any, Dict, List
 from unittest.mock import Mock
 
 import pytest
-from context_analyzer import ContextAnalyzer, EnvironmentalConstraints, ProjectContext, TaskContext, UserContext
-from task_analyzer import TaskAnalysis, TaskAnalyzer
-from tool_recommendation_engine import (
+from turboprop.context_analyzer import ContextAnalyzer, EnvironmentalConstraints, ProjectContext, TaskContext, UserContext
+from turboprop.task_analyzer import TaskAnalysis, TaskAnalyzer
+from turboprop.tool_recommendation_engine import (
     AlternativeRequest,
     AlternativeResponse,
     RecommendationRequest,
@@ -307,7 +307,7 @@ class TestToolRecommendationEngine:
 
     def test_error_handling_analysis_failure(self, recommendation_engine, simple_request, mock_components):
         """Test error handling when task analysis fails."""
-        from exceptions import AnalysisError
+        from turboprop.exceptions import AnalysisError
 
         # Setup mock to raise exception
         mock_components["task_analyzer"].analyze_task.side_effect = AnalysisError("Analysis failed")

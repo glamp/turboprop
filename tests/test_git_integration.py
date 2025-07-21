@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from git_integration import GitRepository, ProjectDetector, RepositoryContext, RepositoryContextExtractor
+from turboprop.git_integration import GitRepository, ProjectDetector, RepositoryContext, RepositoryContextExtractor
 
 
 class TestGitRepository(unittest.TestCase):
@@ -263,8 +263,8 @@ class TestRepositoryContextExtractor(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp())
         self.extractor = RepositoryContextExtractor()
 
-    @patch("git_integration.GitRepository")
-    @patch("git_integration.ProjectDetector")
+    @patch("turboprop.git_integration.GitRepository")
+    @patch("turboprop.git_integration.ProjectDetector")
     def test_extract_context_success(self, mock_detector, mock_git_repo):
         """Test successful repository context extraction."""
         # Mock git repository
@@ -292,7 +292,7 @@ class TestRepositoryContextExtractor(unittest.TestCase):
 
     def test_extract_context_non_git_directory(self):
         """Test context extraction for non-git directory."""
-        with patch("git_integration.ProjectDetector") as mock_detector:
+        with patch("turboprop.git_integration.ProjectDetector") as mock_detector:
             mock_detector_instance = Mock()
             mock_detector_instance.detect_project_type.return_value = "python"
             mock_detector_instance.extract_dependencies.return_value = []

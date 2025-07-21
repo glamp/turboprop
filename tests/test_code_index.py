@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 # Import the modules to test
-from code_index import compute_id, init_db, scan_repo
-from config import config
+from turboprop.code_index import compute_id, init_db, scan_repo
+from turboprop.config import config
 
 # For backward compatibility in tests
 CODE_EXTENSIONS = config.file_processing.CODE_EXTENSIONS

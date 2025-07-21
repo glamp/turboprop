@@ -12,8 +12,8 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from code_index import check_index_freshness, embed_and_store, get_last_index_time, has_repository_changed, init_db
-from config import config
+from turboprop.code_index import check_index_freshness, embed_and_store, get_last_index_time, has_repository_changed, init_db
+from turboprop.config import config
 
 # For backward compatibility in tests
 TABLE_NAME = config.database.TABLE_NAME
@@ -152,7 +152,7 @@ class TestFreshnessCheck:
     def test_has_repository_changed_no_changes(self):
         """Test has_repository_changed with no changes."""
         # First scan repo to get all files
-        from code_index import scan_repo
+        from turboprop.code_index import scan_repo
 
         all_files = scan_repo(self.repo_path, 1024 * 1024)
 
@@ -193,7 +193,7 @@ class TestFreshnessCheck:
     def test_check_index_freshness_fresh_index(self):
         """Test check_index_freshness with fresh index."""
         # First scan repo to get all files
-        from code_index import scan_repo
+        from turboprop.code_index import scan_repo
 
         all_files = scan_repo(self.repo_path, 1024 * 1024)
 

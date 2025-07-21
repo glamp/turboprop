@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from tool_query_processor import ToolQueryProcessor
+from turboprop.tool_query_processor import ToolQueryProcessor
 
 
 class TestInputValidationSecurity:
@@ -382,7 +382,7 @@ class TestSecurityIntegration:
         from unittest.mock import patch
 
         # Mock logger to capture security warnings
-        with patch("tool_query_processor.logger") as mock_logger:
+        with patch("turboprop.tool_query_processor.logger") as mock_logger:
             try:
                 self.processor.process_query("'; DROP TABLE tools; --")
             except ValueError:

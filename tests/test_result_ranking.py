@@ -12,17 +12,17 @@ from typing import List
 from unittest.mock import Mock, patch
 
 import pytest
-from ranking_exceptions import InvalidRankingWeightsError
-from ranking_scorers import ConstructTypeScorer, FileSizeScorer, FileTypeScorer, RecencyScorer
-from ranking_utils import ConfidenceScorer, MatchReason, MatchReasonGenerator, RankingContext, ResultDeduplicator
-from result_ranking import (
+from turboprop.ranking_exceptions import InvalidRankingWeightsError
+from turboprop.ranking_scorers import ConstructTypeScorer, FileSizeScorer, FileTypeScorer, RecencyScorer
+from turboprop.ranking_utils import ConfidenceScorer, MatchReason, MatchReasonGenerator, RankingContext, ResultDeduplicator
+from turboprop.result_ranking import (
     RankingWeights,
     ResultRanker,
     calculate_advanced_confidence,
     generate_match_explanations,
     rank_search_results,
 )
-from search_result_types import CodeSearchResult, CodeSnippet
+from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
 
 class TestRankingWeights:
@@ -52,7 +52,7 @@ class TestRankingWeights:
             )
 
         # Test that slightly off weights (sum within 0.1 of 1.0) only log a warning
-        with patch("result_ranking.logger") as mock_logger:
+        with patch("turboprop.result_ranking.logger") as mock_logger:
             RankingWeights(
                 embedding_similarity=0.36,
                 file_type_relevance=0.25,

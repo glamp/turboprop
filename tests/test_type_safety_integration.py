@@ -10,8 +10,8 @@ integration, and hybrid search scenarios.
 import time
 from decimal import Decimal
 
-from search_operations import format_hybrid_search_results
-from search_result_types import CodeSearchResult, CodeSnippet
+from turboprop.search_operations import format_hybrid_search_results
+from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
 # Test constants
 BATCH_PROCESSING_TIMEOUT = 5.0  # seconds - maximum time for batch processing tests
@@ -282,7 +282,7 @@ class TestConcurrencyAndBatchProcessing:
         """Test that type conversion doesn't cause memory leaks with many conversions."""
         import gc
 
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         # Test many conversions in sequence
         initial_objects = len(gc.get_objects())

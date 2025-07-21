@@ -9,7 +9,7 @@ task descriptions and extracts requirements for tool recommendation.
 from dataclasses import asdict
 
 import pytest
-from task_analyzer import (
+from turboprop.task_analyzer import (
     RequirementExtractor,
     TaskAnalysis,
     TaskAnalyzer,

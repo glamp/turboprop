@@ -9,7 +9,7 @@ in search results, providing structured data for AI reasoning.
 from decimal import Decimal
 
 import pytest
-from search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
+from turboprop.search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
 
 # Test constants for improved maintainability
 PRECISION_TOLERANCE_STANDARD = 1e-10  # standard precision tolerance for float comparisons
@@ -235,7 +235,7 @@ class TestTypeConversion:
     )
     def test_ensure_float_with_float_input(self, input_value, expected_output):
         """Test _ensure_float with valid float inputs."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         result = _ensure_float(input_value)
         assert result == expected_output
@@ -255,7 +255,7 @@ class TestTypeConversion:
     )
     def test_ensure_float_with_decimal_input(self, decimal_input, expected_float):
         """Test _ensure_float with valid Decimal inputs."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         result = _ensure_float(decimal_input)
         assert result == expected_float
@@ -263,7 +263,7 @@ class TestTypeConversion:
 
     def test_ensure_float_with_none_input(self):
         """Test _ensure_float with None input (should raise ValueError)."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         with pytest.raises(ValueError, match="Similarity score cannot be None"):
             _ensure_float(None)
@@ -279,7 +279,7 @@ class TestTypeConversion:
     )
     def test_ensure_float_with_invalid_types(self, invalid_type):
         """Test _ensure_float with invalid input types."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         with pytest.raises(TypeError, match="Unsupported type for similarity score"):
             _ensure_float(invalid_type)
@@ -298,7 +298,7 @@ class TestTypeConversion:
     )
     def test_ensure_float_out_of_bounds(self, out_of_bounds_value):
         """Test _ensure_float with values outside the valid range [0.0, 1.0]."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         with pytest.raises(ValueError, match="Similarity score must be between 0.0 and 1.0"):
             _ensure_float(out_of_bounds_value)
@@ -495,7 +495,7 @@ class TestComprehensiveTypeConversion:
         """Test _ensure_float utility with comprehensive Decimal input cases."""
         from decimal import Decimal
 
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         # Test with various Decimal values from issue specification
         test_cases = [
@@ -512,7 +512,7 @@ class TestComprehensiveTypeConversion:
 
     def test_ensure_float_with_float_input_detailed(self):
         """Test _ensure_float utility with comprehensive float input cases."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         test_values = [0.75, 0.0, 1.0, 0.123456789]
 
@@ -525,7 +525,7 @@ class TestComprehensiveTypeConversion:
         """Test similarity_percentage property with Decimal similarity_score."""
         from decimal import Decimal
 
-        from search_result_types import CodeSearchResult, CodeSnippet
+        from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test code", start_line=1, end_line=3)
 
@@ -538,7 +538,7 @@ class TestComprehensiveTypeConversion:
 
     def test_similarity_percentage_with_float_score_detailed(self):
         """Test similarity_percentage property with float similarity_score."""
-        from search_result_types import CodeSearchResult, CodeSnippet
+        from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test code", start_line=1, end_line=3)
 
@@ -553,7 +553,7 @@ class TestComprehensiveTypeConversion:
         """Test similarity_percentage with edge case values."""
         from decimal import Decimal
 
-        from search_result_types import CodeSearchResult, CodeSnippet
+        from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
 
@@ -578,7 +578,7 @@ class TestComprehensiveTypeConversion:
         """Test that __post_init__ converts Decimal similarity_score to float."""
         from decimal import Decimal
 
-        from search_result_types import CodeSearchResult, CodeSnippet
+        from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
 
@@ -590,7 +590,7 @@ class TestComprehensiveTypeConversion:
 
     def test_type_conversion_with_invalid_inputs_comprehensive(self):
         """Test type conversion error handling with comprehensive invalid inputs."""
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         invalid_inputs = [None, "string", [], {}, complex(1, 2)]
 
@@ -607,7 +607,7 @@ class TestPerformanceAndPrecision:
         import time
         from decimal import Decimal
 
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         # Test with large number of conversions
         decimal_values = [Decimal(str(i / 1000.0)) for i in range(1000)]
@@ -637,7 +637,7 @@ class TestPerformanceAndPrecision:
         """Test that type conversion preserves precision appropriately."""
         from decimal import Decimal
 
-        from search_result_types import _ensure_float
+        from turboprop.search_result_types import _ensure_float
 
         # Test precision with various decimal values
         test_cases = [
@@ -663,7 +663,7 @@ class TestCodeSearchResultPostInitBehavior:
         """Test __post_init__ conversion with various Decimal values."""
         from decimal import Decimal
 
-        from search_result_types import CodeSearchResult, CodeSnippet
+        from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
 
@@ -682,7 +682,7 @@ class TestCodeSearchResultPostInitBehavior:
 
     def test_post_init_float_passthrough(self):
         """Test __post_init__ with float values (should remain unchanged)."""
-        from search_result_types import CodeSearchResult, CodeSnippet
+        from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
         snippet = CodeSnippet(text="test", start_line=1, end_line=1)
 

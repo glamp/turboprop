@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from database_manager import DatabaseManager
+from turboprop.database_manager import DatabaseManager
 
 
 class TestDatabaseMigration:

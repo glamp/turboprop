@@ -3,10 +3,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from indexing_operations import embed_and_store, embed_and_store_single, extract_file_metadata
-from language_detection import LanguageDetectionResult
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.indexing_operations import embed_and_store, embed_and_store_single, extract_file_metadata
+from turboprop.language_detection import LanguageDetectionResult
 
 
 class TestMetadataExtraction:
@@ -103,7 +103,7 @@ class TestMetadataExtraction:
         assert metadata["line_count"] == 3
         assert metadata["category"] == "build"
 
-    @patch("indexing_operations.LanguageDetector")
+    @patch("turboprop.indexing_operations.LanguageDetector")
     def test_embed_and_store_with_metadata(self, mock_detector_class):
         """Test that embed_and_store includes metadata in database operations."""
         # Setup mocks
@@ -148,7 +148,7 @@ class TestMetadataExtraction:
             # Clean up
             temp_path.unlink(missing_ok=True)
 
-    @patch("indexing_operations.LanguageDetector")
+    @patch("turboprop.indexing_operations.LanguageDetector")
     def test_embed_and_store_single_with_metadata(self, mock_detector_class):
         """Test that embed_and_store_single includes metadata."""
         # Setup mocks

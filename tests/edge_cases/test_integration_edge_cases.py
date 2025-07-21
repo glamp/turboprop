@@ -17,12 +17,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample, ToolId
-from mcp_tool_search_engine import MCPToolSearchEngine
-from search_result_formatter import SearchResultFormatter
-from tool_search_results import ToolSearchResponse
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.mcp_metadata_types import MCPToolMetadata, ParameterAnalysis, ToolExample, ToolId
+from turboprop.mcp_tool_search_engine import MCPToolSearchEngine
+from turboprop.search_result_formatter import SearchResultFormatter
+from turboprop.tool_search_results import ToolSearchResponse
 
 
 class TestEndToEndEdgeCases:
@@ -257,7 +257,7 @@ class TestEndToEndEdgeCases:
         formatter = SearchResultFormatter()
 
         # Create response with edge case data
-        from tool_search_results import ToolSearchResult
+        from turboprop.tool_search_results import ToolSearchResult
 
         edge_case_result = ToolSearchResult(
             tool_id=ToolId("edge_case_tool"),

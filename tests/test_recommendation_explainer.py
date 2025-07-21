@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import pytest
-from recommendation_algorithms import ToolRecommendation
-from recommendation_explainer import (
+from turboprop.recommendation_algorithms import ToolRecommendation
+from turboprop.recommendation_explainer import (
     AlternativeComparison,
     ComparisonAnalyzer,
     ExplanationGenerator,
@@ -20,7 +20,7 @@ from recommendation_explainer import (
     RecommendationExplanation,
     UsageGuidance,
 )
-from task_analyzer import TaskAnalysis
+from turboprop.task_analyzer import TaskAnalysis
 
 
 # Mock classes for testing

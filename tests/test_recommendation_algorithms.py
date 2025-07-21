@@ -10,13 +10,13 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import pytest
-from recommendation_algorithms import (
+from turboprop.recommendation_algorithms import (
     RecommendationAlgorithms,
     ToolRecommendation,
     ToolSequenceRecommendation,
     WorkflowRequirements,
 )
-from task_analyzer import TaskAnalysis
+from turboprop.task_analyzer import TaskAnalysis
 
 
 # Mock classes for testing

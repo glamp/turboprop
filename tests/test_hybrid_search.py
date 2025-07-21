@@ -16,9 +16,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
-from hybrid_search import (
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
+from turboprop.hybrid_search import (
     FusionWeights,
     HybridSearchEngine,
     HybridSearchFormatter,
@@ -29,7 +29,7 @@ from hybrid_search import (
     search_hybrid,
     search_hybrid_with_details,
 )
-from search_result_types import CodeSearchResult, CodeSnippet
+from turboprop.search_result_types import CodeSearchResult, CodeSnippet
 
 
 class TestQueryAnalyzer:
@@ -234,7 +234,7 @@ class TestHybridSearchEngine:
         expanded = self.engine._expand_query(original)
         assert expanded == original
 
-    @patch("hybrid_search.search_index_enhanced")
+    @patch("turboprop.hybrid_search.search_index_enhanced")
     def test_search_semantic_only(self, mock_search):
         """Test semantic-only search mode."""
         # Setup mock search results
@@ -257,7 +257,7 @@ class TestHybridSearchEngine:
         assert all(r.match_type == "text" for r in results)
         assert all(r.fusion_method == "text_only" for r in results)
 
-    @patch("search_utils.search_index_enhanced")
+    @patch("turboprop.search_utils.search_index_enhanced")
     def test_search_hybrid_mode(self, mock_search):
         """Test hybrid search mode with result fusion."""
         # Setup mock semantic results
@@ -345,7 +345,7 @@ class TestConvenienceFunctions:
         self.mock_db_manager = Mock(spec=DatabaseManager)
         self.mock_embedder = Mock(spec=EmbeddingGenerator)
 
-    @patch("hybrid_search.HybridSearchEngine")
+    @patch("turboprop.hybrid_search.HybridSearchEngine")
     def test_search_hybrid_function(self, mock_engine_class):
         """Test the search_hybrid convenience function."""
         # Setup mock engine
@@ -363,7 +363,7 @@ class TestConvenienceFunctions:
         mock_engine_class.assert_called_once()
         mock_engine.search.assert_called_once_with("test query", 5, SearchMode.AUTO)
 
-    @patch("hybrid_search.HybridSearchEngine")
+    @patch("turboprop.hybrid_search.HybridSearchEngine")
     def test_search_hybrid_with_details_function(self, mock_engine_class):
         """Test the search_hybrid_with_details convenience function."""
         # Setup mock engine
@@ -433,7 +433,7 @@ class TestIntegration:
 
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch("hybrid_search.search_index_enhanced")
+    @patch("turboprop.hybrid_search.search_index_enhanced")
     def test_integration_auto_mode(self, mock_search):
         """Test integration with auto mode selection."""
         # Mock semantic search results
@@ -476,7 +476,7 @@ class TestPerformance:
         self.mock_embedder.encode.return_value = Mock()
         self.mock_embedder.encode.return_value.tolist.return_value = [0.1] * 384
 
-    @patch("search_utils.search_index_enhanced")
+    @patch("turboprop.search_utils.search_index_enhanced")
     def test_search_performance(self, mock_search):
         """Test search performance with timing."""
         mock_search.return_value = []

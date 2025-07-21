@@ -13,7 +13,7 @@ from .logging_config import get_logger
 from .task_analyzer import TaskAnalysis
 
 if TYPE_CHECKING:
-    from recommendation_algorithms import ToolRecommendation
+    from .recommendation_algorithms import ToolRecommendation
 
 logger = get_logger(__name__)
 

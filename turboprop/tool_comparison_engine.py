@@ -328,7 +328,7 @@ class ToolComparisonEngine:
 
     def _create_mock_tool_data(self, tool_id: str) -> ToolSearchResult:
         """Create mock ToolSearchResult for testing."""
-        from mcp_metadata_types import ParameterAnalysis, ToolId
+        from .mcp_metadata_types import ParameterAnalysis, ToolId
 
         # Mock parameter data based on tool type
         param_data = {

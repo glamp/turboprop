@@ -74,7 +74,7 @@ class MCPResponseOptimizer:
     """Optimize MCP responses for performance and usability"""
 
     def __init__(self):
-        from tool_search_response_cache import ToolSearchResponseCache
+        from .tool_search_response_cache import ToolSearchResponseCache
 
         self.cache = ToolSearchResponseCache()
         self.compressor = ResponseCompressor()

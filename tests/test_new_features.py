@@ -11,8 +11,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from code_index import DebouncedHandler, init_db, print_indexed_files_tree, reindex_all, remove_orphaned_files
-from config import config
+from turboprop.code_index import DebouncedHandler, init_db, print_indexed_files_tree, reindex_all, remove_orphaned_files
+from turboprop.config import config
 
 # For backward compatibility in tests
 TABLE_NAME = config.database.TABLE_NAME
@@ -101,7 +101,7 @@ class TestRemoveOrphanedFiles:
         self.db_path = Path(self.temp_dir) / "test.duckdb"
 
         # Initialize database
-        with patch("code_index.DB_PATH", str(self.db_path)):
+        with patch("turboprop.code_index.DB_PATH", str(self.db_path)):
             self.db_manager = init_db()
 
         # Ensure table exists with full schema

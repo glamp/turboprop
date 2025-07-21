@@ -11,8 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from database_manager import DatabaseManager
-from embedding_helper import EmbeddingGenerator
+from turboprop.database_manager import DatabaseManager
+from turboprop.embedding_helper import EmbeddingGenerator
 
 
 class TestMCPToolDiscovery(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
 
     def test_discovery_engine_initialization(self):
         """Test that MCPToolDiscovery initializes correctly."""
-        from mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
         discovery = MCPToolDiscovery(self.db_manager, self.embedding_generator)
 
@@ -49,7 +49,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
 
     def test_discover_system_tools_returns_expected_tools(self):
         """Test that system tool discovery returns expected Claude Code tools."""
-        from mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
         discovery = MCPToolDiscovery(self.db_manager, self.embedding_generator)
         tools = discovery.discover_system_tools()
@@ -68,7 +68,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
 
     def test_catalog_tools_stores_in_database(self):
         """Test that cataloged tools are properly stored in database."""
-        from mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
         discovery = MCPToolDiscovery(self.db_manager, self.embedding_generator)
         tools = discovery.discover_system_tools()
@@ -87,7 +87,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
 
     def test_tool_metadata_extraction_completeness(self):
         """Test that tool metadata is extracted completely."""
-        from mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
         discovery = MCPToolDiscovery(self.db_manager, self.embedding_generator)
         tools = discovery.discover_system_tools()
@@ -104,7 +104,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
 
     def test_tool_fingerprinting_detects_changes(self):
         """Test that tool fingerprinting can detect when tools change."""
-        from mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
         discovery = MCPToolDiscovery(self.db_manager, self.embedding_generator)
 
@@ -127,7 +127,7 @@ class TestMCPToolDiscovery(unittest.TestCase):
         """Test that discovery completes within performance requirement."""
         import time
 
-        from mcp_tool_discovery import MCPToolDiscovery
+        from turboprop.mcp_tool_discovery import MCPToolDiscovery
 
         discovery = MCPToolDiscovery(self.db_manager, self.embedding_generator)
 
@@ -149,7 +149,7 @@ class TestToolRegistry(unittest.TestCase):
 
     def test_tool_registry_initialization(self):
         """Test that ToolRegistry initializes correctly."""
-        from tool_registry import ToolRegistry
+        from turboprop.tool_registry import ToolRegistry
 
         registry = ToolRegistry()
         self.assertIsNotNone(registry)
@@ -157,8 +157,8 @@ class TestToolRegistry(unittest.TestCase):
 
     def test_tool_registration_and_retrieval(self):
         """Test tool registration and retrieval."""
-        from mcp_tool_discovery import MCPTool
-        from tool_registry import ToolRegistry
+        from turboprop.mcp_tool_discovery import MCPTool
+        from turboprop.tool_registry import ToolRegistry
 
         registry = ToolRegistry()
 
@@ -185,8 +185,8 @@ class TestToolRegistry(unittest.TestCase):
 
     def test_tool_health_checking(self):
         """Test tool health checking functionality."""
-        from mcp_tool_discovery import MCPTool
-        from tool_registry import ToolRegistry
+        from turboprop.mcp_tool_discovery import MCPTool
+        from turboprop.tool_registry import ToolRegistry
 
         registry = ToolRegistry()
 
@@ -215,7 +215,7 @@ class TestToolMetadataExtractor(unittest.TestCase):
 
     def test_metadata_extraction_from_tool_definition(self):
         """Test metadata extraction from tool definitions."""
-        from tool_metadata_extractor import ToolMetadataExtractor
+        from turboprop.tool_metadata_extractor import ToolMetadataExtractor
 
         extractor = ToolMetadataExtractor()
 
@@ -242,7 +242,7 @@ class TestToolMetadataExtractor(unittest.TestCase):
 
     def test_category_identification(self):
         """Test automatic category identification."""
-        from tool_metadata_extractor import ToolMetadataExtractor
+        from turboprop.tool_metadata_extractor import ToolMetadataExtractor
 
         extractor = ToolMetadataExtractor()
 

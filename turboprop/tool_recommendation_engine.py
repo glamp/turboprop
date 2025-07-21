@@ -328,7 +328,7 @@ class ToolRecommendationEngine:
                     tool_chain = [tool.tool_id for tool in candidates[:3]]
 
                     # Use mock workflow requirements for optimization
-                    from recommendation_algorithms import WorkflowRequirements
+                    from .recommendation_algorithms import WorkflowRequirements
 
                     workflow_reqs = WorkflowRequirements(
                         steps=[f"step_{i}"],

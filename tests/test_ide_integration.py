@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ide_integration import (
+from turboprop.ide_integration import (
     IDEIntegration,
     IDENavigationUrl,
     IDEType,

@@ -11,7 +11,7 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
-from mcp_metadata_types import ParameterAnalysis, ToolId
+from turboprop.mcp_metadata_types import ParameterAnalysis, ToolId
 
 
 @dataclass
@@ -58,7 +58,7 @@ class TestParameterAnalyzer:
 
     def test_analyze_parameter_schema_basic(self, sample_parameters):
         """Test basic parameter schema analysis."""
-        from parameter_analyzer import ParameterAnalyzer
+        from turboprop.parameter_analyzer import ParameterAnalyzer
 
         analyzer = ParameterAnalyzer()
         result = analyzer.analyze_parameter_schema(
@@ -79,7 +79,7 @@ class TestParameterAnalyzer:
 
     def test_analyze_parameter_complexity(self, sample_parameters):
         """Test parameter complexity analysis."""
-        from parameter_analyzer import ParameterAnalyzer
+        from turboprop.parameter_analyzer import ParameterAnalyzer
 
         analyzer = ParameterAnalyzer()
         complexity = analyzer.analyze_parameter_complexity(sample_parameters)
@@ -93,7 +93,7 @@ class TestParameterAnalyzer:
 
     def test_match_parameter_requirements(self, sample_parameters):
         """Test parameter requirement matching."""
-        from parameter_analyzer import ParameterAnalyzer, ParameterRequirements
+        from turboprop.parameter_analyzer import ParameterAnalyzer, ParameterRequirements
 
         analyzer = ParameterAnalyzer()
         requirements = ParameterRequirements(
@@ -113,7 +113,7 @@ class TestParameterAnalyzer:
 
     def test_parameter_similarity_calculation(self, sample_parameters):
         """Test parameter similarity calculation between tool sets."""
-        from parameter_analyzer import ParameterAnalyzer
+        from turboprop.parameter_analyzer import ParameterAnalyzer
 
         analyzer = ParameterAnalyzer()
 
@@ -133,7 +133,7 @@ class TestTypeCompatibilityAnalyzer:
 
     def test_basic_type_compatibility(self):
         """Test basic type compatibility analysis."""
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = TypeCompatibilityAnalyzer()
 
@@ -145,7 +145,7 @@ class TestTypeCompatibilityAnalyzer:
 
     def test_type_hierarchy_compatibility(self):
         """Test type hierarchy-based compatibility."""
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = TypeCompatibilityAnalyzer()
 
@@ -156,7 +156,7 @@ class TestTypeCompatibilityAnalyzer:
 
     def test_type_conversion_chain(self):
         """Test type conversion chain finding."""
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = TypeCompatibilityAnalyzer()
 
@@ -166,7 +166,7 @@ class TestTypeCompatibilityAnalyzer:
 
     def test_incompatible_types(self):
         """Test detection of incompatible types."""
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = TypeCompatibilityAnalyzer()
 
@@ -211,7 +211,7 @@ class TestAdvancedFilters:
 
     def test_parameter_count_filters(self, mock_tools):
         """Test filtering by parameter counts."""
-        from advanced_filters import AdvancedFilters, ParameterFilterSet
+        from turboprop.advanced_filters import AdvancedFilters, ParameterFilterSet
 
         filters = AdvancedFilters()
         filter_set = ParameterFilterSet(min_parameters=2, max_parameters=3)
@@ -225,7 +225,7 @@ class TestAdvancedFilters:
 
     def test_required_parameter_type_filters(self, mock_tools):
         """Test filtering by required parameter types."""
-        from advanced_filters import AdvancedFilters, ParameterFilterSet
+        from turboprop.advanced_filters import AdvancedFilters, ParameterFilterSet
 
         filters = AdvancedFilters()
         filter_set = ParameterFilterSet(required_parameter_types=["string", "number"])
@@ -238,7 +238,7 @@ class TestAdvancedFilters:
 
     def test_forbidden_parameter_type_filters(self, mock_tools):
         """Test filtering out tools with forbidden parameter types."""
-        from advanced_filters import AdvancedFilters, ParameterFilterSet
+        from turboprop.advanced_filters import AdvancedFilters, ParameterFilterSet
 
         filters = AdvancedFilters()
         filter_set = ParameterFilterSet(forbidden_parameter_types=["object", "array"])
@@ -256,8 +256,8 @@ class TestParameterRanking:
 
     def test_parameter_match_scoring(self):
         """Test parameter match score calculation."""
-        from parameter_ranking import ParameterRanking
-        from tool_search_results import ToolSearchResult
+        from turboprop.parameter_ranking import ParameterRanking
+        from turboprop.tool_search_results import ToolSearchResult
 
         ranking = ParameterRanking()
 
@@ -281,7 +281,7 @@ class TestParameterRanking:
             examples=[],
         )
 
-        from parameter_analyzer import ParameterRequirements
+        from turboprop.parameter_analyzer import ParameterRequirements
 
         requirements = ParameterRequirements(
             input_types=["string"],
@@ -299,8 +299,8 @@ class TestParameterRanking:
 
     def test_parameter_ranking_boost(self):
         """Test parameter-based ranking boost application."""
-        from parameter_ranking import ParameterRanking
-        from tool_search_results import ToolSearchResult
+        from turboprop.parameter_ranking import ParameterRanking
+        from turboprop.tool_search_results import ToolSearchResult
 
         ranking = ParameterRanking()
 
@@ -340,7 +340,7 @@ class TestParameterRanking:
             ),
         ]
 
-        from parameter_analyzer import ParameterRequirements
+        from turboprop.parameter_analyzer import ParameterRequirements
 
         requirements = ParameterRequirements(
             input_types=["string"],
@@ -368,9 +368,9 @@ class TestParameterSearchEngine:
 
     def test_search_by_parameters(self, mock_search_engine):
         """Test parameter-based search functionality."""
-        from parameter_analyzer import ParameterAnalyzer
-        from parameter_search_engine import ParameterSearchEngine
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.parameter_analyzer import ParameterAnalyzer
+        from turboprop.parameter_search_engine import ParameterSearchEngine
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = ParameterAnalyzer()
         type_analyzer = TypeCompatibilityAnalyzer()
@@ -389,9 +389,9 @@ class TestParameterSearchEngine:
 
     def test_search_by_data_flow(self, mock_search_engine):
         """Test data flow-based tool search."""
-        from parameter_analyzer import ParameterAnalyzer
-        from parameter_search_engine import ParameterSearchEngine
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.parameter_analyzer import ParameterAnalyzer
+        from turboprop.parameter_search_engine import ParameterSearchEngine
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = ParameterAnalyzer()
         type_analyzer = TypeCompatibilityAnalyzer()
@@ -409,9 +409,9 @@ class TestParameterSearchEngine:
 
     def test_find_compatible_tools(self, mock_search_engine):
         """Test finding tools compatible with a reference tool."""
-        from parameter_analyzer import ParameterAnalyzer
-        from parameter_search_engine import ParameterSearchEngine
-        from type_compatibility_analyzer import TypeCompatibilityAnalyzer
+        from turboprop.parameter_analyzer import ParameterAnalyzer
+        from turboprop.parameter_search_engine import ParameterSearchEngine
+        from turboprop.type_compatibility_analyzer import TypeCompatibilityAnalyzer
 
         analyzer = ParameterAnalyzer()
         type_analyzer = TypeCompatibilityAnalyzer()
@@ -431,7 +431,7 @@ class TestParameterSearchExamples:
         """Test finding tools with file path and timeout parameters."""
         # This test verifies basic functionality without complex mocking
 
-        from parameter_search_engine import ParameterSearchEngine
+        from turboprop.parameter_search_engine import ParameterSearchEngine
 
         # Mock the tool search engine more simply
         mock_tool_search = Mock()
@@ -460,7 +460,7 @@ class TestParameterSearchExamples:
         """Test finding tools that return structured data."""
         from unittest.mock import Mock
 
-        from parameter_search_engine import ParameterSearchEngine
+        from turboprop.parameter_search_engine import ParameterSearchEngine
 
         mock_tool_search = Mock()
         mock_analyzer = Mock()
@@ -481,7 +481,7 @@ class TestParameterSearchExamples:
 
     def test_simple_tools_parameter_count_filter(self):
         """Test finding simple tools with 2-4 parameters."""
-        from advanced_filters import AdvancedFilters, ParameterFilterSet
+        from turboprop.advanced_filters import AdvancedFilters, ParameterFilterSet
 
         filters = AdvancedFilters()
 

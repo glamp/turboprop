@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-from database_manager import DatabaseManager
+from turboprop.database_manager import DatabaseManager
 
 
 class TestConnectionLifecycle:
@@ -24,7 +24,7 @@ class TestConnectionLifecycle:
             db_path = Path(tmp_dir) / "test.duckdb"
 
             # Patch the config values to have short timeouts for testing
-            with patch("config.config.database.CONNECTION_MAX_AGE", 0.1):
+            with patch("turboprop.config.config.database.CONNECTION_MAX_AGE", 0.1):
                 db_manager = DatabaseManager(db_path)
 
                 # Get initial connection and record time
@@ -52,7 +52,7 @@ class TestConnectionLifecycle:
             db_path = Path(tmp_dir) / "test.duckdb"
 
             # Patch config for short idle timeout
-            with patch("config.config.database.CONNECTION_IDLE_TIMEOUT", 0.1):
+            with patch("turboprop.config.config.database.CONNECTION_IDLE_TIMEOUT", 0.1):
                 db_manager = DatabaseManager(db_path)
 
                 # Create connection

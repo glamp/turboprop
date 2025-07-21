@@ -67,7 +67,7 @@ class MCPMetadataExtractor:
             except Exception as e:
                 logger.error("Error parsing tool documentation for '%s': %s", name, e)
                 # Create minimal documentation analysis
-                from mcp_metadata_types import DocumentationAnalysis
+                from .mcp_metadata_types import DocumentationAnalysis
 
                 doc_analysis = DocumentationAnalysis(description=description)
 
@@ -122,7 +122,7 @@ class MCPMetadataExtractor:
             except Exception as e:
                 logger.error("Error generating complexity analysis for '%s': %s", name, e)
                 # Create minimal complexity analysis
-                from mcp_metadata_types import ComplexityAnalysis
+                from .mcp_metadata_types import ComplexityAnalysis
 
                 metadata.complexity_analysis = ComplexityAnalysis(
                     overall_complexity=0.5,
@@ -155,7 +155,7 @@ class MCPMetadataExtractor:
             logger.error("Critical error extracting metadata from tool definition: %s", e)
             # Return minimal metadata object
             tool_name = tool_def.get("name", "Unknown Tool") if isinstance(tool_def, dict) else "Unknown Tool"
-            from mcp_metadata_types import ComplexityAnalysis, DocumentationAnalysis
+            from .mcp_metadata_types import ComplexityAnalysis, DocumentationAnalysis
 
             return MCPToolMetadata(
                 name=tool_name,
