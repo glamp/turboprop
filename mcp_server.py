@@ -62,6 +62,19 @@ from tool_search_mcp_tools import list_tool_categories as _list_tool_categories
 from tool_search_mcp_tools import search_mcp_tools as _search_mcp_tools
 from tool_search_mcp_tools import search_tools_by_capability as _search_tools_by_capability
 
+# Import tool recommendation functionality
+from tool_recommendation_mcp_tools import (
+    recommend_tools_for_task as _recommend_tools_for_task,
+    analyze_task_requirements as _analyze_task_requirements,
+    suggest_tool_alternatives as _suggest_tool_alternatives,
+    recommend_tool_sequence as _recommend_tool_sequence,
+    initialize_recommendation_tools,
+    get_tool_availability_status
+)
+from tool_recommendation_engine import ToolRecommendationEngine
+from context_analyzer import ContextAnalyzer
+from parameter_search_engine import ParameterSearchEngine
+
 # Removed unused imports: CodeSearchResult, convert_results_to_legacy_format, convert_legacy_to_enhanced_format
 
 
@@ -92,6 +105,12 @@ _config: Dict[str, Any] = {
     "auto_watch": False,
     "force_reindex": False,
 }
+
+# Global variables for tool recommendation system
+_recommendation_engine: Optional[ToolRecommendationEngine] = None
+_context_analyzer: Optional[ContextAnalyzer] = None
+_parameter_search_engine: Optional[ParameterSearchEngine] = None
+_recommendation_tools_initialized: bool = False
 
 
 def get_db_connection():
@@ -1617,6 +1636,192 @@ def search_tools_by_capability(
         return f"Error searching tools by capability: {str(e)}"
 
 
+# Tool Recommendation MCP Tools
+
+@mcp.tool()
+def recommend_tools_for_task(
+    task_description: str,
+    context: str = None,
+    max_recommendations: int = 5,
+    include_alternatives: bool = True,
+    complexity_preference: str = 'balanced',
+    explain_reasoning: bool = True
+) -> str:
+    """
+    🧠 TURBOPROP: Get intelligent tool recommendations for development tasks
+    
+    SMART TOOL SELECTION! This analyzes your task description and recommends the most 
+    appropriate MCP tools based on functionality, complexity, and context. Get detailed 
+    explanations and alternatives to choose the optimal approach.
+    
+    🎯 PERFECT FOR:
+    • Understanding what tools to use for a specific task
+    • Getting explanations for why tools are recommended
+    • Exploring alternative approaches and tools
+    • Learning about tool capabilities and usage patterns
+    
+    💡 EXAMPLES:
+    • "read configuration file and parse JSON data"
+    • "search codebase for specific function implementations"  
+    • "execute shell commands with timeout handling"
+    • "process CSV files and generate reports"
+    
+    Args:
+        task_description: Natural language description of what you want to accomplish
+        context: Additional context about environment, constraints, or preferences
+        max_recommendations: Maximum number of tool recommendations (1-10)
+        include_alternatives: Whether to include alternative tool options
+        complexity_preference: Tool complexity preference ('simple', 'balanced', 'powerful')  
+        explain_reasoning: Whether to include detailed explanations
+        
+    Returns:
+        JSON with ranked tool recommendations, explanations, and alternatives
+    """
+    try:
+        result = _recommend_tools_for_task(
+            task_description, context, max_recommendations, 
+            include_alternatives, complexity_preference, explain_reasoning
+        )
+        return json.dumps(result, indent=2) if isinstance(result, dict) else result
+    except Exception as e:
+        return f"Error getting tool recommendations: {str(e)}"
+
+
+@mcp.tool()
+def analyze_task_requirements(
+    task_description: str,
+    detail_level: str = 'standard',
+    include_suggestions: bool = True
+) -> str:
+    """
+    🔬 TURBOPROP: Analyze task requirements and complexity
+    
+    DEEP TASK ANALYSIS! This provides detailed analysis of what your task requires,
+    helping you understand complexity, required capabilities, and potential approaches
+    before selecting tools.
+    
+    🎯 ANALYSIS INCLUDES:
+    • Task complexity assessment (simple, moderate, complex)
+    • Required capabilities and functional requirements
+    • Input/output specifications and data flow
+    • Potential challenges and implementation considerations
+    • Skill level requirements and learning resources
+    
+    💡 PERFECT FOR:
+    • Understanding task complexity before starting
+    • Identifying requirements you might have missed
+    • Getting suggestions to improve your task description
+    • Planning multi-step workflows and processes
+    
+    Args:
+        task_description: Description of the task to analyze
+        detail_level: Level of analysis ('basic', 'standard', 'comprehensive')
+        include_suggestions: Whether to include task improvement suggestions
+        
+    Returns:
+        JSON with comprehensive task analysis and insights
+    """
+    try:
+        result = _analyze_task_requirements(task_description, detail_level, include_suggestions)
+        return json.dumps(result, indent=2) if isinstance(result, dict) else result
+    except Exception as e:
+        return f"Error analyzing task requirements: {str(e)}"
+
+
+@mcp.tool()
+def suggest_tool_alternatives(
+    primary_tool: str,
+    task_context: str = None,
+    max_alternatives: int = 5,
+    include_comparisons: bool = True
+) -> str:
+    """
+    🔄 TURBOPROP: Find alternative tools for your primary choice
+    
+    EXPLORE YOUR OPTIONS! This finds alternative tools that could accomplish similar 
+    tasks, providing detailed comparisons and guidance on when each alternative 
+    might be preferred over your primary choice.
+    
+    🎯 COMPARISON FEATURES:
+    • Similarity analysis and functional overlap
+    • Complexity and learning curve comparisons  
+    • Performance and reliability trade-offs
+    • Use case recommendations and preferences
+    • Migration effort and implementation guidance
+    
+    💡 PERFECT FOR:
+    • Exploring different approaches to the same problem
+    • Finding simpler or more powerful alternatives
+    • Understanding tool trade-offs and limitations
+    • Making informed decisions between similar tools
+    
+    Args:
+        primary_tool: The primary tool you're considering (e.g., "bash", "read")
+        task_context: Context about your specific task or use case
+        max_alternatives: Maximum number of alternatives to suggest
+        include_comparisons: Whether to include detailed comparisons
+        
+    Returns:
+        JSON with alternative suggestions, comparisons, and usage guidance
+    """
+    try:
+        result = _suggest_tool_alternatives(primary_tool, task_context, max_alternatives, include_comparisons)
+        return json.dumps(result, indent=2) if isinstance(result, dict) else result
+    except Exception as e:
+        return f"Error suggesting tool alternatives: {str(e)}"
+
+
+@mcp.tool()
+def recommend_tool_sequence(
+    workflow_description: str,
+    optimization_goal: str = 'balanced',
+    max_sequence_length: int = 10,
+    allow_parallel_tools: bool = False
+) -> str:
+    """
+    ⚡ TURBOPROP: Recommend tool sequences for complex workflows
+    
+    WORKFLOW OPTIMIZATION! This analyzes complex multi-step workflows and recommends 
+    optimal sequences of tools to accomplish your tasks efficiently and reliably.
+    Perfect for complex processes that require multiple tools working together.
+    
+    🎯 SEQUENCE FEATURES:
+    • Step-by-step tool recommendations with parameters
+    • Data flow analysis between tools
+    • Parallel execution opportunities identification
+    • Error handling and reliability considerations
+    • Performance optimization and bottleneck analysis
+    
+    💡 OPTIMIZATION GOALS:
+    • "speed" - Optimize for fast execution and minimal delays
+    • "reliability" - Prioritize error handling and robust execution
+    • "simplicity" - Prefer simple tools and straightforward approaches
+    • "balanced" - Balance all factors for general-purpose workflows
+    
+    🔧 PERFECT FOR:
+    • Multi-step data processing workflows
+    • Complex deployment and build processes
+    • Automated testing and validation sequences
+    • Data transformation and analysis pipelines
+    
+    Args:
+        workflow_description: Description of the complete workflow or process
+        optimization_goal: What to optimize for ('speed', 'reliability', 'simplicity', 'balanced')
+        max_sequence_length: Maximum number of tools in sequence (2-20)
+        allow_parallel_tools: Whether to suggest parallel tool execution
+        
+    Returns:
+        JSON with recommended tool sequences, optimization analysis, and guidance
+    """
+    try:
+        result = _recommend_tool_sequence(
+            workflow_description, optimization_goal, max_sequence_length, allow_parallel_tools
+        )
+        return json.dumps(result, indent=2) if isinstance(result, dict) else result
+    except Exception as e:
+        return f"Error recommending tool sequence: {str(e)}"
+
+
 @mcp.prompt()
 def search(query: str = "") -> str:
     """
@@ -1991,6 +2196,42 @@ def main():
     except Exception as e:
         print(f"⚠️  Warning: MCP tool search engines not initialized: {e}", file=sys.stderr)
 
+    # Initialize tool recommendation engines
+    try:
+        global _recommendation_engine, _context_analyzer, _parameter_search_engine, _recommendation_tools_initialized
+        
+        # Create recommendation engine components
+        from mcp_tool_search_engine import MCPToolSearchEngine
+        
+        db_connection = get_db_connection()
+        embedder = get_embedder()
+        
+        # Initialize core components
+        mcp_tool_search = MCPToolSearchEngine(db_connection, embedder)
+        _parameter_search_engine = ParameterSearchEngine(db_connection, embedder)
+        
+        from task_analyzer import TaskAnalyzer
+        task_analyzer = TaskAnalyzer()
+        
+        _context_analyzer = ContextAnalyzer()
+        
+        # Create recommendation engine
+        _recommendation_engine = ToolRecommendationEngine(
+            tool_search_engine=mcp_tool_search,
+            parameter_search_engine=_parameter_search_engine,
+            task_analyzer=task_analyzer,
+            context_analyzer=_context_analyzer
+        )
+        
+        # Initialize recommendation tools
+        initialize_recommendation_tools(_recommendation_engine, task_analyzer)
+        _recommendation_tools_initialized = True
+        
+        print("🧠 Tool recommendation engines initialized", file=sys.stderr)
+    except Exception as e:
+        print(f"⚠️  Warning: Tool recommendation engines not initialized: {e}", file=sys.stderr)
+        _recommendation_tools_initialized = False
+
     print("🎯 MCP Server ready - listening for tool calls...", file=sys.stderr)
     print("=" * 40, file=sys.stderr)
     print(file=sys.stderr)
@@ -2001,11 +2242,17 @@ def main():
     print("  • tp:watch_repository - Live index updates", file=sys.stderr)
     print("  • tp:list_indexed_files - Browse indexed files", file=sys.stderr)
     print(file=sys.stderr)
-    print("🧰 MCP TOOL SEARCH (NEW!):", file=sys.stderr)
+    print("🧰 MCP TOOL SEARCH:", file=sys.stderr)
     print("  • tp:search_mcp_tools - Find MCP tools by functionality", file=sys.stderr)
     print("  • tp:get_tool_details - Get comprehensive tool information", file=sys.stderr)
     print("  • tp:list_tool_categories - Browse tools by category", file=sys.stderr)
     print("  • tp:search_tools_by_capability - Find tools by specific capabilities", file=sys.stderr)
+    print(file=sys.stderr)
+    print("🧠 INTELLIGENT TOOL RECOMMENDATIONS (NEW!):", file=sys.stderr)
+    print("  • tp:recommend_tools_for_task - Get smart tool recommendations for tasks", file=sys.stderr)
+    print("  • tp:analyze_task_requirements - Analyze task complexity and requirements", file=sys.stderr)
+    print("  • tp:suggest_tool_alternatives - Find alternative tools with comparisons", file=sys.stderr)
+    print("  • tp:recommend_tool_sequence - Get tool sequences for complex workflows", file=sys.stderr)
     print(file=sys.stderr)
     print("⚡ SLASH COMMANDS (type '/' to see all):", file=sys.stderr)
     print("  • /mcp__turboprop__search <query> - Fast semantic search", file=sys.stderr)

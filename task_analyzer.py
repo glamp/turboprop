@@ -59,6 +59,11 @@ class TaskAnalysis:
     confidence: float
     analysis_notes: List[str]
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert TaskAnalysis to dictionary for JSON serialization."""
+        from dataclasses import asdict
+        return asdict(self)
+
 
 @dataclass
 class TaskRequirements:
