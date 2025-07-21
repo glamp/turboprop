@@ -18,7 +18,6 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-
 from database_manager import DatabaseManager
 from hybrid_search import HybridSearchEngine
 from logging_config import get_logger

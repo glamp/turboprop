@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-
 from code_index import DebouncedHandler, init_db, print_indexed_files_tree, reindex_all, remove_orphaned_files
 from config import config
 

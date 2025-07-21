@@ -10,7 +10,6 @@ recognition, and example generation.
 from unittest.mock import Mock, patch
 
 import pytest
-
 from docstring_parser import DocstringParser
 from example_generator import ExampleGenerator
 

@@ -11,7 +11,6 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
-
 from mcp_metadata_types import ParameterAnalysis, ToolId
 
 

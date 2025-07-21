@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 import duckdb
 import pytest
-
 from database_manager import DatabaseManager
 
 

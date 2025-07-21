@@ -11,7 +11,6 @@ import json
 from unittest.mock import Mock
 
 import pytest
-
 from mcp_response_types import (
     IndexResponse,
     QueryAnalysis,

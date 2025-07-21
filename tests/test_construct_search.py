@@ -13,7 +13,6 @@ This module tests all aspects of the construct search implementation including:
 from unittest.mock import Mock, patch
 
 import pytest
-
 from construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator

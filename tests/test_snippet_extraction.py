@@ -13,7 +13,6 @@ Tests for the snippet_extractor module including:
 from unittest.mock import Mock
 
 import pytest
-
 from language_detection import LanguageDetectionResult, LanguageDetector
 from search_result_types import CodeSnippet
 from snippet_extractor import (

@@ -16,7 +16,6 @@ import time
 from unittest.mock import Mock, patch
 
 import pytest
-
 from code_index import (
     DebouncedHandler,
     build_full_index,

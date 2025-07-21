@@ -17,7 +17,6 @@ from unittest.mock import Mock, patch
 
 import psutil
 import pytest
-
 from code_index import init_db, reindex_all, scan_repo, search_index
 from config import config
 from construct_search import ConstructSearchOperations

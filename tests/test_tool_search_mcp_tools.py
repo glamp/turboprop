@@ -10,7 +10,6 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
-
 from mcp_metadata_types import ToolId
 from mcp_tool_search_responses import (
     CapabilityMatch,

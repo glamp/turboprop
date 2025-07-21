@@ -20,12 +20,12 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "mcp":
         # Remove 'mcp' from args and run MCP server
         sys.argv.pop(1)
-        from mcp_server import main as mcp_main
+        from .mcp_server import main as mcp_main
 
         mcp_main()
     else:
         # Run regular CLI
-        from code_index import main as cli_main
+        from .code_index import main as cli_main
 
         cli_main()
 

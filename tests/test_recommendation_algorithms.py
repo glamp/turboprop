@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import pytest
-
 from recommendation_algorithms import (
     RecommendationAlgorithms,
     ToolRecommendation,

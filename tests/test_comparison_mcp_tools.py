@@ -10,7 +10,6 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
-
 from comparison_response_types import (
     AlternativeAnalysis,
     AlternativesFoundResponse,

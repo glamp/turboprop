@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 import duckdb
 import pytest
-
 from database_manager import DatabaseManager
 from exceptions import DatabaseError, DatabaseMigrationError
 from mcp_tool_schema import (

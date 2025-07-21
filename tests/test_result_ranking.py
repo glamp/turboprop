@@ -12,7 +12,6 @@ from typing import List
 from unittest.mock import Mock, patch
 
 import pytest
-
 from ranking_exceptions import InvalidRankingWeightsError
 from ranking_scorers import ConstructTypeScorer, FileSizeScorer, FileTypeScorer, RecencyScorer
 from ranking_utils import ConfidenceScorer, MatchReason, MatchReasonGenerator, RankingContext, ResultDeduplicator

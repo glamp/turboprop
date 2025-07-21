@@ -9,7 +9,6 @@ comprehensive tool recommendations with explanations and context awareness.
 from unittest.mock import Mock
 
 import pytest
-
 from context_analyzer import ContextAnalyzer
 from task_analyzer import TaskAnalyzer
 from tool_recommendation_engine import RecommendationRequest, ToolRecommendationEngine

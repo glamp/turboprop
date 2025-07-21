@@ -16,7 +16,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 from hybrid_search import (
