@@ -73,6 +73,8 @@ class MCPToolRegistry:
     def __init__(self):
         self._tool_recommendation_functions = {}
         self._tool_search_functions = {}
+        self._tool_comparison_functions = {}
+        self._tool_category_functions = {}
         self._components = {}
 
     def get_recommendation_function(self, function_name: str):
@@ -119,6 +121,50 @@ class MCPToolRegistry:
             
         return self._tool_search_functions.get(function_name)
 
+    def get_comparison_function(self, function_name: str):
+        """Get a tool comparison function with lazy loading."""
+        if function_name not in self._tool_comparison_functions:
+            from tool_comparison_mcp_tools import (
+                analyze_tool_relationships,
+                compare_mcp_tools,
+                find_tool_alternatives,
+                get_tool_recommendations_comparison,
+                initialize_comparison_tools,
+            )
+            
+            self._tool_comparison_functions.update({
+                'analyze_tool_relationships': analyze_tool_relationships,
+                'compare_mcp_tools': compare_mcp_tools,
+                'find_tool_alternatives': find_tool_alternatives,
+                'get_tool_recommendations_comparison': get_tool_recommendations_comparison,
+                'initialize_comparison_tools': initialize_comparison_tools,
+            })
+            
+        return self._tool_comparison_functions.get(function_name)
+
+    def get_category_function(self, function_name: str):
+        """Get a tool category function with lazy loading."""
+        if function_name not in self._tool_category_functions:
+            from tool_category_mcp_tools import (
+                browse_tools_by_category,
+                explore_tool_ecosystem,
+                find_tools_by_complexity,
+                get_category_overview,
+                get_tool_selection_guidance,
+                initialize_category_tools,
+            )
+            
+            self._tool_category_functions.update({
+                'browse_tools_by_category': browse_tools_by_category,
+                'explore_tool_ecosystem': explore_tool_ecosystem,
+                'find_tools_by_complexity': find_tools_by_complexity,
+                'get_category_overview': get_category_overview,
+                'get_tool_selection_guidance': get_tool_selection_guidance,
+                'initialize_category_tools': initialize_category_tools,
+            })
+            
+        return self._tool_category_functions.get(function_name)
+
     def get_component(self, component_name: str):
         """Get a component with lazy loading."""
         if component_name not in self._components:
@@ -131,6 +177,18 @@ class MCPToolRegistry:
             elif component_name == 'ToolRecommendationEngine':
                 from tool_recommendation_engine import ToolRecommendationEngine
                 self._components['ToolRecommendationEngine'] = ToolRecommendationEngine
+            elif component_name == 'ToolComparisonEngine':
+                from tool_comparison_engine import ToolComparisonEngine
+                self._components['ToolComparisonEngine'] = ToolComparisonEngine
+            elif component_name == 'AlternativeDetector':
+                from alternative_detector import AlternativeDetector
+                self._components['AlternativeDetector'] = AlternativeDetector
+            elif component_name == 'DecisionSupport':
+                from decision_support import DecisionSupport
+                self._components['DecisionSupport'] = DecisionSupport
+            elif component_name == 'TaskAnalyzer':
+                from task_analyzer import TaskAnalyzer
+                self._components['TaskAnalyzer'] = TaskAnalyzer
                 
         return self._components.get(component_name)
 
@@ -171,6 +229,16 @@ _recommendation_engine: Optional[ToolRecommendationEngine] = None
 _context_analyzer: Optional[ContextAnalyzer] = None
 _parameter_search_engine: Optional[ParameterSearchEngine] = None
 _recommendation_tools_initialized: bool = False
+
+# Global variables for tool comparison and category systems
+_comparison_engine: Optional[ToolComparisonEngine] = None
+_alternative_detector = None
+_relationship_analyzer = None
+_decision_support = None
+_tool_catalog = None
+_task_analyzer = None
+_comparison_tools_initialized: bool = False
+_category_tools_initialized: bool = False
 
 
 class MCPServerInitializer:
@@ -323,6 +391,91 @@ class MCPServerInitializer:
             self.initialization_errors.append(f"Recommendation engines initialization failed: {e}")
             return False
 
+    def initialize_comparison_engines(self) -> bool:
+        """Initialize tool comparison engines with proper global variable management."""
+        try:
+            global _comparison_engine, _alternative_detector, _relationship_analyzer, _decision_support, _comparison_tools_initialized
+
+            # Get component classes from registry
+            ToolComparisonEngine = _tool_registry.get_component('ToolComparisonEngine')
+            AlternativeDetector = _tool_registry.get_component('AlternativeDetector')
+            DecisionSupport = _tool_registry.get_component('DecisionSupport')
+
+            db_connection = get_db_connection()
+            embedder = get_embedder()
+
+            # Initialize comparison components
+            from comparison_metrics import ComparisonMetrics
+            from relationship_analyzer import RelationshipAnalyzer
+            
+            # Create comparison engine components
+            comparison_metrics = ComparisonMetrics()
+            _alternative_detector = AlternativeDetector(db_connection, embedder)
+            _relationship_analyzer = RelationshipAnalyzer(db_connection, embedder)
+            _decision_support = DecisionSupport()
+
+            # Create comparison engine
+            _comparison_engine = ToolComparisonEngine(
+                alternative_detector=_alternative_detector,
+                comparison_metrics=comparison_metrics,
+                decision_support=_decision_support,
+            )
+
+            # Initialize comparison tools
+            initialize_comparison_tools = _tool_registry.get_comparison_function('initialize_comparison_tools')
+            initialize_comparison_tools(
+                _comparison_engine, 
+                _decision_support, 
+                _alternative_detector, 
+                _relationship_analyzer
+            )
+            _comparison_tools_initialized = True
+
+            print("🔄 Tool comparison engines initialized", file=sys.stderr)
+            return True
+
+        except Exception as e:
+            print(f"⚠️  Warning: Tool comparison engines not initialized: {e}", file=sys.stderr)
+            _comparison_tools_initialized = False
+            self.initialization_errors.append(f"Comparison engines initialization failed: {e}")
+            return False
+
+    def initialize_category_engines(self) -> bool:
+        """Initialize tool category browsing engines."""
+        try:
+            global _tool_catalog, _task_analyzer, _category_tools_initialized
+
+            # Get component classes from registry
+            TaskAnalyzer = _tool_registry.get_component('TaskAnalyzer')
+
+            db_connection = get_db_connection()
+            embedder = get_embedder()
+
+            # Initialize category components
+            from tool_catalog import ToolCatalog
+            
+            _tool_catalog = ToolCatalog(db_connection, embedder)
+            _task_analyzer = TaskAnalyzer()
+
+            # Initialize category tools
+            initialize_category_tools = _tool_registry.get_category_function('initialize_category_tools')
+            initialize_category_tools(
+                _tool_catalog,
+                _context_analyzer,  # Reuse from recommendation system
+                _task_analyzer,
+                _decision_support   # Reuse from comparison system
+            )
+            _category_tools_initialized = True
+
+            print("📂 Tool category engines initialized", file=sys.stderr)
+            return True
+
+        except Exception as e:
+            print(f"⚠️  Warning: Tool category engines not initialized: {e}", file=sys.stderr)
+            _category_tools_initialized = False
+            self.initialization_errors.append(f"Category engines initialization failed: {e}")
+            return False
+
     def start_file_watcher(self) -> bool:
         """Start file watcher if configured."""
         if not (self.config["repository_path"] and self.config["auto_watch"]):
@@ -362,6 +515,14 @@ class MCPServerInitializer:
 
         # Initialize recommendation engines
         if not self.initialize_recommendation_engines():
+            success = False
+
+        # Initialize comparison engines
+        if not self.initialize_comparison_engines():
+            success = False
+
+        # Initialize category engines  
+        if not self.initialize_category_engines():
             success = False
 
         return success
@@ -2092,6 +2253,256 @@ def recommend_tool_sequence(
         return f"Error recommending tool sequence: {str(e)}"
 
 
+# Tool Comparison and Category MCP Tools
+
+@mcp.tool()
+def compare_mcp_tools(
+    tool_ids: List[str],
+    comparison_criteria: List[str] = None,
+    include_decision_guidance: bool = True,
+    comparison_context: str = None,
+    detail_level: str = 'standard'
+) -> str:
+    """
+    🔄 TURBOPROP: Compare multiple MCP tools across various dimensions
+    
+    COMPREHENSIVE TOOL COMPARISON! This provides side-by-side comparison of MCP tools,
+    helping to understand differences, trade-offs, and optimal use cases for each tool.
+    
+    🎯 COMPARISON FEATURES:
+    • Multi-dimensional analysis across functionality, usability, performance, complexity
+    • Decision guidance with recommendations for optimal tool selection
+    • Context-aware comparisons based on specific use cases
+    • Trade-off analysis highlighting strengths and limitations
+    
+    💡 PERFECT FOR:
+    • Choosing between similar tools for specific tasks
+    • Understanding tool capabilities and limitations
+    • Making informed decisions with comprehensive analysis
+    • Learning about tool relationships and alternatives
+    
+    Args:
+        tool_ids: List of tool IDs to compare (2-10 tools)
+        comparison_criteria: Specific aspects to focus on ['functionality', 'usability', 'performance', 'complexity']
+        include_decision_guidance: Whether to include selection recommendations
+        comparison_context: Context for the comparison (e.g., "for file processing tasks")  
+        detail_level: Level of comparison detail ('basic', 'standard', 'comprehensive')
+        
+    Returns:
+        JSON with comprehensive tool comparison, rankings, and decision guidance
+    """
+    try:
+        compare_mcp_tools_func = _tool_registry.get_comparison_function('compare_mcp_tools')
+        result = compare_mcp_tools_func(tool_ids, comparison_criteria, include_decision_guidance, comparison_context, detail_level)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error comparing MCP tools: {str(e)}"
+
+
+@mcp.tool()
+def find_tool_alternatives(
+    reference_tool: str,
+    similarity_threshold: float = 0.7,
+    max_alternatives: int = 8,
+    include_comparison: bool = True,
+    context_filter: str = None
+) -> str:
+    """
+    🔍 TURBOPROP: Find alternative tools similar to a reference tool
+    
+    DISCOVER TOOL ALTERNATIVES! This finds tools with similar functionality,
+    helping to explore different approaches and find optimal tools for specific use cases.
+    
+    🎯 ALTERNATIVE ANALYSIS:
+    • Similarity scoring based on functionality overlap
+    • Complexity and learning curve comparisons
+    • Unique capabilities and performance differences
+    • Context-based filtering for specific requirements
+    
+    💡 PERFECT FOR:
+    • Exploring different approaches to the same problem
+    • Finding simpler or more advanced alternatives
+    • Understanding the tool ecosystem landscape
+    • Making informed tool selection decisions
+    
+    Args:
+        reference_tool: Tool ID to find alternatives for
+        similarity_threshold: Minimum similarity score (0.0-1.0)
+        max_alternatives: Maximum number of alternatives to return
+        include_comparison: Whether to include comparison with reference tool
+        context_filter: Optional context to filter alternatives (e.g., "simple tools only")
+        
+    Returns:
+        JSON with alternative tools, similarity scores, and comparisons
+    """
+    try:
+        find_tool_alternatives_func = _tool_registry.get_comparison_function('find_tool_alternatives')
+        result = find_tool_alternatives_func(reference_tool, similarity_threshold, max_alternatives, include_comparison, context_filter)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error finding tool alternatives: {str(e)}"
+
+
+@mcp.tool()
+def analyze_tool_relationships(
+    tool_id: str,
+    relationship_types: List[str] = None,
+    max_relationships: int = 20,
+    include_explanations: bool = True
+) -> str:
+    """
+    🕸️ TURBOPROP: Analyze relationships between a tool and other tools
+    
+    UNDERSTAND TOOL RELATIONSHIPS! This explores how a tool relates to others,
+    including alternatives, complements, prerequisites, and workflow connections.
+    
+    🎯 RELATIONSHIP TYPES:
+    • Alternatives - Tools that provide similar functionality
+    • Complements - Tools that work well together in workflows
+    • Prerequisites - Tools often needed before using this tool
+    • Dependents - Tools that often use this tool as part of their functionality
+    
+    💡 PERFECT FOR:
+    • Understanding tool ecosystem connections
+    • Planning multi-tool workflows and processes
+    • Finding complementary tools for complete solutions
+    • Learning about tool dependencies and relationships
+    
+    Args:
+        tool_id: Tool ID to analyze relationships for
+        relationship_types: Types of relationships ['alternatives', 'complements', 'prerequisites', 'dependents']
+        max_relationships: Maximum relationships to return per type
+        include_explanations: Whether to explain why relationships exist
+        
+    Returns:
+        JSON with comprehensive relationship analysis and explanations
+    """
+    try:
+        analyze_tool_relationships_func = _tool_registry.get_comparison_function('analyze_tool_relationships')
+        result = analyze_tool_relationships_func(tool_id, relationship_types, max_relationships, include_explanations)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error analyzing tool relationships: {str(e)}"
+
+
+@mcp.tool()
+def browse_tools_by_category(
+    category: str,
+    sort_by: str = 'popularity',
+    max_tools: int = 20,
+    include_descriptions: bool = True,
+    complexity_filter: str = None
+) -> str:
+    """
+    📂 TURBOPROP: Browse tools within a specific category
+    
+    SYSTEMATIC TOOL EXPLORATION! This enables organized browsing of tools by category,
+    helping to discover tools with similar functionality and purposes.
+    
+    🎯 CATEGORY FEATURES:
+    • Organized tool browsing by functional categories
+    • Flexible sorting options (popularity, complexity, name, functionality)
+    • Complexity filtering to match skill levels
+    • Rich tool descriptions and metadata
+    
+    💡 AVAILABLE CATEGORIES:
+    • file_ops - File operations (read, write, edit, etc.)
+    • web - Web operations (WebFetch, WebSearch, etc.)  
+    • execution - Command execution (bash, task, etc.)
+    • search - Search operations (grep, glob, etc.)
+    • analysis - Analysis and processing tools
+    
+    Args:
+        category: Category to browse (file_ops, web, analysis, etc.)
+        sort_by: Sorting method ('popularity', 'complexity', 'name', 'functionality')
+        max_tools: Maximum number of tools to return
+        include_descriptions: Whether to include tool descriptions
+        complexity_filter: Filter by complexity ('simple', 'moderate', 'complex')
+        
+    Returns:
+        JSON with categorized tools, metadata, and organization
+    """
+    try:
+        browse_tools_by_category_func = _tool_registry.get_category_function('browse_tools_by_category')
+        result = browse_tools_by_category_func(category, sort_by, max_tools, include_descriptions, complexity_filter)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error browsing tools by category: {str(e)}"
+
+
+@mcp.tool()
+def get_category_overview() -> str:
+    """
+    🗺️ TURBOPROP: Get overview of all tool categories and characteristics
+    
+    ECOSYSTEM OVERVIEW! This provides a high-level view of the tool ecosystem,
+    helping to understand the organization and scope of available tools.
+    
+    🎯 OVERVIEW FEATURES:
+    • Comprehensive category statistics and breakdowns
+    • Tool counts and distribution across categories
+    • Ecosystem maturity and completeness metrics
+    • Representative tools for each category
+    
+    💡 PERFECT FOR:
+    • Getting oriented with the tool ecosystem
+    • Understanding tool organization and structure
+    • Planning comprehensive tool usage strategies
+    • Discovering new functional areas and categories
+    
+    Returns:
+        JSON with comprehensive category overview and ecosystem statistics
+    """
+    try:
+        get_category_overview_func = _tool_registry.get_category_function('get_category_overview')
+        result = get_category_overview_func()
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error getting category overview: {str(e)}"
+
+
+@mcp.tool()
+def get_tool_selection_guidance(
+    task_description: str,
+    available_tools: List[str] = None,
+    constraints: List[str] = None,
+    optimization_goal: str = 'balanced'
+) -> str:
+    """
+    🧭 TURBOPROP: Get guidance for selecting optimal tools for specific tasks
+    
+    INTELLIGENT TOOL SELECTION! This provides decision support for tool selection,
+    considering task requirements, available options, constraints, and optimization goals.
+    
+    🎯 SELECTION GUIDANCE:
+    • Task analysis and requirement identification
+    • Constraint-aware tool recommendations
+    • Optimization for speed, reliability, simplicity, or balanced approach
+    • Decision reasoning and alternative suggestions
+    
+    💡 OPTIMIZATION GOALS:
+    • 'speed' - Optimize for fast execution and minimal delays
+    • 'reliability' - Prioritize error handling and robust execution
+    • 'simplicity' - Prefer simple tools and straightforward approaches
+    • 'balanced' - Balance all factors for general-purpose tasks
+    
+    Args:
+        task_description: Description of the task requiring tool selection
+        available_tools: List of tools to choose from (if limited)
+        constraints: Constraints to consider (e.g., ["no complex tools", "performance critical"])
+        optimization_goal: What to optimize for ('speed', 'reliability', 'simplicity', 'balanced')
+        
+    Returns:
+        JSON with tool selection guidance, reasoning, and alternatives
+    """
+    try:
+        get_tool_selection_guidance_func = _tool_registry.get_category_function('get_tool_selection_guidance')
+        result = get_tool_selection_guidance_func(task_description, available_tools, constraints, optimization_goal)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return f"Error getting tool selection guidance: {str(e)}"
+
+
 @mcp.prompt()
 def search(query: str = "") -> str:
     """
@@ -2400,6 +2811,16 @@ def main():
     print("  • tp:analyze_task_requirements - Analyze task complexity and requirements", file=sys.stderr)
     print("  • tp:suggest_tool_alternatives - Find alternative tools with comparisons", file=sys.stderr)
     print("  • tp:recommend_tool_sequence - Get tool sequences for complex workflows", file=sys.stderr)
+    print(file=sys.stderr)
+    print("🔄 TOOL COMPARISON & ANALYSIS (NEW!):", file=sys.stderr)
+    print("  • tp:compare_mcp_tools - Compare multiple tools across dimensions", file=sys.stderr)
+    print("  • tp:find_tool_alternatives - Find alternative tools with similarity analysis", file=sys.stderr)
+    print("  • tp:analyze_tool_relationships - Understand tool connections and dependencies", file=sys.stderr)
+    print(file=sys.stderr)
+    print("📂 TOOL CATEGORY BROWSING (NEW!):", file=sys.stderr)
+    print("  • tp:browse_tools_by_category - Browse tools by functional categories", file=sys.stderr)
+    print("  • tp:get_category_overview - Get ecosystem overview and statistics", file=sys.stderr)
+    print("  • tp:get_tool_selection_guidance - Get intelligent tool selection guidance", file=sys.stderr)
     print(file=sys.stderr)
     print("⚡ SLASH COMMANDS (type '/' to see all):", file=sys.stderr)
     print("  • /mcp__turboprop__search <query> - Fast semantic search", file=sys.stderr)
