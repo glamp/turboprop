@@ -1,6 +1,43 @@
 # MCP Tools Reference - Complete Tool Catalog
 
-This document provides a comprehensive reference for all MCP tools available through the tool search system, including their capabilities, parameters, and usage patterns.
+This document provides a comprehensive reference for all MCP tools available through the MCP Tool Search System, including their capabilities, parameters, and usage patterns.
+
+## Table of Contents
+
+### MCP Tools
+- [Core Search Tools](#core-search-tools)
+  - [search_mcp_tools](#search_mcp_tools)
+  - [recommend_tools_for_task](#recommend_tools_for_task)
+  - [compare_mcp_tools](#compare_mcp_tools)
+- [System Tools](#system-tools)
+  - [get_tool_details](#get_tool_details)
+  - [list_tool_categories](#list_tool_categories)
+  - [analyze_task_requirements](#analyze_task_requirements)
+  - [find_tool_alternatives](#find_tool_alternatives)
+
+### Tool Categories
+- [Tool Categories](#tool-categories)
+  - [file_ops (File Operations)](#file_ops-file-operations)
+  - [execution (Command Execution)](#execution-command-execution)
+  - [web (Web Operations)](#web-web-operations)
+  - [data (Data Processing)](#data-data-processing)
+  - [analysis (Code Analysis)](#analysis-code-analysis)
+  - [system (System Operations)](#system-system-operations)
+
+### Performance and Operations
+- [Performance Profiles](#performance-profiles)
+  - [Response Time Expectations](#response-time-expectations)
+  - [Scalability Characteristics](#scalability-characteristics)
+  - [Optimization Recommendations](#optimization-recommendations)
+- [Error Codes and Troubleshooting](#error-codes-and-troubleshooting)
+  - [Common Error Codes](#common-error-codes)
+  - [Performance Troubleshooting](#performance-troubleshooting)
+- [Integration Patterns](#integration-patterns)
+  - [Basic Integration](#basic-integration)
+  - [Advanced Integration](#advanced-integration)
+  - [Error Handling Pattern](#error-handling-pattern)
+
+---
 
 ## Core Search Tools
 

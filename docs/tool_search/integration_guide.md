@@ -4,11 +4,57 @@
 
 This guide provides comprehensive instructions for integrating the MCP Tool Search System with Claude Code, MCP clients, and other development tools. The system is designed to work seamlessly with existing MCP protocols while adding powerful tool discovery capabilities.
 
+## Table of Contents
+
+### Core Integration
+- [Claude Code Integration](#claude-code-integration)
+  - [Basic Integration](#basic-integration)
+  - [Enhanced Claude Code Workflows](#enhanced-claude-code-workflows)
+    - [1. Proactive Tool Suggestions](#1-proactive-tool-suggestions)
+    - [2. Context-Aware Tool Selection](#2-context-aware-tool-selection)  
+    - [3. Tool Chain Optimization](#3-tool-chain-optimization)
+  - [Claude Code Configuration](#claude-code-configuration)
+- [MCP Client Integration](#mcp-client-integration)
+  - [Standard MCP Client Integration](#standard-mcp-client-integration)
+  - [Python MCP Client Integration](#python-mcp-client-integration)
+  - [Integration Patterns](#integration-patterns)
+    - [1. Smart Tool Discovery Pattern](#1-smart-tool-discovery-pattern)
+    - [2. Tool Chain Optimization Pattern](#2-tool-chain-optimization-pattern)
+
+### Development Environment Integration
+- [IDE and Editor Integration](#ide-and-editor-integration)
+  - [Visual Studio Code Extension](#visual-studio-code-extension)
+  - [Vim/Neovim Plugin](#vimneovim-plugin)
+- [Custom Application Integration](#custom-application-integration)
+  - [Web Application Integration](#web-application-integration)
+  - [REST API Integration](#rest-api-integration)
+
+### Testing and Performance
+- [Testing Integration](#testing-integration)
+  - [Integration Testing Framework](#integration-testing-framework)
+  - [Automated Integration Tests](#automated-integration-tests)
+- [Performance Considerations](#performance-considerations)
+  - [Caching Strategies](#caching-strategies)
+  - [Rate Limiting](#rate-limiting)
+
+### Troubleshooting and Advanced Topics
+- [Troubleshooting Integration Issues](#troubleshooting-integration-issues)
+  - [Common Integration Problems](#common-integration-problems)
+    - [1. Connection Issues](#1-connection-issues)
+    - [2. Authentication Issues](#2-authentication-issues)
+    - [3. Tool Discovery Issues](#3-tool-discovery-issues)
+    - [4. Performance Issues](#4-performance-issues)
+- [Advanced Integration Patterns](#advanced-integration-patterns)
+  - [1. Intelligent Tool Chains](#1-intelligent-tool-chains)
+  - [2. Context-Aware Tool Selection](#2-context-aware-tool-selection-1)
+
+---
+
 ## Claude Code Integration
 
 ### Basic Integration
 
-Claude Code automatically benefits from the tool search system once it's enabled:
+Claude Code automatically benefits from the MCP Tool Search System once it's enabled:
 
 ```python
 # Claude Code can now discover tools intelligently
@@ -743,4 +789,619 @@ class RateLimiter:
         return wrapper
 ```
 
-This integration guide provides comprehensive patterns for integrating the MCP Tool Search System with various clients, IDEs, and applications while maintaining performance and reliability.
+## Troubleshooting Integration Issues
+
+### Common Integration Problems
+
+#### 1. Connection Issues
+
+**Problem**: Cannot connect to MCP Tool Search System
+```
+ConnectionError: Unable to connect to tool search service
+```
+
+**Solutions**:
+```bash
+# Check service status
+curl -f http://localhost:8000/health || echo "Service not responding"
+
+# Check network connectivity
+telnet localhost 8000
+
+# Verify MCP server is running
+ps aux | grep mcp | grep -v grep
+
+# Check logs for errors
+tail -f /var/log/mcp-tool-search/service.log
+```
+
+**Code-level diagnostics**:
+```python
+async def diagnose_connection_issue():
+    """Diagnose MCP Tool Search connection problems."""
+    try:
+        # Test basic connectivity
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get('http://localhost:8000/health') as resp:
+                if resp.status == 200:
+                    print("✅ Service is reachable")
+                    health_data = await resp.json()
+                    print(f"Service status: {health_data}")
+                else:
+                    print(f"⚠️  Service returned status {resp.status}")
+    
+    except aiohttp.ClientConnectorError:
+        print("❌ Cannot connect to service")
+        print("Solutions:")
+        print("1. Check if service is running on correct port")
+        print("2. Verify firewall settings")
+        print("3. Check service configuration")
+    
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+```
+
+#### 2. Authentication Issues
+
+**Problem**: Authentication failures
+```
+PermissionError: Invalid API key or insufficient permissions
+```
+
+**Solutions**:
+```python
+# Verify API key configuration
+import os
+
+def check_auth_config():
+    """Check authentication configuration."""
+    api_key = os.environ.get('MCP_TOOL_SEARCH_API_KEY')
+    
+    if not api_key:
+        print("❌ API key not set")
+        print("Set environment variable: export MCP_TOOL_SEARCH_API_KEY=your_key")
+        return False
+    
+    if len(api_key) < 16:
+        print("⚠️  API key seems too short")
+        return False
+    
+    # Test key validity
+    import requests
+    headers = {'Authorization': f'Bearer {api_key}'}
+    
+    try:
+        response = requests.get('http://localhost:8000/api/tools/validate', headers=headers)
+        if response.status_code == 200:
+            print("✅ API key is valid")
+            return True
+        elif response.status_code == 401:
+            print("❌ API key is invalid")
+            return False
+        else:
+            print(f"⚠️  Unexpected response: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Error validating API key: {e}")
+        return False
+```
+
+#### 3. Tool Discovery Issues
+
+**Problem**: No tools found or poor search results
+```
+{"success": true, "results": [], "message": "No tools found"}
+```
+
+**Solutions**:
+```python
+async def diagnose_search_issues(query: str):
+    """Diagnose tool search problems."""
+    from tool_search_mcp_tools import search_mcp_tools
+    
+    print(f"🔍 Diagnosing search for: '{query}'")
+    
+    # Test different search modes
+    search_modes = ['semantic', 'keyword', 'hybrid']
+    
+    for mode in search_modes:
+        try:
+            results = await search_mcp_tools(
+                query=query,
+                search_mode=mode,
+                max_results=5
+            )
+            
+            if results['success']:
+                count = len(results['results'])
+                print(f"  {mode}: {count} results")
+                
+                if count == 0:
+                    # Try broader search
+                    broad_results = await search_mcp_tools(
+                        query=query.split()[0],  # First word only
+                        search_mode=mode,
+                        max_results=5
+                    )
+                    if broad_results['success'] and broad_results['results']:
+                        print(f"    Broader search found {len(broad_results['results'])} results")
+            else:
+                print(f"  {mode}: ERROR - {results.get('error', 'Unknown')}")
+                
+        except Exception as e:
+            print(f"  {mode}: EXCEPTION - {e}")
+    
+    # Check catalog status
+    try:
+        catalog_info = await search_mcp_tools(query="*", max_results=1)
+        if catalog_info['success']:
+            total = catalog_info.get('total_results', 0)
+            print(f"📊 Total tools in catalog: {total}")
+            
+            if total == 0:
+                print("❌ Tool catalog is empty - check indexing")
+            elif total < 10:
+                print("⚠️  Tool catalog seems small - may need re-indexing")
+        
+    except Exception as e:
+        print(f"❌ Could not check catalog status: {e}")
+
+# Usage
+await diagnose_search_issues("file operations")
+```
+
+#### 4. Performance Issues
+
+**Problem**: Slow search responses
+```
+Search taking >5 seconds, timeouts occurring
+```
+
+**Solutions**:
+```python
+import time
+import asyncio
+
+class PerformanceDiagnostic:
+    """Diagnose and optimize performance issues."""
+    
+    async def run_performance_tests(self):
+        """Run comprehensive performance tests."""
+        
+        # Test different query complexities
+        test_queries = [
+            "read",  # Simple
+            "file operations",  # Medium
+            "complex data processing with error handling and logging"  # Complex
+        ]
+        
+        results = {}
+        
+        for query in test_queries:
+            print(f"Testing query: '{query}'")
+            
+            # Measure search time
+            start_time = time.time()
+            
+            try:
+                search_result = await search_mcp_tools(
+                    query=query,
+                    max_results=10
+                )
+                
+                end_time = time.time()
+                response_time = end_time - start_time
+                
+                results[query] = {
+                    'response_time': response_time,
+                    'success': search_result['success'],
+                    'result_count': len(search_result.get('results', []))
+                }
+                
+                # Performance assessment
+                if response_time < 0.5:
+                    status = "✅ Excellent"
+                elif response_time < 1.0:
+                    status = "🟡 Good"
+                elif response_time < 2.0:
+                    status = "⚠️  Acceptable"
+                else:
+                    status = "❌ Poor"
+                
+                print(f"  Response time: {response_time:.3f}s - {status}")
+                
+            except asyncio.TimeoutError:
+                print(f"  ⏱️  TIMEOUT")
+                results[query] = {'timeout': True}
+            except Exception as e:
+                print(f"  ❌ ERROR: {e}")
+                results[query] = {'error': str(e)}
+        
+        return results
+    
+    def recommend_optimizations(self, results: dict):
+        """Recommend performance optimizations."""
+        print("\n🔧 Performance Optimization Recommendations:")
+        
+        slow_queries = [q for q, r in results.items() 
+                       if r.get('response_time', 0) > 1.0]
+        
+        if slow_queries:
+            print("• Enable result caching:")
+            print("  export TOOL_SEARCH_CACHE_ENABLED=true")
+            print("  export TOOL_SEARCH_CACHE_SIZE=1000")
+            
+            print("• Reduce max_results for faster searches:")
+            print("  Use max_results=5 instead of 10+ for interactive use")
+            
+            print("• Use simpler search modes for speed:")
+            print("  search_mode='keyword' for exact matches")
+            print("  search_mode='hybrid' for balanced performance")
+        
+        timeouts = [q for q, r in results.items() if r.get('timeout')]
+        if timeouts:
+            print("• Increase timeout values:")
+            print("  export TOOL_SEARCH_TIMEOUT=30")
+        
+        errors = [q for q, r in results.items() if r.get('error')]
+        if errors:
+            print("• Check system resources:")
+            print("  Monitor CPU and memory usage during searches")
+            print("  Consider scaling to multiple instances")
+
+# Usage
+diagnostic = PerformanceDiagnostic()
+perf_results = await diagnostic.run_performance_tests()
+diagnostic.recommend_optimizations(perf_results)
+```
+
+### Integration Testing
+
+#### Automated Integration Tests
+
+```python
+import pytest
+import asyncio
+from tool_search_mcp_tools import search_mcp_tools, recommend_tools_for_task
+
+class TestToolSearchIntegration:
+    """Comprehensive integration tests."""
+    
+    @pytest.mark.asyncio
+    async def test_basic_search_functionality(self):
+        """Test basic search operations."""
+        
+        # Test successful search
+        result = await search_mcp_tools("file operations", max_results=5)
+        
+        assert result['success'] is True
+        assert isinstance(result['results'], list)
+        assert len(result['results']) <= 5
+        
+        # Verify result structure
+        if result['results']:
+            tool = result['results'][0]
+            required_fields = ['tool_id', 'name', 'description', 'similarity_score']
+            
+            for field in required_fields:
+                assert field in tool, f"Missing field: {field}"
+    
+    @pytest.mark.asyncio
+    async def test_error_handling(self):
+        """Test error handling scenarios."""
+        
+        # Test empty query
+        result = await search_mcp_tools("", max_results=5)
+        
+        # Should handle gracefully
+        assert 'success' in result
+        if not result['success']:
+            assert 'error' in result
+    
+    @pytest.mark.asyncio
+    async def test_recommendation_system(self):
+        """Test recommendation functionality."""
+        
+        result = await recommend_tools_for_task(
+            "process CSV files",
+            context="performance critical",
+            max_recommendations=3
+        )
+        
+        assert result['success'] is True
+        assert 'recommendations' in result
+        assert len(result['recommendations']) <= 3
+    
+    @pytest.mark.asyncio  
+    async def test_search_modes(self):
+        """Test different search modes."""
+        
+        query = "web scraping"
+        modes = ['semantic', 'keyword', 'hybrid']
+        
+        for mode in modes:
+            result = await search_mcp_tools(
+                query=query,
+                search_mode=mode,
+                max_results=3
+            )
+            
+            # All modes should work
+            assert result['success'] is True, f"Search mode {mode} failed"
+    
+    def test_concurrent_searches(self):
+        """Test system under concurrent load."""
+        
+        async def concurrent_test():
+            tasks = []
+            
+            for i in range(10):
+                task = search_mcp_tools(f"test query {i}", max_results=3)
+                tasks.append(task)
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Count successful vs failed requests
+            successes = sum(1 for r in results 
+                          if isinstance(r, dict) and r.get('success'))
+            
+            # At least 80% should succeed under load
+            assert successes >= 8, f"Only {successes}/10 requests succeeded"
+        
+        asyncio.run(concurrent_test())
+
+# Run tests
+# pytest test_integration.py -v --asyncio-mode=auto
+```
+
+## Advanced Integration Patterns
+
+### 1. Intelligent Tool Chains
+
+```python
+class IntelligentToolChain:
+    """Build and execute intelligent tool chains."""
+    
+    def __init__(self):
+        self.execution_history = []
+        self.context_memory = {}
+    
+    async def build_adaptive_chain(self, goal: str, context: dict = None):
+        """Build a tool chain that adapts based on execution results."""
+        
+        # Start with initial recommendations
+        initial_recs = await recommend_tools_for_task(
+            goal,
+            context=self._format_context(context),
+            max_recommendations=3
+        )
+        
+        if not initial_recs['success']:
+            raise ValueError("Could not get initial tool recommendations")
+        
+        # Build adaptive chain
+        chain = []
+        current_context = context or {}
+        
+        for step, rec in enumerate(initial_recs['recommendations']):
+            tool_id = rec['tool']['tool_id']
+            
+            # Add context-aware configuration
+            tool_config = {
+                'tool_id': tool_id,
+                'step': step,
+                'context': current_context.copy(),
+                'fallbacks': self._get_fallback_tools(rec),
+                'success_criteria': self._define_success_criteria(rec, goal)
+            }
+            
+            chain.append(tool_config)
+            
+            # Update context for next step
+            current_context.update({
+                'previous_tool': tool_id,
+                'chain_progress': f"{step + 1}/{len(initial_recs['recommendations'])}"
+            })
+        
+        return chain
+    
+    async def execute_chain(self, chain: list):
+        """Execute tool chain with adaptive error recovery."""
+        
+        results = []
+        context = {}
+        
+        for step_config in chain:
+            step_result = await self._execute_step_with_recovery(step_config, context)
+            results.append(step_result)
+            
+            # Update context with step results
+            if step_result['success']:
+                context.update(step_result.get('context_updates', {}))
+            else:
+                # Handle step failure
+                recovery_result = await self._handle_step_failure(
+                    step_config, step_result, context
+                )
+                
+                if recovery_result['recovered']:
+                    results[-1] = recovery_result['result']
+                    context.update(recovery_result['result'].get('context_updates', {}))
+                else:
+                    # Chain failed - attempt emergency recovery
+                    return await self._emergency_recovery(results, chain, context)
+        
+        return {
+            'success': True,
+            'chain_results': results,
+            'final_context': context,
+            'performance_metrics': self._calculate_metrics(results)
+        }
+    
+    def _format_context(self, context):
+        """Format context for API calls."""
+        if not context:
+            return "default context"
+        
+        context_parts = []
+        for key, value in context.items():
+            context_parts.append(f"{key}: {value}")
+        
+        return ", ".join(context_parts)
+    
+    def _get_fallback_tools(self, recommendation):
+        """Get fallback tools for a recommendation."""
+        return recommendation.get('alternative_tools', [])[:2]  # Top 2 alternatives
+    
+    def _define_success_criteria(self, recommendation, goal):
+        """Define success criteria for a tool execution."""
+        return {
+            'min_confidence': 0.7,
+            'max_execution_time': 30.0,
+            'required_output_fields': ['success', 'result']
+        }
+
+# Usage Example
+chain_builder = IntelligentToolChain()
+
+# Build chain for complex task
+chain = await chain_builder.build_adaptive_chain(
+    "Deploy web application with monitoring and backup",
+    context={
+        'environment': 'production',
+        'priority': 'high_availability',
+        'constraints': ['security_compliance', 'performance_monitoring']
+    }
+)
+
+# Execute with adaptive recovery
+result = await chain_builder.execute_chain(chain)
+print(f"Chain execution: {'✅ Success' if result['success'] else '❌ Failed'}")
+```
+
+### 2. Context-Aware Tool Selection
+
+```python
+class ContextualToolSelector:
+    """Select tools based on rich contextual information."""
+    
+    def __init__(self):
+        self.context_analyzers = [
+            self._analyze_user_expertise,
+            self._analyze_project_constraints,
+            self._analyze_performance_requirements,
+            self._analyze_security_requirements,
+            self._analyze_integration_context
+        ]
+    
+    async def select_optimal_tools(self, task: str, context: dict):
+        """Select optimal tools using comprehensive context analysis."""
+        
+        # Analyze context through multiple lenses
+        enriched_context = await self._enrich_context(context)
+        
+        # Get base recommendations
+        base_recs = await recommend_tools_for_task(
+            task,
+            context=self._format_context(enriched_context),
+            max_recommendations=10
+        )
+        
+        if not base_recs['success']:
+            return base_recs
+        
+        # Apply contextual scoring
+        scored_tools = []
+        
+        for rec in base_recs['recommendations']:
+            contextual_score = await self._calculate_contextual_score(
+                rec, enriched_context, task
+            )
+            
+            enhanced_rec = rec.copy()
+            enhanced_rec['contextual_score'] = contextual_score
+            enhanced_rec['final_score'] = (
+                rec['recommendation_score'] * 0.6 + 
+                contextual_score * 0.4
+            )
+            
+            scored_tools.append(enhanced_rec)
+        
+        # Re-rank by contextual score
+        scored_tools.sort(key=lambda x: x['final_score'], reverse=True)
+        
+        return {
+            'success': True,
+            'recommendations': scored_tools[:5],
+            'context_analysis': enriched_context,
+            'selection_reasoning': self._explain_selection(scored_tools[:3], enriched_context)
+        }
+    
+    async def _enrich_context(self, base_context: dict):
+        """Enrich context with additional analysis."""
+        enriched = base_context.copy()
+        
+        for analyzer in self.context_analyzers:
+            analysis_result = await analyzer(base_context)
+            enriched.update(analysis_result)
+        
+        return enriched
+    
+    async def _analyze_user_expertise(self, context: dict):
+        """Analyze user expertise level."""
+        expertise_indicators = {
+            'beginner': ['new to', 'learning', 'first time', 'help'],
+            'intermediate': ['familiar with', 'some experience', 'usually'],
+            'expert': ['optimize', 'performance', 'advanced', 'complex']
+        }
+        
+        # Analyze context text for expertise clues
+        context_text = str(context).lower()
+        
+        expertise_scores = {}
+        for level, indicators in expertise_indicators.items():
+            score = sum(1 for indicator in indicators if indicator in context_text)
+            expertise_scores[level] = score
+        
+        # Determine most likely expertise level
+        likely_expertise = max(expertise_scores, key=expertise_scores.get)
+        
+        return {
+            'user_expertise': likely_expertise,
+            'expertise_confidence': expertise_scores[likely_expertise] / 4.0,
+            'preferences': {
+                'beginner': {'prioritize': 'safety', 'avoid': 'complexity'},
+                'intermediate': {'prioritize': 'efficiency', 'balance': 'features'},
+                'expert': {'prioritize': 'power', 'accept': 'complexity'}
+            }.get(likely_expertise, {})
+        }
+
+# Usage Example
+selector = ContextualToolSelector()
+
+# Rich context for tool selection
+context = {
+    'user_message': "I'm new to deployment but need to deploy this critical application quickly",
+    'project_type': 'web_application',
+    'environment': 'production',
+    'constraints': ['time_sensitive', 'reliability_critical'],
+    'team_size': 3,
+    'experience_level': 'mixed'
+}
+
+# Get contextually optimized tool recommendations
+recommendations = await selector.select_optimal_tools(
+    "Deploy web application with monitoring", 
+    context
+)
+
+if recommendations['success']:
+    print("🎯 Contextually optimized recommendations:")
+    for i, rec in enumerate(recommendations['recommendations'][:3], 1):
+        print(f"{i}. {rec['tool']['name']} (score: {rec['final_score']:.3f})")
+        print(f"   Context fit: {rec['contextual_score']:.3f}")
+        print(f"   Why: {rec['recommendation_reasons'][0]}")
+```
+
+This comprehensive integration guide provides complete patterns for integrating the MCP Tool Search System with various clients, IDEs, and applications while addressing common issues and providing advanced capabilities.

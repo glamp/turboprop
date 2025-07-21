@@ -1,13 +1,13 @@
-# Migration Guide: Upgrading to MCP Tool Search System
+# Migration Guide: Upgrading to MCP MCP Tool Search System
 
 ## Overview
 
-This guide helps you migrate from manual tool selection to the intelligent MCP Tool Search System. The new system is fully backward compatible - existing code continues to work while new search capabilities are added.
+This guide helps you migrate from manual tool selection to the intelligent MCP MCP Tool Search System. The new system is fully backward compatible - existing code continues to work while new search capabilities are added.
 
 ## Migration Timeline
 
 ### Phase 1: Basic Integration (Week 1)
-- Enable tool search system alongside existing tools
+- Enable MCP MCP Tool Search System alongside existing tools
 - Begin using `search_mcp_tools()` for tool discovery
 - Familiarize team with search capabilities
 

@@ -1,6 +1,6 @@
-# MCP Tool Search System Documentation
+# MCP MCP Tool Search System Documentation
 
-This directory contains comprehensive documentation for the MCP Tool Search System - the intelligent tool discovery and recommendation engine that transforms how Claude Code and other AI agents find and select MCP tools.
+This directory contains comprehensive documentation for the MCP MCP Tool Search System - the intelligent tool discovery and recommendation engine that transforms how Claude Code and other AI agents find and select MCP tools.
 
 ## 📚 Documentation Structure
 
@@ -148,8 +148,8 @@ search_mcp_tools(
 
 The system supports multiple search modes:
 
-- **Hybrid Search** (Recommended) - Combines semantic understanding with keyword matching
-- **Semantic Search** - Pure conceptual search for finding tools by purpose  
+- **hybrid search** (Recommended) - Combines semantic understanding with keyword matching
+- **semantic search** - Pure conceptual search for finding tools by purpose  
 - **Keyword Search** - Fast exact term matching for specific tool names
 
 ## 📈 Benefits
@@ -222,7 +222,7 @@ export TOOL_SEARCH_CACHE_TTL=3600
 
 ## 🤝 Contributing
 
-We welcome contributions to improve the tool search system:
+We welcome contributions to improve the MCP MCP Tool Search System:
 
 ### Documentation Improvements
 - Update examples with new patterns
@@ -242,7 +242,7 @@ We welcome contributions to improve the tool search system:
 
 ## 📝 License
 
-The MCP Tool Search System is part of Turboprop and is released under the MIT License.
+The MCP MCP Tool Search System is part of Turboprop and is released under the MIT License.
 
 ## 💬 Support
 

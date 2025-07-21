@@ -2,6 +2,36 @@
 
 This document provides comprehensive documentation of all data structures used in the MCP Tool Search System, including request/response formats, internal data models, and configuration schemas.
 
+## Table of Contents
+
+### Core Data Structures
+- [Request Data Structures](#request-data-structures)
+  - [SearchRequest](#searchrequest)
+  - [RecommendationRequest](#recommendationrequest)
+  - [ComparisonRequest](#comparisonrequest)
+- [Response Data Structures](#response-data-structures)
+  - [SearchResponse](#searchresponse)
+  - [RecommendationResponse](#recommendationresponse)
+  - [ComparisonResponse](#comparisonresponse)
+
+### System Data Structures
+- [Internal Data Structures](#internal-data-structures)
+  - [ToolMetadata](#toolmetadata)
+  - [ParameterDefinition](#parameterdefinition)
+  - [ToolExample](#toolexample)
+  - [UsageStatistics](#usagestatistics)
+- [Configuration Data Structures](#configuration-data-structures)
+  - [SearchConfiguration](#searchconfiguration)
+- [Error Data Structures](#error-data-structures)
+  - [ErrorDetail](#errordetail)
+
+### Validation and Flow
+- [Validation Schemas](#validation-schemas)
+  - [Request Validation](#request-validation)
+- [Data Flow Diagrams](#data-flow-diagrams)
+
+---
+
 ## Request Data Structures
 
 ### SearchRequest

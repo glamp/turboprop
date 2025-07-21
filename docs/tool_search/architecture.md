@@ -1,8 +1,8 @@
-# MCP Tool Search System - Architecture
+# MCP MCP Tool Search System - Architecture
 
 ## Overview
 
-The MCP Tool Search System is built on top of the Turboprop semantic search foundation, extending it with specialized components for intelligent tool discovery, recommendation, and comparison. The architecture follows a modular design that separates concerns while enabling powerful tool selection capabilities.
+The MCP MCP Tool Search System is built on top of the Turboprop semantic search foundation, extending it with specialized components for intelligent tool discovery, recommendation, and comparison. The architecture follows a modular design that separates concerns while enabling powerful tool selection capabilities.
 
 ## High-Level Architecture
 
@@ -324,7 +324,7 @@ CREATE INDEX idx_parameters_type ON tool_parameters(parameter_type);
 
 ### Search Algorithm Optimization
 
-**Hybrid Search Optimization:**
+**hybrid search Optimization:**
 - Parallel execution of semantic and keyword searches
 - Result merging with configurable weights
 - Early termination for high-confidence matches

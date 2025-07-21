@@ -2,6 +2,46 @@
 
 This document provides detailed technical documentation of the search algorithms used in the MCP Tool Search System, including implementation details, performance characteristics, and optimization strategies.
 
+## Table of Contents
+
+### Core Algorithms
+- [Algorithm Overview](#algorithm-overview)
+  - [Search Algorithm Hierarchy](#search-algorithm-hierarchy)
+- [Semantic Search Algorithm](#semantic-search-algorithm)
+  - [Implementation Details](#implementation-details)
+    - [Embedding Generation](#embedding-generation)
+    - [Vector Similarity Search](#vector-similarity-search)
+    - [Performance Characteristics](#performance-characteristics)
+  - [Advantages and Limitations](#advantages-and-limitations)
+- [Keyword Search Algorithm](#keyword-search-algorithm)
+  - [Implementation Details](#implementation-details-1)
+    - [BM25 Implementation](#bm25-implementation)
+    - [Enhanced Keyword Matching](#enhanced-keyword-matching)
+  - [Performance Optimization](#performance-optimization)
+- [Hybrid Search Algorithm](#hybrid-search-algorithm)
+  - [Reciprocal Rank Fusion (RRF)](#reciprocal-rank-fusion-rrf)
+  - [Adaptive Weight Adjustment](#adaptive-weight-adjustment)
+
+### Advanced Algorithms
+- [Domain-Specific Search Algorithms](#domain-specific-search-algorithms)
+  - [Technical Domain Enhancement](#technical-domain-enhancement)
+  - [Context-Aware Ranking](#context-aware-ranking)
+
+### Optimization and Performance
+- [Performance Optimization Strategies](#performance-optimization-strategies)
+  - [Caching Architecture](#caching-architecture)
+  - [Database Query Optimization](#database-query-optimization)
+  - [Parallel Processing](#parallel-processing)
+
+### Algorithm Selection and Metrics
+- [Algorithm Selection Strategy](#algorithm-selection-strategy)
+  - [Automatic Algorithm Selection](#automatic-algorithm-selection)
+- [Algorithm Performance Metrics](#algorithm-performance-metrics)
+  - [Evaluation Metrics](#evaluation-metrics)
+  - [Performance Benchmarking](#performance-benchmarking)
+
+---
+
 ## Algorithm Overview
 
 The MCP Tool Search System implements multiple search algorithms that can be used independently or in combination to provide optimal tool discovery capabilities.
@@ -10,7 +50,7 @@ The MCP Tool Search System implements multiple search algorithms that can be use
 
 ```
 Search Algorithms
-├── Semantic Search
+├── semantic search
 │   ├── Dense Vector Search
 │   ├── Sentence Transformer Embeddings
 │   └── Cosine Similarity Ranking
@@ -18,7 +58,7 @@ Search Algorithms
 │   ├── TF-IDF Scoring
 │   ├── BM25 Relevance
 │   └── Fuzzy String Matching
-├── Hybrid Search
+├── hybrid search
 │   ├── Reciprocal Rank Fusion (RRF)
 │   ├── Weighted Score Combination
 │   └── Adaptive Weight Adjustment
@@ -28,7 +68,7 @@ Search Algorithms
     └── Learning-Enhanced Search
 ```
 
-## Semantic Search Algorithm
+## semantic search Algorithm
 
 ### Implementation Details
 
@@ -211,7 +251,7 @@ class KeywordIndex:
         self.avg_doc_length = sum(self.tool_lengths.values()) / self.total_docs
 ```
 
-## Hybrid Search Algorithm
+## hybrid search Algorithm
 
 ### Reciprocal Rank Fusion (RRF)
 

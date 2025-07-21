@@ -1,4 +1,4 @@
-# MCP Tool Search System - API Reference
+# MCP MCP Tool Search System - API Reference
 
 ## Core MCP Tools
 

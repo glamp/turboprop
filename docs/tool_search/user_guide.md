@@ -53,13 +53,13 @@ get_tool_details("search_code", include_examples=True)
 
 The system supports multiple search strategies optimized for different scenarios:
 
-### Semantic Search
+### semantic search
 Best for: Conceptual queries, finding tools by purpose
 ```python
 search_mcp_tools("tools for data transformation", search_mode="semantic")
 ```
 
-### Hybrid Search (Recommended)
+### hybrid search (Recommended)
 Best for: Most queries, combines semantic understanding with keyword matching
 ```python
 search_mcp_tools("bash shell scripting", search_mode="hybrid")
