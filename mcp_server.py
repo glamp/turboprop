@@ -46,11 +46,15 @@ from config import config
 
 # Search functionality
 from construct_search import ConstructSearchOperations, format_construct_search_results
+
+# Tool engine imports for type hints
+from context_analyzer import ContextAnalyzer
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
 
 # Response types
 from mcp_response_types import IndexResponse, SearchResponse, StatusResponse
+from parameter_search_engine import ParameterSearchEngine
 from search_operations import search_hybrid  # Legacy construct hybrid search
 from search_operations import search_with_hybrid_fusion  # New semantic+text hybrid search
 from search_operations import (
@@ -58,10 +62,6 @@ from search_operations import (
     search_with_comprehensive_response,
     search_with_intelligent_routing,
 )
-
-# Tool engine imports for type hints
-from context_analyzer import ContextAnalyzer
-from parameter_search_engine import ParameterSearchEngine
 from tool_comparison_engine import ToolComparisonEngine
 from tool_recommendation_engine import ToolRecommendationEngine
 

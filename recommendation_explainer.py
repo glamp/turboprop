@@ -119,7 +119,7 @@ class ExplanationGenerator:
         missing = required_set - tool_set
 
         if match_score >= self.capability_thresholds["excellent"]:
-            common_caps = ', '.join(list(common)[:3])
+            common_caps = ", ".join(list(common)[:3])
             return f"Excellent capability match - tool provides {len(common)}/{len(required_set)} required capabilities including {common_caps}."
         elif match_score >= self.capability_thresholds["good"]:
             match_ratio = f"{len(common)}/{len(required_set)}"
@@ -130,7 +130,7 @@ class ExplanationGenerator:
             return f"Adequate capability match - tool provides {match_ratio} required capabilities{missing_str}."
         else:
             match_ratio = f"{len(common)}/{len(required_set)}"
-            missing_features = ', '.join(list(missing)[:3])
+            missing_features = ", ".join(list(missing)[:3])
             return f"Limited capability match - tool provides only {match_ratio} required capabilities. Missing key features: {missing_features}."
 
     def generate_complexity_explanation(
@@ -156,15 +156,9 @@ class ExplanationGenerator:
                 f"for a {task_desc} task, but offers room to grow."
             )
         elif task_complexity in ["moderate", "complex"] and tool_complexity == "simple":
-            return (
-                f"Tool may be too simple - {tool_desc} tool for a {task_desc} task "
-                "may lack advanced features."
-            )
+            return f"Tool may be too simple - {tool_desc} tool for a {task_desc} task " "may lack advanced features."
         else:
-            return (
-                f"Complexity mismatch - task requires {task_complexity} approach "
-                f"but tool is {tool_complexity}."
-            )
+            return f"Complexity mismatch - task requires {task_complexity} approach " f"but tool is {tool_complexity}."
 
     def generate_parameter_explanation(self, tool_parameters: Dict[str, Any], task_requirements: Dict[str, Any]) -> str:
         """Generate explanation for parameter compatibility."""

@@ -419,9 +419,7 @@ def validate_tool_metadata(tool_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
             errors.append("Embedding must be a list of numbers")
         elif len(tool_data["embedding"]) != EmbeddingConfig.DIMENSIONS:
             embedding_len = len(tool_data["embedding"])
-            errors.append(
-                f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {embedding_len}"
-            )
+            errors.append(f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {embedding_len}")
 
     # Validate JSON fields
     if "metadata_json" in tool_data and tool_data["metadata_json"]:
@@ -472,8 +470,6 @@ def validate_parameter_metadata(param_data: Dict[str, Any]) -> Tuple[bool, List[
             errors.append("Embedding must be a list of numbers")
         elif len(param_data["embedding"]) != EmbeddingConfig.DIMENSIONS:
             embedding_len = len(param_data["embedding"])
-            errors.append(
-                f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {embedding_len}"
-            )
+            errors.append(f"Embedding must have exactly {EmbeddingConfig.DIMENSIONS} dimensions, got {embedding_len}")
 
     return len(errors) == 0, errors

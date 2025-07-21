@@ -19,7 +19,7 @@ from typing import List, Optional, Union
 from config import config
 from database_manager import DatabaseManager
 from embedding_helper import EmbeddingGenerator
-from search_result_types import CodeSearchResult
+from search_result_types import CodeSearchResult, _ensure_float
 from search_utils import create_enhanced_snippet, extract_file_metadata, search_index_enhanced
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,12 @@ class HybridSearchResult:
     text_rank: int = -1
     fusion_method: str = "unknown"
     match_type: str = "hybrid"  # semantic, text, hybrid
+
+    def __post_init__(self):
+        """Ensure all score values are converted from Decimal to float for consistency."""
+        self.semantic_score = _ensure_float(self.semantic_score)
+        self.text_score = _ensure_float(self.text_score)
+        self.fusion_score = _ensure_float(self.fusion_score)
 
 
 class QueryAnalyzer:

@@ -668,9 +668,7 @@ class TestRegressionBenchmarks:
                     current_metrics["indexing_time"] <= baseline["indexing_time"] * 1.2
                 ), f"Indexing time regression: {current_metrics['indexing_time']} > {baseline['indexing_time']} * 1.2"
 
-                assert (
-                    current_metrics["files_per_second"] >= baseline["files_per_second"] * 0.8
-                ), (
+                assert current_metrics["files_per_second"] >= baseline["files_per_second"] * 0.8, (
                     f"Indexing rate regression: {current_metrics['files_per_second']} < "
                     f"{baseline['files_per_second']} * 0.8"
                 )

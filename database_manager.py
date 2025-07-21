@@ -201,17 +201,18 @@ class DatabaseManager:
         connection_timeout: Optional[float] = None,
         lock_timeout: Optional[float] = None,
     ) -> None:
-        self.db_path = db_path
+        # Ensure db_path is a Path object
+        self.db_path = Path(db_path) if not isinstance(db_path, Path) else db_path
         self.max_retries = max_retries or config.database.MAX_RETRIES
         self.retry_delay = retry_delay or config.database.RETRY_DELAY
         self.lock_timeout = lock_timeout or config.database.LOCK_TIMEOUT
         self._lock = threading.RLock()
         self._file_lock: Optional[TextIO] = None
-        self._lock_file_path = db_path.with_suffix(".lock")
+        self._lock_file_path = self.db_path.with_suffix(".lock")
 
         # Use ConnectionManager for connection handling
         self.connection_timeout = connection_timeout or config.database.CONNECTION_TIMEOUT
-        self._connection_manager = ConnectionManager(db_path, self.connection_timeout)
+        self._connection_manager = ConnectionManager(self.db_path, self.connection_timeout)
 
         # Register cleanup handlers only in main thread
         try:
@@ -778,27 +779,32 @@ class DatabaseManager:
         """
         try:
             with self.get_connection() as conn:
+                # First, check if alternative FTS table exists
+                fts_table_name = f"{table_name}_fts"
+                try:
+                    conn.execute(f"SELECT COUNT(*) FROM {fts_table_name} LIMIT 1")
+                    logger.debug(f"Alternative FTS table available for {table_name}")
+                    return True
+                except Exception:
+                    # Alternative FTS table doesn't exist, try DuckDB FTS schema
+                    pass
+
                 # Test if DuckDB FTS schema exists and is functional
                 fts_schema = f"fts_main_{table_name}"
                 try:
-                    # Check if FTS schema exists
-                    conn.execute(
-                        f"SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{fts_schema}'"
-                    ).fetchone()
-
-                    # Test match_bm25 function with a simple query
+                    # Try to use match_bm25 function
                     conn.execute(f"SELECT {fts_schema}.match_bm25('{table_name}', 'test') LIMIT 1")
                     logger.debug(f"DuckDB FTS is available for table {table_name}")
                     return True
                 except Exception:
-                    # Fallback: check if alternative FTS table exists
-                    fts_table_name = f"{table_name}_fts"
-                    conn.execute(f"SELECT * FROM {fts_table_name} LIMIT 1")
-                    logger.debug(f"Alternative FTS table available for {table_name}")
-                    return True
+                    # FTS schema/function not available
+                    pass
+
         except Exception:
-            logger.debug(f"FTS not available for table {table_name}")
-            return False
+            pass
+
+        logger.debug(f"FTS not available for table {table_name}")
+        return False
 
     def _execute_fts_search_duckdb(
         self, conn: duckdb.DuckDBPyConnection, query: str, limit: int, table_name: str = "code_files"
@@ -863,13 +869,13 @@ class DatabaseManager:
         alt_fts_query = f"""
         SELECT id, path, content,
                CASE
-                   WHEN content_lower LIKE ? THEN 1.0
-                   WHEN path_lower LIKE ? THEN 0.8
-                   WHEN content_lower LIKE ? THEN 0.6
+                   WHEN LOWER(content) LIKE ? THEN 1.0
+                   WHEN LOWER(path) LIKE ? THEN 0.8
+                   WHEN LOWER(content) LIKE ? THEN 0.6
                    ELSE 0.4
                END as fts_score
         FROM {fts_table_name}
-        WHERE content_lower LIKE ? OR path_lower LIKE ? OR content_lower LIKE ?
+        WHERE LOWER(content) LIKE ? OR LOWER(path) LIKE ? OR LOWER(content) LIKE ?
         ORDER BY fts_score DESC
         LIMIT ?
         """
