@@ -92,6 +92,92 @@ export TURBOPROP_RRF_K=80
 echo '{"search": {"mode": "hybrid", "max_results": 15}}' > .turboprop/config.json
 ```
 
+## 🧠 MCP Tool Search System
+
+Turboprop now includes an advanced **MCP Tool Search System** that revolutionizes how Claude Code and other AI agents discover and select tools. Instead of manually knowing which tools exist, you can now use natural language to intelligently find, compare, and get recommendations for the optimal tools for any development task.
+
+### 🔍 Key Capabilities
+
+**🔍 Natural Language Tool Discovery**
+```bash
+# Find tools by functionality
+search_mcp_tools("read configuration files safely")
+search_mcp_tools("execute shell commands with timeout support")
+search_mcp_tools("web scraping tools for JSON APIs")
+```
+
+**🎯 Intelligent Tool Recommendations**
+```bash
+# Get personalized recommendations based on task context
+recommend_tools_for_task(
+    "process CSV files and generate reports",
+    context="performance critical, large files",
+    complexity_preference="balanced"
+)
+```
+
+**⚖️ Tool Comparison & Decision Support**
+```bash
+# Compare multiple tools to understand trade-offs
+compare_mcp_tools(["read", "write", "edit"])
+find_tool_alternatives("bash", context_filter="beginner-friendly")
+```
+
+### 🎯 Search Strategies
+
+The system supports multiple search modes optimized for different scenarios:
+
+- **Hybrid Search** (Recommended) - Combines semantic understanding with keyword matching
+- **Semantic Search** - Pure conceptual search for finding tools by purpose
+- **Keyword Search** - Fast exact term matching for specific tool names
+
+### 🧪 Claude Code Integration
+
+With the tool search system, Claude Code becomes dramatically more effective:
+
+```
+🔍 Tool Search Suggestion: For this file processing task, consider using 'read' 
+instead of 'bash cat' for better error handling and parameter validation.
+
+Confidence: High (0.91)
+Reasoning: Direct file reading, built-in error handling, type safety
+```
+
+Claude Code can now:
+- **Proactively suggest** optimal tools during conversations
+- **Context-aware selection** based on your specific requirements
+- **Learn from patterns** to improve future recommendations
+- **Explain reasoning** behind tool choices
+
+### 📚 Complete Documentation
+
+The tool search system includes comprehensive documentation:
+
+- **[User Guide](docs/tool_search/user_guide.md)** - Master tool discovery with examples and best practices
+- **[API Reference](docs/tool_search/api_reference.md)** - Complete technical documentation for all search tools
+- **[Migration Guide](docs/tool_search/migration_guide.md)** - Step-by-step upgrade from manual to intelligent tool selection
+- **[Integration Guide](docs/tool_search/integration_guide.md)** - Claude Code, MCP client, and IDE integration patterns
+- **[Architecture Documentation](docs/tool_search/architecture.md)** - System design and extension guidelines
+
+### 🚀 Getting Started with Tool Search
+
+The tool search system activates automatically with Claude Code. Try these enhanced prompts:
+
+**Tool Discovery:**
+- "What tools are available for processing JSON data?"
+- "Find tools that can execute shell commands safely"
+- "Search for web scraping tools with error handling"
+
+**Task-Based Recommendations:**
+- "What's the best tool for reading large configuration files?"
+- "Recommend tools for automating deployment tasks"
+- "I need to parse CSV files - what should I use?"
+
+**Tool Comparison:**
+- "Compare the 'read' and 'bash' tools for file operations"
+- "What are the alternatives to the 'write' tool?"
+- "Help me choose between different web request tools"
+
 ## 🚀 Quick Start with Claude Code
 
 ### MCP Installation
