@@ -7,13 +7,27 @@ Find code by describing what it does, not just what it's called. Perfect for exp
 ## Quickstart
 
 ### With Claude Code (Recommended)
-Add to your Claude Code MCP configuration:
+
+**Option 1: Default stdio transport (recommended for local development)**
 ```json
 {
   "mcpServers": {
     "turboprop": {
       "command": "uvx",
       "args": ["turboprop@latest", "mcp", "--repository", ".", "--auto-index"],
+      "env": {}
+    }
+  }
+}
+```
+
+**Option 2: HTTP transport (for server deployments)**
+```json
+{
+  "mcpServers": {
+    "turboprop": {
+      "command": "uvx", 
+      "args": ["turboprop@latest", "mcp", "--transport", "http", "--host", "0.0.0.0", "--port", "8080", "--repository", "."],
       "env": {}
     }
   }
@@ -35,6 +49,24 @@ uvx turboprop search "JWT authentication middleware"
 uvx turboprop search "database connection setup"
 uvx turboprop search "error handling patterns"
 ```
+
+### Standalone HTTP Server
+```bash
+# Start HTTP server with all MCP tools exposed as REST API
+uvx turboprop@latest server
+
+# Custom host and port
+uvx turboprop@latest server --host 0.0.0.0 --port 9000
+
+# Index specific repository
+uvx turboprop@latest server --repository /path/to/repo
+
+# Server with custom settings
+uvx turboprop@latest server --repository . --max-mb 2.0 --no-auto-index
+```
+
+The HTTP server exposes all MCP functionality via REST endpoints at `/mcp/*`. 
+Visit `http://localhost:8080/docs` for interactive API documentation.
 
 ## Features
 
@@ -125,6 +157,16 @@ turboprop search "query" --k 10       # Get 10 results
 
 # Live updates
 turboprop watch .                     # Monitor for file changes
+
+# HTTP Server
+turboprop server                      # Start HTTP server on localhost:8080
+turboprop server --host 0.0.0.0 --port 9000  # Custom host and port
+turboprop server --repository /path   # Serve specific repository
+
+# MCP Server (for Claude Code integration)
+turboprop mcp --repository .          # Start MCP server for current directory (stdio)
+turboprop mcp --transport http --host 0.0.0.0 --port 8080  # HTTP transport
+turboprop mcp --transport sse --port 9000                  # SSE transport
 ```
 
 ## Search Query Tips
@@ -147,6 +189,73 @@ turboprop watch .                     # Monitor for file changes
 - "React component state management"
 - "database query optimization"
 - "OAuth2 authorization flow implementation"
+
+## HTTP API Usage
+
+The HTTP server exposes all MCP tools as REST API endpoints, making Turboprop accessible from any programming language or system.
+
+### Key Endpoints
+
+**Core Search & Indexing:**
+- `POST /mcp/search_code` - Semantic code search
+- `POST /mcp/search_code_structured` - Advanced search with JSON metadata
+- `POST /mcp/search_code_hybrid` - Hybrid semantic + keyword search
+- `POST /mcp/index_repository` - Build searchable code index
+- `GET /mcp/index_status` - Check index health
+
+**Construct-Level Search:**
+- `POST /mcp/search_functions` - Find functions by purpose
+- `POST /mcp/search_classes` - Discover classes by functionality
+- `POST /mcp/search_imports` - Search import statements
+
+**Tool Discovery & Management:**
+- `POST /mcp/search_mcp_tools` - Find tools using natural language
+- `POST /mcp/get_tool_details` - Get detailed tool information
+- `POST /mcp/recommend_tools_for_task` - Get intelligent tool recommendations
+
+### Example API Usage
+
+```bash
+# Start the server
+uvx turboprop@latest server
+
+# Search for authentication code
+curl -X POST "http://localhost:8080/mcp/search_code" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "JWT authentication middleware", "max_results": 5}'
+
+# Get index status
+curl "http://localhost:8080/mcp/index_status"
+
+# Search for specific functions
+curl -X POST "http://localhost:8080/mcp/search_functions" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "password validation", "max_results": 3}'
+```
+
+**Interactive API Documentation:** Visit `http://localhost:8080/docs` for full OpenAPI documentation with request/response schemas and a testing interface.
+
+## MCP Transport Options
+
+Turboprop's MCP server supports multiple transport methods for different use cases:
+
+### stdio (Default)
+- **Best for**: Claude Desktop, local development, command-line tools
+- **Usage**: `uvx turboprop@latest mcp --repository .`
+- **Characteristics**: Process-to-process communication via stdin/stdout
+
+### HTTP Transport  
+- **Best for**: Web applications, microservices, server deployments
+- **Usage**: `uvx turboprop@latest mcp --transport http --host 0.0.0.0 --port 8080`
+- **Characteristics**: RESTful HTTP endpoints, easy integration with web services
+- **Access**: Direct HTTP requests to MCP endpoints
+
+### SSE (Server-Sent Events)
+- **Best for**: Streaming web applications, real-time updates
+- **Usage**: `uvx turboprop@latest mcp --transport sse --host 127.0.0.1 --port 9000`
+- **Characteristics**: Persistent streaming connection, server push capabilities
+
+Choose the transport that best fits your deployment architecture and integration needs.
 
 ## Architecture & Technical Details
 

@@ -13,7 +13,10 @@ Tools provided:
 - get_index_status: Check the current state of the code index
 - watch_repository: Start monitoring a repository for changes
 
-The server uses stdio transport for communication with MCP clients.
+The server supports multiple transport options:
+- stdio: Standard input/output (default, for Claude Desktop integration)
+- http: HTTP server for web applications and services
+- sse: Server-Sent Events for streaming web connections
 """
 
 import argparse
@@ -748,7 +751,7 @@ def search_code(query: str, max_results: int = None) -> str:
             formatted_results.append(f"   Preview: {snippet.strip()[:config.file_processing.PREVIEW_LENGTH]}" "...")
 
             # Add IDE navigation URLs for enhanced user experience
-            from ide_integration import get_ide_navigation_urls
+            from .ide_integration import get_ide_navigation_urls
 
             nav_urls = get_ide_navigation_urls(path, 1)  # Use line 1 as default
             if nav_urls:
@@ -2691,14 +2694,27 @@ def parse_args():
     """Parse command-line arguments for MCP server configuration."""
     parser = argparse.ArgumentParser(
         prog="turboprop-mcp",
-        description="Turboprop MCP Server - Semantic code search and indexing",
+        description="Turboprop MCP Server - Semantic code search and indexing with multiple transport options (stdio, HTTP, SSE)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic usage with stdio transport (default)
   turboprop-mcp /path/to/repo                    # Index and watch repository
   turboprop-mcp /path/to/repo --max-mb 2.0       # Allow larger files
   turboprop-mcp /path/to/repo --no-auto-index    # Don't auto-index on startup
-  turboprop-mcp /path/to/repo --no-auto-watch    # Don't auto-watch for changes
+  
+  # HTTP transport for web integration
+  turboprop-mcp --transport http --host 0.0.0.0 --port 9000
+  turboprop-mcp --transport http --repository /path/to/repo
+  
+  # SSE transport for streaming connections
+  turboprop-mcp --transport sse --host 127.0.0.1 --port 8080
+  turboprop-mcp --transport sse --path /custom-sse-path
+  
+Transport Options:
+  stdio   - Standard input/output (default, for Claude Desktop)
+  http    - HTTP server (for web applications and services)
+  sse     - Server-Sent Events (for streaming web connections)
         """,
     )
 
@@ -2762,6 +2778,30 @@ Examples:
         help="Force complete reindexing, ignoring freshness checks",
     )
 
+    # Transport options
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "http"],
+        default="stdio",
+        help="Transport method for MCP communication (default: stdio)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to for HTTP/SSE transport (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind to for HTTP/SSE transport (default: 8080)",
+    )
+    parser.add_argument(
+        "--path",
+        default="/sse",
+        help="Path for SSE endpoint (default: /sse)",
+    )
+
     return parser.parse_args()
 
 
@@ -2791,10 +2831,21 @@ def main():
     _config["auto_watch"] = args.auto_watch
     _config["force_reindex"] = args.force_reindex
 
+    # Store transport configuration
+    _config["transport"] = args.transport
+    _config["host"] = args.host
+    _config["port"] = args.port
+    _config["path"] = args.path
+
     # Print configuration
     print("🚀 Turboprop MCP Server Starting", file=sys.stderr)
     print("=" * 40, file=sys.stderr)
     print(f"🤖 Model: {config.embedding.EMBED_MODEL} ({config.embedding.DIMENSIONS}D)", file=sys.stderr)
+    print(f"🔗 Transport: {_config['transport'].upper()}", file=sys.stderr)
+    if _config["transport"] != "stdio":
+        print(f"🌐 Address: {_config['host']}:{_config['port']}", file=sys.stderr)
+        if _config["transport"] == "sse":
+            print(f"📡 SSE Path: {_config['path']}", file=sys.stderr)
     if _config["repository_path"]:
         print(f"📁 Repository: {_config['repository_path']}", file=sys.stderr)
         print(f"📊 Max file size: {_config['max_file_size_mb']} MB", file=sys.stderr)
@@ -2859,8 +2910,18 @@ def main():
     )
     print("=" * 40, file=sys.stderr)
 
-    # Run the MCP server
-    mcp.run()
+    # Run the MCP server with appropriate transport
+    if _config["transport"] == "stdio":
+        # Default stdio transport
+        mcp.run()
+    elif _config["transport"] == "sse":
+        # Server-Sent Events transport
+        print(f"🚀 Starting SSE server on {_config['host']}:{_config['port']}{_config['path']}", file=sys.stderr)
+        mcp.run(transport="sse", host=_config["host"], port=_config["port"], path=_config["path"])
+    elif _config["transport"] == "http":
+        # Streamable HTTP transport
+        print(f"🚀 Starting HTTP server on {_config['host']}:{_config['port']}", file=sys.stderr)
+        mcp.run(transport="http", host=_config["host"], port=_config["port"])
 
 
 if __name__ == "__main__":

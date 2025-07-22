@@ -1302,6 +1302,69 @@ Examples:
     )
 
 
+def _setup_server_subcommand(sub):
+    """Set up the server subcommand and its arguments."""
+    # 'server' command: Start HTTP server
+    p_s = sub.add_parser(
+        "server",
+        help="🌐 Start HTTP server with MCP tools exposed as REST API",
+        description="""
+Start an HTTP server that exposes all MCP tools as REST API endpoints.
+This allows you to access Turboprop's semantic search and indexing
+capabilities via HTTP requests from any programming language or tool.
+Perfect for integrating with web applications, microservices, or CI/CD pipelines.
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  turboprop server                                 # Start server on localhost:8080
+  turboprop server --host 0.0.0.0 --port 9000     # Custom host and port
+  turboprop server --repository /path/to/repo      # Index specific repository
+
+API Documentation:
+  Visit http://localhost:8080/docs for interactive API documentation
+  MCP tools available at /mcp/* endpoints
+  
+💡 Pro Tip: Use with uvx for easy deployment: uvx turboprop@latest server
+        """,
+    )
+    p_s.add_argument(
+        "--repository",
+        default=".",
+        help="Path to the repository to index and serve (default: current directory)",
+    )
+    p_s.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the server to (default: 127.0.0.1)",
+    )
+    p_s.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to run the server on (default: 8080)",
+    )
+    p_s.add_argument(
+        "--max-mb",
+        type=float,
+        default=1.0,
+        metavar="SIZE",
+        help="Maximum file size in MB to process (default: 1.0)",
+    )
+    p_s.add_argument(
+        "--auto-index",
+        action="store_true",
+        default=True,
+        help="Automatically index the repository on startup (default: True)",
+    )
+    p_s.add_argument(
+        "--no-auto-index",
+        action="store_false",
+        dest="auto_index",
+        help="Don't automatically index the repository on startup",
+    )
+
+
 def setup_argument_parser():
     """Set up the complete argument parser with all subcommands."""
     parser = _setup_base_parser()
@@ -1315,6 +1378,7 @@ def setup_argument_parser():
     _setup_search_subcommand(sub)
     _setup_watch_subcommand(sub)
     _setup_mcp_subcommand(sub)
+    _setup_server_subcommand(sub)
 
     return parser
 
@@ -1508,6 +1572,86 @@ def handle_mcp_command(args):
         return
 
 
+def handle_server_command(args):
+    """Handle the server command logic."""
+    print("\n🌐 Starting HTTP server...")
+    print(f"🏠 Server will run on {args.host}:{args.port}")
+    print(f"📁 Repository: {args.repository}")
+
+    # Import and run the HTTP server with the provided arguments
+    try:
+        from .config import config
+        from .server import main as server_main
+
+        # Set server configuration from args
+        config.server.HOST = args.host
+        config.server.PORT = args.port
+        config.server.WATCH_DIRECTORY = args.repository
+        config.server.WATCH_MAX_FILE_SIZE_MB = args.max_mb
+
+        # Change to the repository directory if specified
+        if args.repository != ".":
+            import os
+
+            original_cwd = os.getcwd()
+            try:
+                repo_path = Path(args.repository).resolve()
+                os.chdir(repo_path)
+                print(f"📂 Changed to repository directory: {repo_path}")
+
+                # Index the repository if requested
+                if args.auto_index:
+                    print("🔄 Auto-indexing repository on startup...")
+                    from .code_index import init_db, reindex_all
+                    from .embedding_helper import EmbeddingGenerator
+
+                    db_manager = init_db(repo_path)
+                    embedder = EmbeddingGenerator(config.embedding.EMBED_MODEL)
+                    max_bytes = int(args.max_mb * 1024**2)
+
+                    try:
+                        total_files, processed_files, elapsed = reindex_all(repo_path, max_bytes, db_manager, embedder)
+                        print(f"✅ Indexed {processed_files} files in {elapsed:.1f}s")
+                    except Exception as e:
+                        print(f"⚠️ Warning: Auto-indexing failed: {e}")
+
+                # Start the server
+                server_main()
+
+            finally:
+                # Restore original working directory
+                os.chdir(original_cwd)
+        else:
+            # Index current directory if requested
+            if args.auto_index:
+                print("🔄 Auto-indexing current directory...")
+                try:
+                    from .code_index import init_db, reindex_all
+                    from .embedding_helper import EmbeddingGenerator
+
+                    repo_path = Path(".").resolve()
+                    db_manager = init_db(repo_path)
+                    embedder = EmbeddingGenerator(config.embedding.EMBED_MODEL)
+                    max_bytes = int(args.max_mb * 1024**2)
+
+                    total_files, processed_files, elapsed = reindex_all(repo_path, max_bytes, db_manager, embedder)
+                    print(f"✅ Indexed {processed_files} files in {elapsed:.1f}s")
+                except Exception as e:
+                    print(f"⚠️ Warning: Auto-indexing failed: {e}")
+
+            # Start the server
+            server_main()
+
+    except ImportError as e:
+        print("❌ HTTP server module not available.")
+        print(f"💡 Import error: {e}")
+        print("Make sure you've installed the server dependencies: pip install turboprop")
+        return
+    except Exception as e:
+        print(f"❌ HTTP server failed to start: {e}")
+        return
+
+
 def main():
     """Main entry point for the code indexing CLI application."""
     parser = setup_argument_parser()
@@ -1532,8 +1676,10 @@ def main():
 
     elif args.cmd == "mcp":
         handle_mcp_command(args)
+    elif args.cmd == "server":
+        handle_server_command(args)
 
-    if args.cmd != "mcp":
+    if args.cmd not in ("mcp", "server"):
         print("\n✨ Done!")
 
 

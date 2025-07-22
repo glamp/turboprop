@@ -27,15 +27,22 @@ This server is particularly useful for:
 import contextlib
 import threading
 from pathlib import Path
+from typing import List, Optional
 
 # Web framework and data validation
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 # Import our core indexing functionality
 from .code_index import init_db, reindex_all, search_index, watch_mode
 from .config import config
 from .embedding_helper import EmbeddingGenerator
+
+# Import MCP tools for HTTP endpoints
+try:
+    from . import mcp_server
+except ImportError:
+    mcp_server = None
 
 # For backward compatibility in server
 DIMENSIONS = config.embedding.DIMENSIONS
@@ -126,6 +133,86 @@ class SearchResponse(BaseModel):
     path: str
     snippet: str
     distance: float
+
+
+# MCP Tool Request/Response Models
+class MCPSearchRequest(BaseModel):
+    """Request model for MCP search tools."""
+
+    query: str
+    max_results: Optional[int] = None
+
+
+class MCPHybridSearchRequest(BaseModel):
+    """Request model for hybrid search tool."""
+
+    query: str
+    search_mode: str = "auto"
+    max_results: Optional[int] = None
+    text_weight: Optional[float] = None
+    semantic_weight: Optional[float] = None
+
+
+class MCPConstructSearchRequest(BaseModel):
+    """Request model for construct-level search tools."""
+
+    query: str
+    max_results: Optional[int] = None
+    include_methods: Optional[bool] = True
+    function_weight: Optional[float] = None
+    class_weight: Optional[float] = None
+    import_weight: Optional[float] = None
+
+
+class MCPToolSearchRequest(BaseModel):
+    """Request model for tool search endpoints."""
+
+    query: Optional[str] = None
+    category: Optional[str] = None
+    max_results: Optional[int] = None
+    include_experimental: Optional[bool] = True
+
+
+class MCPToolDetailsRequest(BaseModel):
+    """Request model for tool details endpoint."""
+
+    tool_id: str
+    include_schema: Optional[bool] = True
+    include_examples: Optional[bool] = True
+
+
+class MCPToolCapabilityRequest(BaseModel):
+    """Request model for tool capability search."""
+
+    capability_description: str
+    required_parameters: Optional[List[str]] = None
+    optional_parameters: Optional[List[str]] = None
+    max_results: Optional[int] = None
+
+
+class MCPTaskRecommendationRequest(BaseModel):
+    """Request model for task-based tool recommendations."""
+
+    task_description: str
+    context: Optional[str] = None
+    max_recommendations: Optional[int] = None
+    include_explanations: Optional[bool] = True
+
+
+class MCPToolComparisonRequest(BaseModel):
+    """Request model for tool comparison."""
+
+    tool_ids: List[str]
+    comparison_criteria: Optional[List[str]] = None
+    include_detailed_analysis: Optional[bool] = True
+
+
+class MCPResponse(BaseModel):
+    """Generic response model for MCP tools."""
+
+    result: str
+    success: bool = True
+    error: Optional[str] = None
 
 
 # API endpoint definitions
@@ -307,3 +394,272 @@ def http_status():
         "embedding_dimensions": DIMENSIONS,
         "model_name": EMBED_MODEL,
     }
+
+
+# MCP Tool HTTP Endpoints
+# These endpoints expose the MCP server functionality via REST API
+
+
+@app.post("/mcp/search_code", response_model=MCPResponse)
+def http_mcp_search_code(req: MCPSearchRequest):
+    """Search code using natural language (semantic search)."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_code(req.query, req.max_results)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_code_structured", response_model=MCPResponse)
+def http_mcp_search_code_structured(req: MCPSearchRequest):
+    """Semantic search with comprehensive JSON metadata."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_code_structured(req.query, req.max_results)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_code_hybrid", response_model=MCPResponse)
+def http_mcp_search_code_hybrid(req: MCPHybridSearchRequest):
+    """Hybrid search combining semantic and keyword matching."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_code_hybrid(
+            req.query, req.search_mode, req.max_results, req.text_weight, req.semantic_weight
+        )
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/index_repository", response_model=MCPResponse)
+def http_mcp_index_repository(req: IndexRequest):
+    """Build searchable index from repository."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.index_repository(req.repo, req.max_mb)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/index_repository_structured", response_model=MCPResponse)
+def http_mcp_index_repository_structured(req: IndexRequest):
+    """Advanced indexing with detailed JSON response."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.index_repository_structured(req.repo, req.max_mb)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/mcp/index_status", response_model=MCPResponse)
+def http_mcp_get_index_status():
+    """Check code index status and health."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.get_index_status()
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/mcp/index_status_structured", response_model=MCPResponse)
+def http_mcp_get_index_status_structured():
+    """Comprehensive index status with JSON metadata."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.get_index_status_structured()
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/mcp/list_indexed_files", response_model=MCPResponse)
+def http_mcp_list_indexed_files(limit: int = 20):
+    """List all files in the search index."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.list_indexed_files(limit)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_functions", response_model=MCPResponse)
+def http_mcp_search_functions(req: MCPSearchRequest):
+    """Search functions and methods semantically."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_functions(req.query, req.max_results)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_classes", response_model=MCPResponse)
+def http_mcp_search_classes(req: MCPConstructSearchRequest):
+    """Search classes semantically."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_classes(req.query, req.max_results, req.include_methods)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_imports", response_model=MCPResponse)
+def http_mcp_search_imports(req: MCPSearchRequest):
+    """Search import statements semantically."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_imports(req.query, req.max_results)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_hybrid_constructs", response_model=MCPResponse)
+def http_mcp_search_hybrid_constructs(req: MCPConstructSearchRequest):
+    """Multi-granularity construct search with configurable weights."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_hybrid_constructs(
+            req.query, req.max_results, req.function_weight, req.class_weight, req.import_weight
+        )
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_mcp_tools", response_model=MCPResponse)
+def http_mcp_search_mcp_tools(req: MCPToolSearchRequest):
+    """Find MCP tools using natural language queries."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_mcp_tools(req.query, req.category, req.max_results, req.include_experimental)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/get_tool_details", response_model=MCPResponse)
+def http_mcp_get_tool_details(req: MCPToolDetailsRequest):
+    """Get detailed information about a specific MCP tool."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.get_tool_details(req.tool_id, req.include_schema, req.include_examples)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/mcp/list_tool_categories", response_model=MCPResponse)
+def http_mcp_list_tool_categories():
+    """Get overview of available tool categories."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.list_tool_categories()
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/search_tools_by_capability", response_model=MCPResponse)
+def http_mcp_search_tools_by_capability(req: MCPToolCapabilityRequest):
+    """Search tools by specific technical capabilities."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.search_tools_by_capability(
+            req.capability_description, req.required_parameters, req.optional_parameters, req.max_results
+        )
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/recommend_tools_for_task", response_model=MCPResponse)
+def http_mcp_recommend_tools_for_task(req: MCPTaskRecommendationRequest):
+    """Get intelligent tool recommendations for a task."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.recommend_tools_for_task(
+            req.task_description, req.context, req.max_recommendations, req.include_explanations
+        )
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/compare_mcp_tools", response_model=MCPResponse)
+def http_mcp_compare_mcp_tools(req: MCPToolComparisonRequest):
+    """Compare multiple MCP tools across various dimensions."""
+    if not mcp_server:
+        raise HTTPException(status_code=500, detail="MCP server not available")
+
+    try:
+        result = mcp_server.compare_mcp_tools(req.tool_ids, req.comparison_criteria, req.include_detailed_analysis)
+        return MCPResponse(result=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def create_server_app():
+    """Factory function to create the FastAPI server app."""
+    return app
+
+
+def main():
+    """Main entry point for running the HTTP server."""
+    import uvicorn
+
+    host = getattr(config.server, "HOST", "127.0.0.1")
+    port = getattr(config.server, "PORT", 8080)
+
+    print(f"🚀 Starting Turboprop HTTP server on {host}:{port}")
+    print(f"📖 API documentation: http://{host}:{port}/docs")
+    print(f"🔍 MCP tools available at /mcp/* endpoints")
+
+    uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    main()

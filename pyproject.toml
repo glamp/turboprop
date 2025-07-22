@@ -89,6 +89,7 @@ cache_dir = ".pytest_cache"
 [project.scripts]
 turboprop = "turboprop.code_index:main"
 turboprop-mcp = "turboprop.mcp_server:main"
+turboprop-server = "turboprop.server:main"
 
 # Build system configuration
 [build-system]
