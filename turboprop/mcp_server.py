@@ -2999,11 +2999,11 @@ def main():
     elif _config["transport"] == "sse":
         # Server-Sent Events transport
         print(f"🚀 Starting SSE server on {_config['host']}:{_config['port']}{_config['path']}", file=sys.stderr)
-        mcp.run(transport="sse", host=_config["host"], port=_config["port"], path=_config["path"])
+        mcp.run(transport="sse", mount_path=_config["path"])
     elif _config["transport"] == "http":
         # Streamable HTTP transport
         print(f"🚀 Starting HTTP server on {_config['host']}:{_config['port']}", file=sys.stderr)
-        mcp.run(transport="http", host=_config["host"], port=_config["port"])
+        mcp.run(transport="streamable-http")
 
 
 if __name__ == "__main__":
