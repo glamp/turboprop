@@ -11,7 +11,14 @@ from typing import Any, Dict, List
 from unittest.mock import Mock
 
 import pytest
-from turboprop.context_analyzer import ContextAnalyzer, EnvironmentalConstraints, ProjectContext, TaskContext, UserContext
+
+from turboprop.context_analyzer import (
+    ContextAnalyzer,
+    EnvironmentalConstraints,
+    ProjectContext,
+    TaskContext,
+    UserContext,
+)
 from turboprop.task_analyzer import TaskAnalysis, TaskAnalyzer
 from turboprop.tool_recommendation_engine import (
     AlternativeRequest,

@@ -236,6 +236,8 @@ mcp = FastMCP("🚀 Turboprop: Semantic Code Search & AI-Powered Discovery")
 _db_connection: Optional[DatabaseManager] = None
 _embedder: Optional[EmbeddingGenerator] = None
 _watcher_thread: Optional[threading.Thread] = None
+_db_init_error: Optional[str] = None
+_embedder_init_error: Optional[str] = None
 _config: Dict[str, Any] = {
     "repository_path": None,
     "max_file_size_mb": config.mcp.DEFAULT_MAX_FILE_SIZE_MB,
@@ -270,15 +272,10 @@ class MCPServerInitializer:
         self.initialization_errors = []
 
     def initialize_database_and_embedder(self) -> tuple[bool, Optional[str]]:
-        """Initialize database and embedder components."""
-        try:
-            get_db_connection()
-            get_embedder()
-            return True, None
-        except Exception as e:
-            error_msg = f"Failed to initialize database/embedder: {e}"
-            self.initialization_errors.append(error_msg)
-            return False, error_msg
+        """Skip blocking database/embedder initialization - now lazy loaded."""
+        # Database and embedder are now initialized lazily when first needed
+        print("📦 Core components configured for lazy initialization", file=sys.stderr)
+        return True, None
 
     def run_smart_auto_index(self) -> bool:
         """Run smart auto-indexing if configured."""
@@ -561,34 +558,89 @@ class MCPServerInitializer:
 
 
 def get_db_connection():
-    """Get or create the database connection."""
-    global _db_connection
+    """Get or create the database connection with lazy initialization."""
+    global _db_connection, _db_init_error
     with _db_connection_lock:
         if _db_connection is None:
-            if _config["repository_path"]:
-                repo_path = Path(_config["repository_path"])
-                _db_connection = init_db(repo_path)
-            else:
-                # Use current directory as fallback
-                _db_connection = init_db(Path.cwd())
+            # If we had a previous initialization error, re-raise it
+            if _db_init_error:
+                raise Exception(f"Database initialization failed: {_db_init_error}")
+
+            try:
+                if _config["repository_path"]:
+                    repo_path = Path(_config["repository_path"])
+                    _db_connection = init_db(repo_path)
+                else:
+                    # Use current directory as fallback
+                    _db_connection = init_db(Path.cwd())
+                print("✅ Database connection initialized successfully", file=sys.stderr)
+            except Exception as e:
+                _db_init_error = str(e)
+                print(f"❌ Failed to initialize database connection: {e}", file=sys.stderr)
+                raise
         return _db_connection
 
 
 def get_embedder():
-    """Get or create the embedding generator with proper MPS handling."""
-    global _embedder
+    """Get or create the embedding generator with lazy initialization."""
+    global _embedder, _embedder_init_error
     if _embedder is None:
+        # If we had a previous initialization error, re-raise it
+        if _embedder_init_error:
+            raise Exception(f"Embedder initialization failed: {_embedder_init_error}")
+
         # Initialize ML model using our reliable EmbeddingGenerator class
         try:
             _embedder = EmbeddingGenerator(config.embedding.EMBED_MODEL)
             print("✅ Embedding generator initialized successfully", file=sys.stderr)
         except Exception as e:
+            _embedder_init_error = str(e)
             print(f"❌ Failed to initialize embedding generator: {e}", file=sys.stderr)
             raise
     return _embedder
 
 
+def get_initialization_status():
+    """Get current initialization status of core components."""
+    db_status = "ready" if _db_connection else ("error" if _db_init_error else "not_initialized")
+    embedder_status = "ready" if _embedder else ("error" if _embedder_init_error else "not_initialized")
+
+    return {
+        "database": {"status": db_status, "error": _db_init_error if _db_init_error else None},
+        "embedder": {"status": embedder_status, "error": _embedder_init_error if _embedder_init_error else None},
+    }
+
+
+def handle_initialization_errors(func):
+    """Decorator to gracefully handle initialization errors in tools."""
+
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_msg = str(e)
+            if "Database initialization failed" in error_msg or "Embedder initialization failed" in error_msg:
+                return f"""🔄 **Initialization Required**
+
+The requested operation requires core components that haven't been initialized yet.
+
+**Error Details:** {error_msg}
+
+**What you can do:**
+1. Check server status with the status tool to see initialization state
+2. Try the operation again - components initialize automatically on first use
+3. If the error persists, there may be a configuration issue
+
+**Note:** This is normal on first use - components initialize lazily for faster server startup."""
+            else:
+                # Re-raise non-initialization errors
+                raise e
+
+    return wrapper
+
+
 @mcp.tool()
+@handle_initialization_errors
 def index_repository(
     repository_path: str = None,
     max_file_size_mb: float = None,
@@ -689,6 +741,7 @@ def index_repository(
 
 
 @mcp.tool()
+@handle_initialization_errors
 def search_code(query: str, max_results: int = None) -> str:
     """
     🔍 TURBOPROP: Search code using natural language (SEMANTIC SEARCH!)
@@ -854,6 +907,7 @@ def search_code_structured(query: str, max_results: int = None) -> str:
 
 
 @mcp.tool()
+@handle_initialization_errors
 def search_code_hybrid(
     query: str,
     search_mode: str = "auto",
@@ -1381,40 +1435,67 @@ def get_index_status() -> str:
         Complete status report with all index metrics
     """
     try:
-        con = get_db_connection()
+        # Get initialization status first
+        init_status = get_initialization_status()
 
-        # Get file count
-        file_count = con.execute(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}").fetchone()[0]
+        status_info = ["Server Status:"]
 
-        # Get database size
-        db_size_mb = 0
-        if _config["repository_path"]:
-            db_path = Path(_config["repository_path"]) / ".turboprop" / "code_index.duckdb"
+        # Add initialization status
+        db_status = init_status["database"]["status"]
+        embedder_status = init_status["embedder"]["status"]
+
+        status_info.append(f"  Database: {db_status}")
+        if db_status == "error":
+            status_info.append(f"    Error: {init_status['database']['error']}")
+
+        status_info.append(f"  Embedder: {embedder_status}")
+        if embedder_status == "error":
+            status_info.append(f"    Error: {init_status['embedder']['error']}")
+
+        # Only try to get index info if database is ready
+        if db_status == "ready":
+            con = get_db_connection()
+
+            # Get file count
+            file_count = con.execute(f"SELECT COUNT(*) FROM {config.database.TABLE_NAME}").fetchone()[0]
+
+            # Get database size
+            db_size_mb = 0
+            if _config["repository_path"]:
+                db_path = Path(_config["repository_path"]) / ".turboprop" / "code_index.duckdb"
+            else:
+                db_path = Path.cwd() / ".turboprop" / "code_index.duckdb"
+
+            if db_path.exists():
+                db_size_mb = db_path.stat().st_size / (1024 * 1024)
+
+            # Check if index is ready
+            index_ready = file_count > 0
+
+            status_info.extend(
+                [
+                    "",
+                    "Index Status:",
+                    f"  Files indexed: {file_count}",
+                    f"  Database size: {db_size_mb:.2f} MB",
+                    f"  Search ready: {'Yes' if index_ready else 'No'}",
+                    f"  Database path: {db_path}",
+                    f"  Embedding model: {config.embedding.EMBED_MODEL} ({config.embedding.DIMENSIONS} dimensions)",
+                    f"  Configured repository: {_config['repository_path'] or 'Not configured'}",
+                ]
+            )
+
+            if file_count == 0:
+                status_info.append("\nTo get started, use the index_repository tool to index a code repository.")
+
         else:
-            db_path = Path.cwd() / ".turboprop" / "code_index.duckdb"
-
-        if db_path.exists():
-            db_size_mb = db_path.stat().st_size / (1024 * 1024)
-
-        # Check if index is ready
-        index_ready = file_count > 0
+            status_info.append(
+                "\nCore components not yet initialized. Database and embedder will initialize on first use."
+            )
 
         # Check watcher status
         watcher_status = "Running" if _watcher_thread and _watcher_thread.is_alive() else "Not running"
-
-        status_info = [
-            "Index Status:",
-            f"  Files indexed: {file_count}",
-            f"  Database size: {db_size_mb:.2f} MB",
-            f"  Search ready: {'Yes' if index_ready else 'No'}",
-            f"  Database path: {db_path}",
-            f"  Embedding model: {config.embedding.EMBED_MODEL} ({config.embedding.DIMENSIONS} dimensions)",
-            f"  Configured repository: " f"{_config['repository_path'] or 'Not configured'}",
-            f"  File watcher: {watcher_status}",
-        ]
-
-        if file_count == 0:
-            status_info.append("\nTo get started, use the index_repository tool to index a code " "repository.")
+        status_info.append(f"  File watcher: {watcher_status}")
 
         return "\n".join(status_info)
 
@@ -1823,6 +1904,7 @@ def search_imports(query: str, max_results: int = None) -> str:
 
 
 @mcp.tool()
+@handle_initialization_errors
 def search_hybrid_constructs(
     query: str,
     max_results: int = None,

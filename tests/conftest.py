@@ -839,22 +839,22 @@ def quick_git_repo(temp_root_dir):
     """Create a minimal Git repository quickly without subprocess calls."""
     repo_path = temp_root_dir / "quick_repo"
     repo_path.mkdir(exist_ok=True)
-    
+
     # Create minimal .git directory structure
     git_dir = repo_path / ".git"
     git_dir.mkdir()
     (git_dir / "HEAD").write_text("ref: refs/heads/main\n")
     (git_dir / "config").write_text("[core]\n    repositoryformatversion = 0\n")
-    
+
     # Create refs structure
     refs_dir = git_dir / "refs" / "heads"
     refs_dir.mkdir(parents=True)
     (refs_dir / "main").write_text("fake_commit_hash\n")
-    
+
     # Create test files
     (repo_path / "main.py").write_text("print('hello world')")
     (repo_path / "utils.py").write_text("def helper(): pass")
-    
+
     yield repo_path
 
 

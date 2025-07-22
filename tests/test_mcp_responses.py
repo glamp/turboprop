@@ -11,6 +11,7 @@ import json
 from unittest.mock import Mock
 
 import pytest
+
 from turboprop.mcp_response_types import (
     IndexResponse,
     QueryAnalysis,

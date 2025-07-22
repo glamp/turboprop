@@ -209,7 +209,7 @@ class CodeSearchResult:
                 # If we can't read the file, skip syntax highlighting
                 return
 
-        from ide_integration import ide_integration
+        from . import ide_integration
 
         self.syntax_highlighting_hints = ide_integration.generate_syntax_hints(
             self.file_path, file_content, self.snippet.start_line

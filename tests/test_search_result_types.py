@@ -9,6 +9,7 @@ in search results, providing structured data for AI reasoning.
 from decimal import Decimal
 
 import pytest
+
 from turboprop.search_result_types import CodeSearchResult, CodeSnippet, SearchMetadata
 
 # Test constants for improved maintainability

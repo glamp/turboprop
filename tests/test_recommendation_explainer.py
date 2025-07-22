@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import pytest
+
 from turboprop.recommendation_algorithms import ToolRecommendation
 from turboprop.recommendation_explainer import (
     AlternativeComparison,

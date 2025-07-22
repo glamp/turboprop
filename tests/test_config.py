@@ -238,6 +238,7 @@ class TestDatabaseConfig:
         """Test DatabaseConfig with environment variable override."""
         # Need to reload the module to pick up new env vars
         import importlib
+
         from turboprop import config as config_module
 
         importlib.reload(config_module)
@@ -251,14 +252,15 @@ class TestDatabaseConfig:
         """Test DatabaseConfig with invalid environment variable."""
         # This should fail during class initialization
         import importlib
-        from turboprop import config as config_module
 
+        from turboprop import config as config_module
         from turboprop.config import config
 
         # Manually check for the exception
         try:
             importlib.reload(config_module)
             from turboprop.config import config
+
             # If we get here, the test should fail
             assert False, "Expected ConfigValidationError to be raised"
         except Exception as e:
@@ -423,6 +425,7 @@ class TestEnvironmentVariableHandling:
         with patch.dict(os.environ, env_vars):
             # Need to reload the module to pick up new env vars
             import importlib
+
             from turboprop import config as config_module
 
             importlib.reload(config_module)
@@ -449,11 +452,13 @@ class TestEnvironmentVariableHandling:
             with patch.dict(os.environ, {env_var: invalid_value}):
                 # This should fail during module reload
                 import importlib
+
                 from turboprop import config as config_module
 
                 try:
                     importlib.reload(config_module)
                     from turboprop.config import config
+
                     # If we get here, the test should fail
                     assert False, f"Expected ConfigValidationError to be raised " f"for {env_var}={invalid_value}"
                 except Exception as e:
@@ -488,10 +493,12 @@ class TestBoundaryConditions:
         # Other validators should handle leading/trailing whitespace
         with patch.dict(os.environ, {"TURBOPROP_DB_THREADS": " 4 "}):
             import importlib
+
             from turboprop import config as config_module
 
             importlib.reload(config_module)
             from turboprop.config import config
+
             assert config.database.THREADS == 4
 
     def test_very_large_numbers(self):
@@ -511,7 +518,7 @@ class TestYAMLConfigurationIntegration:
         """Test that YAML configuration overrides default values."""
         import tempfile
         from pathlib import Path
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a test YAML config file
             config_file = Path(temp_dir) / ".turboprop.yml"
@@ -522,34 +529,37 @@ database:
   auto_vacuum: false
             """
             config_file.write_text(config_content)
-            
+
             # Change to the temp directory
             import os
+
             original_cwd = os.getcwd()
             try:
                 os.chdir(temp_dir)
-                
+
                 # Reload the config module to pick up the new YAML file
                 import importlib
+
                 from turboprop import config as config_module
+
                 importlib.reload(config_module)
                 from turboprop.config import config
-                
+
                 # Check that YAML values are used
                 assert config.database.THREADS == 12
                 assert config.database.MEMORY_LIMIT == "3GB"
                 assert config.database.AUTO_VACUUM is False
-                
+
             finally:
                 os.chdir(original_cwd)
 
     def test_environment_variables_override_yaml(self):
         """Test that environment variables override YAML configuration."""
-        import tempfile
         import os
+        import tempfile
         from pathlib import Path
         from unittest.mock import patch
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a test YAML config file
             config_file = Path(temp_dir) / ".turboprop.yml"
@@ -559,53 +569,54 @@ database:
   memory_limit: "3GB"
             """
             config_file.write_text(config_content)
-            
+
             # Set environment variables that should override YAML
-            env_vars = {
-                "TURBOPROP_DB_THREADS": "16",
-                "TURBOPROP_DB_MEMORY_LIMIT": "4GB"
-            }
-            
+            env_vars = {"TURBOPROP_DB_THREADS": "16", "TURBOPROP_DB_MEMORY_LIMIT": "4GB"}
+
             original_cwd = os.getcwd()
             try:
                 os.chdir(temp_dir)
-                
+
                 with patch.dict(os.environ, env_vars):
                     # Reload the config module
                     import importlib
+
                     from turboprop import config as config_module
+
                     importlib.reload(config_module)
                     from turboprop.config import config
-                    
+
                     # Environment variables should override YAML
                     assert config.database.THREADS == 16
                     assert config.database.MEMORY_LIMIT == "4GB"
-                    
+
             finally:
                 os.chdir(original_cwd)
 
     def test_fallback_to_defaults_without_yaml_or_env(self):
         """Test fallback to defaults when neither YAML nor env vars are set."""
-        import tempfile
         import os
-        
+        import tempfile
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # No YAML file, no environment variables
             original_cwd = os.getcwd()
             try:
                 os.chdir(temp_dir)
-                
+
                 # Reload the config module
                 import importlib
+
                 from turboprop import config as config_module
+
                 importlib.reload(config_module)
                 from turboprop.config import config
-                
+
                 # Should use default values
                 assert config.database.THREADS == 4  # default
                 assert config.database.MEMORY_LIMIT == "1GB"  # default
                 assert config.database.AUTO_VACUUM is True  # default
-                
+
             finally:
                 os.chdir(original_cwd)
 

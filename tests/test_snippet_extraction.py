@@ -13,6 +13,7 @@ Tests for the snippet_extractor module including:
 from unittest.mock import Mock
 
 import pytest
+
 from turboprop.language_detection import LanguageDetectionResult, LanguageDetector
 from turboprop.search_result_types import CodeSnippet
 from turboprop.snippet_extractor import (

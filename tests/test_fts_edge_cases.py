@@ -20,6 +20,7 @@ from unittest.mock import Mock, patch
 
 import duckdb
 import pytest
+
 from turboprop.database_manager import DatabaseManager
 from turboprop.hybrid_search import HybridSearchEngine, SearchMode
 

@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
+
 from turboprop.code_construct_extractor import CodeConstructExtractor
 from turboprop.code_index import init_db, reindex_all, search_index
 from turboprop.config import config

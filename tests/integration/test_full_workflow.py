@@ -16,6 +16,7 @@ import time
 from unittest.mock import Mock, patch
 
 import pytest
+
 from turboprop.code_index import (
     DebouncedHandler,
     build_full_index,

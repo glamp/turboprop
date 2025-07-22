@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 
 import duckdb
 import pytest
+
 from turboprop.code_index import embed_and_store, init_db, reindex_all, scan_repo, search_index
 from turboprop.config import config
 from turboprop.database_manager import DatabaseManager

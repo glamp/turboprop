@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
+
 from turboprop.database_manager import DatabaseManager
 from turboprop.embedding_helper import EmbeddingGenerator
 from turboprop.mcp_metadata_extractor import MCPMetadataExtractor

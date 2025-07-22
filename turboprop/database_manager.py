@@ -501,7 +501,7 @@ class DatabaseManager:
         This table stores individual programming constructs (functions, classes, variables, etc.)
         with their own embeddings for more granular search capabilities.
         """
-        logger.info("Creating code_constructs table")
+        logger.debug("Creating code_constructs table")
 
         create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS code_constructs (
@@ -535,7 +535,7 @@ class DatabaseManager:
                 for index_sql in create_indexes_sql:
                     conn.execute(index_sql)
 
-                logger.info("Successfully created code_constructs table with indexes")
+                logger.debug("Successfully created code_constructs table with indexes")
 
         except Exception as e:
             logger.error("Failed to create code_constructs table: %s", e)

@@ -26,7 +26,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .yaml_config import load_yaml_config, get_config_value
+from .yaml_config import get_config_value, load_yaml_config
+
 
 def _get_yaml_config() -> Dict[str, Any]:
     """Get YAML configuration, loading it fresh each time for dynamic behavior."""
@@ -37,32 +38,27 @@ def _get_yaml_config() -> Dict[str, Any]:
         return {}
 
 
-def get_config_with_fallback(
-    yaml_key: str, 
-    env_var: str, 
-    default: Any, 
-    validator=None
-) -> Any:
+def get_config_with_fallback(yaml_key: str, env_var: str, default: Any, validator=None) -> Any:
     """
     Get configuration value with fallback chain: environment -> YAML -> default.
-    
+
     Args:
         yaml_key: Dot-separated key path in YAML (e.g., "database.threads")
         env_var: Environment variable name
         default: Default value
         validator: Optional validation function
-        
+
     Returns:
         Configuration value, validated if validator provided
     """
     # Load YAML config fresh to pick up any changes
     yaml_config = _get_yaml_config()
-    
+
     # First try environment variable, then YAML, then default
     value = get_config_value(yaml_config, yaml_key, None, env_var)
     if value is None:
         value = default
-    
+
     # Apply validation if provided
     if validator is not None and value is not None:
         # Convert to string for validation (environment variables are strings)
@@ -70,7 +66,7 @@ def get_config_with_fallback(
             value = str(value)
         # Call validator with the expected signature (value, var_name)
         return validator(value, env_var)
-    
+
     return value
 
 
@@ -202,7 +198,10 @@ class DatabaseConfig:
 
     # Connection pool and timeout settings
     MAX_CONNECTIONS_PER_THREAD: int = get_config_with_fallback(
-        "database.max_connections_per_thread", "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD", 1, _validate_positive_int_wrapper
+        "database.max_connections_per_thread",
+        "TURBOPROP_DB_MAX_CONNECTIONS_PER_THREAD",
+        1,
+        _validate_positive_int_wrapper,
     )
     CONNECTION_TIMEOUT: float = get_config_with_fallback(
         "database.connection_timeout", "TURBOPROP_DB_CONNECTION_TIMEOUT", 30.0, _validate_positive_float_wrapper
@@ -240,11 +239,16 @@ class DatabaseConfig:
         "database.connection_max_age", "TURBOPROP_DB_CONNECTION_MAX_AGE", 3600.0, _validate_positive_float_wrapper
     )  # 1 hour
     CONNECTION_IDLE_TIMEOUT: float = get_config_with_fallback(
-        "database.connection_idle_timeout", "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT", 300.0, _validate_positive_float_wrapper
+        "database.connection_idle_timeout",
+        "TURBOPROP_DB_CONNECTION_IDLE_TIMEOUT",
+        300.0,
+        _validate_positive_float_wrapper,
     )  # 5 minutes
     CONNECTION_HEALTH_CHECK_INTERVAL: float = get_config_with_fallback(
-        "database.connection_health_check_interval", "TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL", 
-        60.0, _validate_positive_float_wrapper
+        "database.connection_health_check_interval",
+        "TURBOPROP_DB_CONNECTION_HEALTH_CHECK_INTERVAL",
+        60.0,
+        _validate_positive_float_wrapper,
     )  # 1 minute
 
     @classmethod

@@ -13,6 +13,7 @@ This module tests all aspects of the construct search implementation including:
 from unittest.mock import Mock, patch
 
 import pytest
+
 from turboprop.construct_search import ConstructSearchOperations, ConstructSearchResult, format_construct_search_results
 from turboprop.database_manager import DatabaseManager
 from turboprop.embedding_helper import EmbeddingGenerator

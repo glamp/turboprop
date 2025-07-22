@@ -9,6 +9,7 @@ comprehensive tool recommendations with explanations and context awareness.
 from unittest.mock import Mock
 
 import pytest
+
 from turboprop.context_analyzer import ContextAnalyzer
 from turboprop.task_analyzer import TaskAnalyzer
 from turboprop.tool_recommendation_engine import RecommendationRequest, ToolRecommendationEngine

@@ -18,8 +18,8 @@ Example usage:
     max_results = get_config_value(config_data, "search.default_max_results", 5)
 """
 
-import os
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -27,8 +27,7 @@ try:
     import yaml
 except ImportError:
     raise ImportError(
-        "PyYAML is required for YAML configuration support. "
-        "Please install it with: pip install PyYAML>=6.0"
+        "PyYAML is required for YAML configuration support. " "Please install it with: pip install PyYAML>=6.0"
     )
 
 logger = logging.getLogger(__name__)
@@ -36,16 +35,17 @@ logger = logging.getLogger(__name__)
 
 class YAMLConfigError(Exception):
     """Exception raised when YAML configuration loading fails."""
+
     pass
 
 
 def find_config_file(directory: Optional[Union[str, Path]] = None) -> Optional[Path]:
     """
     Find .turboprop.yml configuration file in the specified directory.
-    
+
     Args:
         directory: Directory to search in. Defaults to current working directory.
-        
+
     Returns:
         Path to .turboprop.yml file if found, None otherwise.
     """
@@ -53,66 +53,59 @@ def find_config_file(directory: Optional[Union[str, Path]] = None) -> Optional[P
         directory = Path.cwd()
     else:
         directory = Path(directory)
-        
+
     config_file = directory / ".turboprop.yml"
-    
+
     if config_file.exists() and config_file.is_file():
         return config_file
-    
+
     return None
 
 
 def load_yaml_config(directory: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
     """
     Load YAML configuration from .turboprop.yml file.
-    
+
     Args:
         directory: Directory containing .turboprop.yml. Defaults to current directory.
-        
+
     Returns:
         Dictionary containing parsed YAML configuration, or empty dict if no file found.
-        
+
     Raises:
         YAMLConfigError: If YAML file exists but cannot be parsed.
     """
     config_file = find_config_file(directory)
-    
+
     if config_file is None:
         logger.debug("No .turboprop.yml file found, using environment variables and defaults")
         return {}
-    
+
     try:
-        with open(config_file, 'r', encoding='utf-8') as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
-            
+
         logger.info(f"Loaded YAML configuration from {config_file}")
         return config_data
-        
+
     except yaml.YAMLError as e:
-        raise YAMLConfigError(
-            f"Failed to parse YAML configuration file {config_file}: {e}"
-        ) from e
+        raise YAMLConfigError(f"Failed to parse YAML configuration file {config_file}: {e}") from e
     except (OSError, IOError) as e:
-        raise YAMLConfigError(
-            f"Failed to read configuration file {config_file}: {e}"
-        ) from e
+        raise YAMLConfigError(f"Failed to read configuration file {config_file}: {e}") from e
 
 
 def get_config_value(
-    config_data: Dict[str, Any], 
-    key_path: str, 
-    default: Any = None,
-    env_var: Optional[str] = None
+    config_data: Dict[str, Any], key_path: str, default: Any = None, env_var: Optional[str] = None
 ) -> Any:
     """
     Get configuration value with fallback chain: environment -> YAML -> default.
-    
+
     Args:
         config_data: Parsed YAML configuration data
         key_path: Dot-separated path to config value (e.g., "database.threads")
         default: Default value if not found in environment or YAML
         env_var: Environment variable name to check first
-        
+
     Returns:
         Configuration value from environment, YAML, or default (in that order)
     """
@@ -121,12 +114,12 @@ def get_config_value(
         env_value = os.getenv(env_var)
         if env_value is not None:
             return env_value
-    
+
     # Then try to get from YAML config
     yaml_value = _get_nested_value(config_data, key_path)
     if yaml_value is not None:
         return yaml_value
-    
+
     # Finally return default
     return default
 
@@ -134,58 +127,55 @@ def get_config_value(
 def _get_nested_value(data: Dict[str, Any], key_path: str) -> Any:
     """
     Get a nested value from a dictionary using dot notation.
-    
+
     Args:
         data: Dictionary to search
         key_path: Dot-separated path (e.g., "database.threads")
-        
+
     Returns:
         Value if found, None otherwise
     """
     if not key_path:
         return None
-        
-    keys = key_path.split('.')
+
+    keys = key_path.split(".")
     current = data
-    
+
     for key in keys:
         if not isinstance(current, dict) or key not in current:
             return None
         current = current[key]
-    
+
     return current
 
 
 def validate_yaml_structure(config_data: Dict[str, Any]) -> bool:
     """
     Validate that the YAML configuration has the expected structure.
-    
+
     Args:
         config_data: Parsed YAML configuration data
-        
+
     Returns:
         True if structure is valid, False otherwise
     """
     if not isinstance(config_data, dict):
         return False
-    
+
     # Define expected top-level sections
-    valid_sections = {
-        'database', 'file_processing', 'search', 'embedding', 
-        'server', 'logging', 'mcp'
-    }
-    
+    valid_sections = {"database", "file_processing", "search", "embedding", "server", "logging", "mcp"}
+
     # Check that all keys are valid section names
     for key in config_data.keys():
         if key not in valid_sections:
             logger.warning(f"Unknown configuration section: {key}")
-    
+
     # Check that each section is a dictionary
     for key, value in config_data.items():
         if key in valid_sections and not isinstance(value, dict):
             logger.error(f"Configuration section '{key}' must be a dictionary")
             return False
-    
+
     return True
 
 
@@ -193,37 +183,38 @@ def merge_configs(yaml_config: Dict[str, Any], env_config: Dict[str, Any]) -> Di
     """
     Merge YAML and environment-based configurations.
     Environment variables take precedence over YAML values.
-    
+
     Args:
         yaml_config: Configuration loaded from YAML file
         env_config: Configuration derived from environment variables
-        
+
     Returns:
         Merged configuration dictionary
     """
+
     def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Recursively merge two dictionaries."""
         result = base.copy()
-        
+
         for key, value in override.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = deep_merge(result[key], value)
             else:
                 result[key] = value
-                
+
         return result
-    
+
     return deep_merge(yaml_config, env_config)
 
 
 def create_sample_config() -> str:
     """
     Create a sample .turboprop.yml configuration file content.
-    
+
     Returns:
         String containing sample YAML configuration with comments
     """
-    return '''# Turboprop Configuration File
+    return """# Turboprop Configuration File
 # This file configures the semantic code search and indexing system.
 # All settings are optional - if not specified, environment variables 
 # (TURBOPROP_*) and built-in defaults will be used.
@@ -293,16 +284,16 @@ mcp:
   default_max_recommendations: 5   # Default max tool recommendations
   default_max_alternatives: 5      # Default max alternative tools
   max_task_description_length: 2000 # Maximum task description length
-'''
+"""
 
 
 def get_config_file_path(directory: Optional[Union[str, Path]] = None) -> Path:
     """
     Get the path where the .turboprop.yml configuration file should be located.
-    
+
     Args:
         directory: Directory path. Defaults to current working directory.
-        
+
     Returns:
         Path to .turboprop.yml file (may or may not exist)
     """
@@ -310,5 +301,5 @@ def get_config_file_path(directory: Optional[Union[str, Path]] = None) -> Path:
         directory = Path.cwd()
     else:
         directory = Path(directory)
-        
+
     return directory / ".turboprop.yml"

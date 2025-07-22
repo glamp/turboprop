@@ -19,7 +19,12 @@ from turboprop.comparison_metrics import ComparisonMetrics
 from turboprop.context_analyzer import TaskContext
 from turboprop.decision_support import DecisionSupport, SelectionGuidance, TradeOffAnalysis
 from turboprop.mcp_metadata_types import ParameterAnalysis, ToolId
-from turboprop.tool_comparison_engine import DetailedComparison, TaskComparisonResult, ToolComparisonEngine, ToolComparisonResult
+from turboprop.tool_comparison_engine import (
+    DetailedComparison,
+    TaskComparisonResult,
+    ToolComparisonEngine,
+    ToolComparisonResult,
+)
 from turboprop.tool_search_results import ToolSearchResult
 
 

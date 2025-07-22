@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import duckdb
 import pytest
+
 from turboprop.database_manager import DatabaseManager
 
 

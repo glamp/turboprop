@@ -12,7 +12,13 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from turboprop.code_index import check_index_freshness, embed_and_store, get_last_index_time, has_repository_changed, init_db
+from turboprop.code_index import (
+    check_index_freshness,
+    embed_and_store,
+    get_last_index_time,
+    has_repository_changed,
+    init_db,
+)
 from turboprop.config import config
 
 # For backward compatibility in tests

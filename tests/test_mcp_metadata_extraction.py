@@ -10,6 +10,7 @@ recognition, and example generation.
 from unittest.mock import Mock, patch
 
 import pytest
+
 from turboprop.docstring_parser import DocstringParser
 from turboprop.example_generator import ExampleGenerator
 

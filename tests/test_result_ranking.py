@@ -12,9 +12,16 @@ from typing import List
 from unittest.mock import Mock, patch
 
 import pytest
+
 from turboprop.ranking_exceptions import InvalidRankingWeightsError
 from turboprop.ranking_scorers import ConstructTypeScorer, FileSizeScorer, FileTypeScorer, RecencyScorer
-from turboprop.ranking_utils import ConfidenceScorer, MatchReason, MatchReasonGenerator, RankingContext, ResultDeduplicator
+from turboprop.ranking_utils import (
+    ConfidenceScorer,
+    MatchReason,
+    MatchReasonGenerator,
+    RankingContext,
+    ResultDeduplicator,
+)
 from turboprop.result_ranking import (
     RankingWeights,
     ResultRanker,

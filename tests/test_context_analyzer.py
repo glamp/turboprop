@@ -8,6 +8,7 @@ based on user context, project requirements, and environmental constraints.
 
 
 import pytest
+
 from turboprop.context_analyzer import (
     ContextAnalyzer,
     EnvironmentalConstraints,

@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
     "benchmark" not in pytest.config.option.markexpr
     if hasattr(pytest, "config") and hasattr(pytest.config, "option") and hasattr(pytest.config.option, "markexpr")
     else True,
-    reason="Performance tests skipped (use --benchmark to run)"
+    reason="Performance tests skipped (use --benchmark to run)",
 )
 from turboprop.code_index import init_db, reindex_all, scan_repo, search_index
 from turboprop.config import config
