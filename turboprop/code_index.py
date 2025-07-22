@@ -1249,10 +1249,19 @@ Perfect for AI-assisted development workflows.
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic usage with stdio transport (default)
   turboprop mcp --repository .                     # Start MCP server for current dir
   turboprop mcp --repository /path/to/repo         # Index specific repository
   turboprop mcp --repository . --max-mb 2.0        # Allow larger files
   turboprop mcp --repository . --no-auto-index     # Don't auto-index on startup
+  
+  # HTTP transport for web integration
+  turboprop mcp --transport http --host 0.0.0.0 --port 9000
+  turboprop mcp --transport http --repository /path/to/repo
+  
+  # SSE transport for streaming connections
+  turboprop mcp --transport sse --host 127.0.0.1 --port 8080
+  turboprop mcp --transport sse --path /custom-sse-path
 
 💡 Pro Tip: Use with Claude Code or other MCP clients for AI-powered code exploration.
         """,
@@ -1299,6 +1308,30 @@ Examples:
         action="store_false",
         dest="auto_watch",
         help="Don't automatically watch for file changes",
+    )
+    
+    # Transport options
+    p_m.add_argument(
+        "--transport",
+        choices=["stdio", "http", "sse"],
+        default="stdio",
+        help="Transport method for MCP communication (default: stdio)",
+    )
+    p_m.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to for HTTP/SSE transport (default: 127.0.0.1)",
+    )
+    p_m.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind to for HTTP/SSE transport (default: 8080)",
+    )
+    p_m.add_argument(
+        "--path",
+        default="/sse",
+        help="Path for SSE endpoint (default: /sse)",
     )
 
 
@@ -1552,6 +1585,13 @@ def handle_mcp_command(args):
             mcp_args.append("--no-auto-index")
         if not args.auto_watch:
             mcp_args.append("--no-auto-watch")
+        
+        # Add transport options
+        mcp_args.extend(["--transport", args.transport])
+        if args.transport != "stdio":
+            mcp_args.extend(["--host", args.host, "--port", str(args.port)])
+            if args.transport == "sse":
+                mcp_args.extend(["--path", args.path])
 
         # Override sys.argv for MCP server
         original_argv = sys.argv[:]
